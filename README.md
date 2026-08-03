@@ -18,7 +18,6 @@ Database:
 
 - MongoDB Atlas
 
-
 ## Run Project
 
 Install:
@@ -29,12 +28,13 @@ Start:
 
 npm run dev
 
-## Deployment
-
-Deploy using Netlify.
 npm install -g netlify-cli
 
 netlify dev
+
+## Deployment
+
+Deploy using Netlify.
 
 #Running Locally
 npm install
