@@ -1,0 +1,13 @@
+node_modules/
+
+.env
+
+dist/
+
+frontend/node_modules/
+
+.netlify/
+
+.vscode/
+
+*.log
