@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 interface Column<T> {
   key: keyof T;
   label: string;
