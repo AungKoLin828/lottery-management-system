@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { Wallet } from "@/types/wallet";
 import type { Transaction } from "@/types/transaction";
 import type { DepositRequest } from "@/types/deposit";
+import type { WithdrawRequest } from "@/types/withdraw";
 
 import Button from "@/components/common/Button";
 import Input from "@/components/common/Input";
@@ -54,7 +55,7 @@ export default function BalanceManagement() {
 
       playerId: "P001",
 
-      playerName: "Mg Mg",
+      playerName: "Maung Maung",
 
       phone: "09123456789",
 
@@ -87,6 +88,22 @@ export default function BalanceManagement() {
       status: "Pending",
 
       createdAt: "2026-08-05",
+    },
+  ]);
+
+  // sample data
+
+  const [withdrawRequests, setWithdrawRequests] = useState<WithdrawRequest[]>([
+    {
+      id: 1,
+      playerId: "P001",
+      playerName: "Mg Mg",
+      phone: "09123456789",
+      requestedAmount: 3000,
+      paymentMethod: "KBZPay",
+      accountNumber: "09123456789",
+      status: "Pending",
+      createdAt: "2026-08-06",
     },
   ]);
 
@@ -267,6 +284,90 @@ export default function BalanceManagement() {
     setTransactions((prev) => [transaction, ...prev]);
   };
 
+  const handleApproveWithdraw = (req: WithdrawRequest) => {
+    const amount = req.requestedAmount;
+
+    const wallet = wallets.find((w) => w.playerId === req.playerId);
+
+    if (!wallet) return;
+
+    if (wallet.balance < amount) {
+      alert("Insufficient wallet balance");
+      return;
+    }
+
+    // Deduct balance
+
+    setWallets((prev) =>
+      prev.map((wallet) =>
+        wallet.playerId === req.playerId
+          ? {
+              ...wallet,
+              balance: wallet.balance - amount,
+            }
+          : wallet,
+      ),
+    );
+
+    // Add transaction
+
+    const transaction: Transaction = {
+      id: Date.now(),
+
+      playerId: req.playerId,
+
+      playerName: req.playerName,
+
+      type: "Withdraw",
+
+      amount,
+
+      paymentMethod: req.paymentMethod,
+
+      transactionNumber: req.accountNumber,
+
+      note: "Withdraw approved",
+
+      createdBy: "admin",
+
+      createdAt: new Date().toISOString().split("T")[0],
+    };
+
+    setTransactions((prev) => [transaction, ...prev]);
+
+    // update status
+
+    setWithdrawRequests((prev) =>
+      prev.map((item) =>
+        item.id === req.id
+          ? {
+              ...item,
+              status: "Approved",
+            }
+          : item,
+      ),
+    );
+  };
+
+  const handleRejectWithdraw = (req: WithdrawRequest) => {
+    const confirmReject = window.confirm(
+      `Reject withdraw request from ${req.playerName}?`,
+    );
+
+    if (!confirmReject) return;
+
+    setWithdrawRequests((prev) =>
+      prev.map((item) =>
+        item.id === req.id
+          ? {
+              ...item,
+              status: "Rejected",
+            }
+          : item,
+      ),
+    );
+  };
+
   return (
     <div>
       {/* Header */}
@@ -377,6 +478,65 @@ export default function BalanceManagement() {
                     </Button>
 
                     <Button variant="danger" onClick={() => handleReject(req)}>
+                      Reject
+                    </Button>
+                  </>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <h2 className="text-xl font-bold mt-8 mb-4">Withdraw Requests</h2>
+
+      <table className="w-full bg-white shadow rounded">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="p-3">Player</th>
+
+            <th>Amount</th>
+
+            <th>Method</th>
+
+            <th>Account</th>
+
+            <th>Status</th>
+
+            <th>Action</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {withdrawRequests.map((req) => (
+            <tr key={req.id} className="border-b">
+              <td className="p-3">{req.playerName}</td>
+
+              <td>
+                {req.requestedAmount.toLocaleString()}
+                MMK
+              </td>
+
+              <td>{req.paymentMethod}</td>
+
+              <td>{req.accountNumber}</td>
+
+              <td>{req.status}</td>
+
+              <td className="flex gap-2 p-3">
+                {req.status === "Pending" && (
+                  <>
+                    <Button
+                      variant="success"
+                      onClick={() => handleApproveWithdraw(req)}
+                    >
+                      Approve
+                    </Button>
+
+                    <Button
+                      variant="danger"
+                      onClick={() => handleRejectWithdraw(req)}
+                    >
                       Reject
                     </Button>
                   </>
