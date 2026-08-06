@@ -19,6 +19,10 @@ export default function AdminLayout() {
             Users
           </Link>
 
+          <Link to="/admin/balance" className="block hover:text-blue-400">
+            Balance Management
+          </Link>
+
           <Link to="/admin/reports" className="block hover:text-blue-400">
             Reports
           </Link>

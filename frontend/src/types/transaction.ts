@@ -1,0 +1,21 @@
+export interface Transaction {
+  id: number;
+
+  playerId: string;
+
+  playerName: string;
+
+  type: "Deposit" | "Withdraw" | "Adjustment" | "Reject Deposit";
+
+  amount: number;
+
+  paymentMethod?: string;
+
+  transactionNumber?: string;
+
+  note: string;
+
+  createdBy: string;
+
+  createdAt: string;
+}

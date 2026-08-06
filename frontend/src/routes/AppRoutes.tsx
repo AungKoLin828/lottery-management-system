@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import AdminLayout from "@/layouts/AdminLayout";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import ResultManagement from "@/pages/admin/ResultManagement";
+import BalanceManagement from "@/pages/admin/BalanceManagement";
 import PlayerLayout from "@/layouts/PlayerLayout";
 import PlayerDashboard from "@/pages/player/PlayerDashboard";
 import Wallet from "@/pages/player/Wallet";
@@ -19,6 +20,7 @@ export default function AppRoutes() {
       <Route element={<AdminLayout />}>
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/results" element={<ResultManagement />} />
+        <Route path="/admin/balance" element={<BalanceManagement />} />
       </Route>
 
       {/* Player */}
