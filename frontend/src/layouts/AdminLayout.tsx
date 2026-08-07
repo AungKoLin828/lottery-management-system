@@ -7,23 +7,42 @@ export default function AdminLayout() {
       <aside className="w-64 bg-gray-900 text-white p-5">
         <h1 className="text-xl font-bold mb-8">Administrator</h1>
         <nav className="space-y-3">
-          <Link to="/admin" className="block hover:text-blue-400">
+          <Link to="/admin" className="block px-4 py-2 hover:text-blue-400">
             Dashboard
           </Link>
 
-          <Link to="/admin/results" className="block hover:text-blue-400">
-            Results
+          <Link
+            to="/admin/results"
+            className="block px-4 py-2 hover:text-blue-400"
+          >
+            Results Management
           </Link>
 
-          <Link to="/admin/users" className="block hover:text-blue-400">
-            Users
+          <Link
+            to="/admin/users"
+            className="block px-4 py-2 hover:text-blue-400"
+          >
+            User Management
           </Link>
 
-          <Link to="/admin/balance" className="block hover:text-blue-400">
+          <Link
+            to="/admin/balance"
+            className="block px-4 py-2 hover:text-blue-400"
+          >
             Balance Management
           </Link>
 
-          <Link to="/admin/reports" className="block hover:text-blue-400">
+          <Link
+            to="/admin/settings"
+            className="block px-4 py-2 hover:text-blue-400"
+          >
+            Settings
+          </Link>
+
+          <Link
+            to="/admin/reports"
+            className="block px-4 py-2 hover:text-blue-400"
+          >
             Reports
           </Link>
         </nav>
