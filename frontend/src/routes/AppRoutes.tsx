@@ -6,6 +6,7 @@ import ResultManagement from "@/pages/admin/ResultManagement";
 import BalanceManagement from "@/pages/admin/BalanceManagement";
 import UserManagement from "@/pages/admin/UserManagement";
 import Settings from "@/pages/admin/Settings";
+import Reports from "@/pages/admin/Reports";
 import PlayerLayout from "@/layouts/PlayerLayout";
 import PlayerDashboard from "@/pages/player/PlayerDashboard";
 import Wallet from "@/pages/player/Wallet";
@@ -25,6 +26,7 @@ export default function AppRoutes() {
         <Route path="/admin/balance" element={<BalanceManagement />} />
         <Route path="/admin/users" element={<UserManagement />} />
         <Route path="/admin/settings" element={<Settings />} />
+        <Route path="/admin/reports" element={<Reports />} />
       </Route>
 
       {/* Player */}
