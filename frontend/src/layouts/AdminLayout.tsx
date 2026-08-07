@@ -33,17 +33,17 @@ export default function AdminLayout() {
           </Link>
 
           <Link
-            to="/admin/settings"
-            className="block px-4 py-2 hover:text-blue-400"
-          >
-            Settings
-          </Link>
-
-          <Link
             to="/admin/reports"
             className="block px-4 py-2 hover:text-blue-400"
           >
             Reports
+          </Link>
+
+          <Link
+            to="/admin/settings"
+            className="block px-4 py-2 hover:text-blue-400"
+          >
+            Settings
           </Link>
         </nav>
       </aside>
