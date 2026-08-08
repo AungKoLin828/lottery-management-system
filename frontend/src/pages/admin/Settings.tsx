@@ -3,6 +3,9 @@ import { useState } from "react";
 import Button from "@/components/common/Button";
 import Input from "@/components/common/Input";
 import Modal from "@/components/common/Modal";
+import LotteryNumberSettings from "@/components/admin/settings/LotteryNumberSettings";
+import DrawSettings from "@/components/admin/settings/DrawSettings";
+import NumberRestrictions from "@/components/admin/settings/NumberRestrictions";
 
 import type {
   GeneralSettings,
@@ -15,6 +18,7 @@ import type {
 
 type SettingsTab =
   | "general"
+  | "lottery"
   | "payment"
   | "deposit"
   | "withdraw"
@@ -547,7 +551,6 @@ export default function Settings() {
   return (
     <div className="space-y-6">
       {/* Header */}
-
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Settings</h1>
 
@@ -555,9 +558,7 @@ export default function Settings() {
           Manage your lottery system settings.
         </p>
       </div>
-
       {/* Tabs */}
-
       <div className="bg-white rounded-xl shadow p-4">
         <div className="flex flex-wrap gap-2">
           <button
@@ -574,6 +575,14 @@ export default function Settings() {
             onClick={() => setActiveTab("payment")}
           >
             Payment Methods
+          </button>
+
+          <button
+            type="button"
+            className={tabClass("lottery")}
+            onClick={() => setActiveTab("lottery")}
+          >
+            Lottery Number Control
           </button>
 
           <button
@@ -601,11 +610,9 @@ export default function Settings() {
           </button>
         </div>
       </div>
-
       {/* ======================================================
           GENERAL
           ====================================================== */}
-
       {activeTab === "general" && (
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="text-xl font-bold mb-6">General Settings</h2>
@@ -750,7 +757,6 @@ export default function Settings() {
       {/* ======================================================
           PAYMENT METHODS
           ====================================================== */}
-
       {activeTab === "payment" && (
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow p-6">
@@ -1006,13 +1012,7 @@ export default function Settings() {
                 )}
               </div>
 
-              <div
-                className="
-flex
-justify-end
-gap-3
-"
-              >
+              <div className="flex justify-end gap-3 ">
                 <Button
                   type="button"
                   variant="outline"
@@ -1031,9 +1031,44 @@ gap-3
       )}
 
       {/* ======================================================
+    LOTTERY NUMBER CONTROL
+    ====================================================== */}
+      {activeTab === "lottery" && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl shadow p-6">
+            <h2 className="text-xl font-bold mb-6">Lottery Number Control</h2>
+
+            {/* Lottery Number Settings */}
+            <section className="border rounded-lg p-5 mb-6">
+              <h3 className="text-lg font-semibold mb-4">
+                Lottery Number Settings
+              </h3>
+
+              <LotteryNumberSettings />
+            </section>
+
+            {/* Draw Settings */}
+            <section className="border rounded-lg p-5 mb-6">
+              <h3 className="text-lg font-semibold mb-4">Draw Control</h3>
+
+              <DrawSettings />
+            </section>
+
+            {/* Number Restrictions */}
+            <section className="border rounded-lg p-5">
+              <h3 className="text-lg font-semibold mb-4">
+                Number Restrictions
+              </h3>
+
+              <NumberRestrictions />
+            </section>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================
           DEPOSIT SETTINGS
           ====================================================== */}
-
       {activeTab === "deposit" && (
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="text-xl font-bold mb-6">Deposit Settings</h2>
@@ -1173,11 +1208,9 @@ gap-3
           </div>
         </div>
       )}
-
       {/* ======================================================
           WITHDRAW SETTINGS
           ====================================================== */}
-
       {activeTab === "withdraw" && (
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="text-xl font-bold mb-6">Withdraw Settings</h2>
@@ -1309,11 +1342,9 @@ gap-3
           </div>
         </div>
       )}
-
       {/* ======================================================
           MAINTENANCE
           ====================================================== */}
-
       {activeTab === "maintenance" && (
         <div className="bg-white rounded-xl shadow p-6">
           <div className="flex justify-between items-center mb-6">
