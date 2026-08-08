@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useMemo } from "react";
 
 /* ============================================================
    TYPES
@@ -74,29 +75,9 @@ const dayNames = [
 /* ============================================================
    2D PUBLIC HOLIDAYS / OFF DAYS
 
-   These affect 2D ONLY.
-   They do NOT affect 3D.
-
-   Example:
-
-   "2026-08-04": "Public Holiday",
-   "2026-08-06": "Special Holiday",
-
-   ============================================================ */
-
-
-/* ============================================================
-   2D PUBLIC HOLIDAYS / OFF DAYS
-   ============================================================
-
-   These affect 2D ONLY.
-
    IMPORTANT:
-   - Public holidays stop 2D AM/PM draws.
-   - Public holidays DO NOT cancel 3D draws.
-   - 3D schedule is completely independent.
-
-   2026 Myanmar Public Holidays
+   - These affect 2D only.
+   - They do NOT cancel 3D draws.
    ============================================================ */
 
 const twoDOffDays: Record<string, string> = {
@@ -104,48 +85,43 @@ const twoDOffDays: Record<string, string> = {
 
   "2026-01-01": "New Year's Day",
   "2026-01-02": "New Year Holiday",
-
   "2026-01-04": "Independence Day",
 
   /* February */
 
   "2026-02-12": "Union Day",
   "2026-02-13": "Union Day Holiday",
-
   "2026-02-16": "Chinese New Year",
   "2026-02-17": "Chinese New Year Holiday",
 
   /* March */
 
   "2026-03-02": "Peasants' Day / Full Moon Day of Tabaung",
-
   "2026-03-27": "Armed Forces Day",
+
   /* May */
 
   "2026-05-01": "Labour Day",
-
   "2026-05-28": "Eid Al-Adha",
 
   /* July */
 
   "2026-07-19": "Martyrs' Day",
+
   /* December */
 
   "2026-12-04": "National Day",
-
   "2026-12-25": "Christmas Day",
 };
-
 
 /* ============================================================
    2D RESULTS
 
-   2D has:
+   2D contains:
    - AM
    - PM
    - Set
    - Value
-
    ============================================================ */
 
 const twoDResults: Record<
@@ -223,9 +199,6 @@ const twoDResults: Record<
 
 /* ============================================================
    BUILD WEEKLY 2D RESULTS
-
-   2D is completely independent from 3D.
-
    ============================================================ */
 
 const weekly2DResults: Weekly2D[] = weekDates.map(
@@ -253,17 +226,15 @@ const weekly2DResults: Weekly2D[] = weekDates.map(
 /* ============================================================
    3D RESULTS
 
+   IMPORTANT:
    3D is completely independent from 2D.
 
-   3D:
    - No AM
    - No PM
    - No Set
    - No Value
    - One winning number
-   - Scheduled independently
-
-   Example: two 3D draws per month.
+   - Independent schedule
    ============================================================ */
 
 const threeDDraws: Record<string, Result3D> = {
@@ -294,8 +265,6 @@ const threeDDraws: Record<string, Result3D> = {
 
 /* ============================================================
    3D DRAW DATES
-
-   Separate from weekly 2D results.
    ============================================================ */
 
 const threeDDrawDates = [
@@ -307,7 +276,11 @@ const threeDDrawDates = [
   "2026-10-16",
 ];
 
-const getDayName = (date: string) => {
+/* ============================================================
+   DATE HELPER
+   ============================================================ */
+
+const getDayName = (date: string): string => {
   return new Date(`${date}T00:00:00`).toLocaleDateString(
     "en-US",
     {
@@ -318,44 +291,18 @@ const getDayName = (date: string) => {
 
 /* ============================================================
    BUILD 3D RESULTS
-
-   3D is NOT connected to 2D weekly data.
    ============================================================ */
 
-const weekly3DResults: ThreeDDraw[] =
-  threeDDrawDates.map((date) => ({
+const weekly3DResults: ThreeDDraw[] = threeDDrawDates.map(
+  (date) => ({
     date,
     day: getDayName(date),
     result: threeDDraws[date]?.result ?? null,
-  }));
-
-  
-
-/* ============================================================
-   PUBLIC HOLIDAYS
-
-   These are 2D off-days only.
-
-   IMPORTANT:
-   Public holidays do NOT cancel 3D draws.
-
-   ============================================================ */
+  }),
+);
 
 /* ============================================================
    PUBLIC HOLIDAY TABLE DATA
-   ============================================================
-
-   Generated from twoDOffDays so that:
-
-   twoDOffDays
-        ↓
-   Public Holiday Table
-
-   This prevents duplicate holiday data.
-
-   IMPORTANT:
-   These holidays affect 2D only.
-   They do NOT affect 3D.
    ============================================================ */
 
 const publicHolidays: PublicHoliday[] = Object.entries(
@@ -368,9 +315,14 @@ const publicHolidays: PublicHoliday[] = Object.entries(
   }))
   .sort((a, b) => a.date.localeCompare(b.date));
 
-
 /* ============================================================
    LATEST 2D RESULTS
+
+   Source data can be in any order.
+   We sort it below:
+   1. Latest date first
+   2. AM first
+   3. PM second
    ============================================================ */
 
 const latest2DResults: Latest2DResult[] = [
@@ -394,9 +346,40 @@ const latest2DResults: Latest2DResult[] = [
 ];
 
 /* ============================================================
-   LATEST 3D RESULTS
+   SORT LATEST 2D RESULTS
 
-   The first item is the latest 3D result.
+   RESULT:
+   2026-08-07 AM
+   2026-08-07 PM
+   ============================================================ */
+
+const sortedLatest2DResults: Latest2DResult[] = [
+  ...latest2DResults,
+].sort((a, b) => {
+  /* Latest date first */
+
+  const dateCompare = b.date.localeCompare(a.date);
+
+  if (dateCompare !== 0) {
+    return dateCompare;
+  }
+
+  /* Same date:
+     AM first, PM second */
+
+  const sessionOrder: Record<Session2D, number> = {
+    AM: 1,
+    PM: 2,
+  };
+
+  return (
+    sessionOrder[a.session] -
+    sessionOrder[b.session]
+  );
+});
+
+/* ============================================================
+   LATEST 3D RESULTS
    ============================================================ */
 
 const latest3DResults: Latest3DResult[] = [
@@ -418,6 +401,24 @@ const latest3DResults: Latest3DResult[] = [
     result: "392",
   },
 ];
+
+/* ============================================================
+   RANDOM LUCKY NUMBER HELPERS
+
+   These are NOT official results.
+   ============================================================ */
+
+const generateRandom2D = (): string => {
+  return Math.floor(Math.random() * 100)
+    .toString()
+    .padStart(2, "0");
+};
+
+const generateRandom3D = (): string => {
+  return Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, "0");
+};
 
 /* ============================================================
    2D RESULT CARD
@@ -446,9 +447,7 @@ function TwoDResultCard({
           : "border-indigo-200 bg-indigo-50/40"
       }`}
     >
-      {/* Header */}
-
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-3">
           <span
             className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm ${
@@ -476,8 +475,6 @@ function TwoDResultCard({
         </span>
       </div>
 
-      {/* Result */}
-
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-xs text-gray-500">
@@ -494,8 +491,6 @@ function TwoDResultCard({
             {result}
           </p>
         </div>
-
-        {/* Set / Value */}
 
         <div className="text-right">
           <p className="text-xs text-gray-500">
@@ -529,12 +524,12 @@ function TwoDOffDayCard({
   holidayName?: string;
 }) {
   return (
-    <div className="rounded-xl border border-red-200 bg-red-50 p-5">
+    <div className="rounded-xl border border-red-200 bg-red-50 p-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <span className="w-10 h-10 rounded-lg bg-red-100 text-red-700 flex items-center justify-center font-bold text-sm">
+          <div className="w-11 h-11 rounded-xl bg-red-100 text-red-700 flex items-center justify-center font-bold">
             2D
-          </span>
+          </div>
 
           <div>
             <h4 className="font-bold text-red-800">
@@ -558,11 +553,6 @@ function TwoDOffDayCard({
 
 /* ============================================================
    3D RESULT CARD
-
-   IMPORTANT:
-   - No AM / PM
-   - No Set
-   - No Value
    ============================================================ */
 
 function ThreeDResultCard({
@@ -575,15 +565,17 @@ function ThreeDResultCard({
   result: string;
 }) {
   return (
-    <div className="rounded-2xl border border-emerald-200 bg-white overflow-hidden shadow-sm">
-      {/* Header */}
-
-      <div className="px-5 py-4 bg-emerald-50 border-b border-emerald-100">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden">
+      <div className="px-6 py-5 bg-emerald-50 border-b border-emerald-100">
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-emerald-700">
+            <span className="inline-flex px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+              3D
+            </span>
+
+            <h3 className="font-bold text-gray-800 mt-2">
               {day}
-            </p>
+            </h3>
 
             <p className="text-sm text-gray-500 mt-1">
               {date}
@@ -595,8 +587,6 @@ function ThreeDResultCard({
           </span>
         </div>
       </div>
-
-      {/* Result */}
 
       <div className="p-8 text-center">
         <p className="text-sm text-gray-500">
@@ -619,44 +609,78 @@ function ThreeDResultCard({
    NO 3D DRAW CARD
    ============================================================ */
 
-function NoThreeDDraw() {
+function NoThreeDDraw({
+  date,
+  day,
+}: {
+  date: string;
+  day: string;
+}) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6">
-      <div className="flex items-center gap-3">
-        <span className="w-10 h-10 rounded-lg bg-gray-200 text-gray-600 flex items-center justify-center font-bold text-sm">
-          3D
-        </span>
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="px-6 py-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center font-bold">
+              3D
+            </div>
 
-        <div>
-          <h4 className="font-semibold text-gray-700">
-            No 3D Draw
-          </h4>
+            <div>
+              <h4 className="font-semibold text-gray-700">
+                No 3D Draw
+              </h4>
 
-          <p className="text-xs text-gray-500 mt-1">
-            There is no scheduled 3D draw on this
-            date.
-          </p>
+              <p className="text-xs text-gray-500 mt-1">
+                {day} · {date}
+              </p>
+            </div>
+          </div>
+
+          <span className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 text-xs font-semibold">
+            NOT SCHEDULED
+          </span>
         </div>
+
+        <p className="text-xs text-gray-500 mt-5">
+          There is no scheduled 3D draw on this
+          date.
+        </p>
       </div>
     </div>
   );
 }
 
 /* ============================================================
-   HOME
+   HOME PAGE
    ============================================================ */
 
 export default function Home() {
-  /*
-   * Latest 3D result.
-   *
-   * The first item in latest3DResults is treated
-   * as the latest published 3D result.
-   */
+  /* ==========================================================
+     TODAY'S RANDOM LUCKY NUMBERS
+
+     useMemo keeps the generated numbers stable while this
+     component remains mounted.
+
+     Separate AM and PM numbers are generated.
+     ========================================================== */
+
+  const todayLuckyNumbers = useMemo(
+    () => ({
+      twoDAM: generateRandom2D(),
+      twoDPM: generateRandom2D(),
+      threeD: generateRandom3D(),
+    }),
+    [],
+  );
+
+  /* ==========================================================
+     LATEST 3D RESULT
+     ========================================================== */
+
   const latest3DResult = latest3DResults[0];
 
   return (
-    <div>
+    <div className="min-h-screen bg-white">
       {/* ======================================================
           HERO
           ====================================================== */}
@@ -698,11 +722,6 @@ export default function Home() {
 
       {/* ======================================================
           LATEST RESULTS
-          ------------------------------------------------------
-          Contains:
-          - Latest 2D AM
-          - Latest 2D PM
-          - Latest 3D
           ====================================================== */}
 
       <section className="max-w-7xl mx-auto px-4 py-12">
@@ -729,9 +748,13 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* ==================================================
               LATEST 2D RESULTS
+
+              ORDER:
+              AM FIRST
+              PM SECOND
               ================================================== */}
 
-          {latest2DResults.map((item) => (
+          {sortedLatest2DResults.map((item) => (
             <div
               key={`2d-${item.id}`}
               className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
@@ -810,16 +833,10 @@ export default function Home() {
 
           {/* ==================================================
               LATEST 3D RESULT
-
-              IMPORTANT:
-              No AM / PM
-              No Set / Value
               ================================================== */}
 
           {latest3DResult && (
             <div className="bg-white rounded-xl shadow-sm border border-emerald-200 overflow-hidden">
-              {/* Header */}
-
               <div className="px-6 py-5 bg-emerald-50 border-b border-emerald-100">
                 <div className="flex justify-between gap-3">
                   <div>
@@ -841,8 +858,6 @@ export default function Home() {
                   </span>
                 </div>
               </div>
-
-              {/* 3D Winning Number */}
 
               <div className="p-8 text-center">
                 <p className="text-sm text-gray-500">
@@ -944,9 +959,7 @@ export default function Home() {
                           <TwoDResultCard
                             title="Morning"
                             session="AM"
-                            result={
-                              day.morning.result
-                            }
+                            result={day.morning.result}
                             setValue={
                               day.morning.setValue
                             }
@@ -968,9 +981,7 @@ export default function Home() {
                           <TwoDResultCard
                             title="Evening"
                             session="PM"
-                            result={
-                              day.evening.result
-                            }
+                            result={day.evening.result}
                             setValue={
                               day.evening.setValue
                             }
@@ -997,13 +1008,9 @@ export default function Home() {
 
       {/* ======================================================
           3D RESULTS
-          ------------------------------------------------------
-          Completely independent from 2D.
-          No AM / PM.
-          No Set / Value.
           ====================================================== */}
 
-      <section className="bg-gray py-12">
+      <section className="bg-gray-50 py-12">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8">
             <div>
@@ -1025,8 +1032,6 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* 3D Result Grid */}
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {weekly3DResults.map((draw) =>
               draw.result ? (
@@ -1037,29 +1042,234 @@ export default function Home() {
                   result={draw.result}
                 />
               ) : (
-                <NoThreeDDraw key={draw.date} />
+                <NoThreeDDraw
+                  key={draw.date}
+                  date={draw.date}
+                  day={draw.day}
+                />
               ),
             )}
           </div>
         </div>
       </section>
 
-     
       {/* ======================================================
-          PUBLIC HOLIDAY
-          ------------------------------------------------------
-          2D holidays only.
-          This section is AFTER 3D results.
+          TODAY'S LUCKY NUMBERS
+          
+          IMPORTANT:
+          Random suggestions only.
+          NOT official lottery results.
           ====================================================== */}
 
       <section className="bg-gray-50 py-12">
         <div className="max-w-7xl mx-auto px-4">
-
           {/* Section Header */}
 
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8">
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center text-xl">
+                  🍀
+                </div>
+
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">
+                    Today's Lucky Numbers
+                  </h2>
+
+                  <p className="text-gray-500 mt-1">
+                    Random lucky-number suggestions
+                    for today
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Disclaimer */}
+
+          <div className="mb-6 p-4 rounded-xl border border-purple-100 bg-purple-50">
+            <div className="flex items-start gap-3">
+              <span className="text-lg">
+                💡
+              </span>
+
+              <div>
+                <p className="text-sm font-semibold text-purple-800">
+                  Lucky Number Suggestions
+                </p>
+
+                <p className="text-xs text-purple-700 mt-1">
+                  These numbers are randomly generated
+                  for entertainment purposes only. They
+                  are not official lottery results and do
+                  not guarantee any outcome.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Lucky Number Cards */}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* ==================================================
+                2D AM
+                ================================================== */}
+
+            <div className="bg-white rounded-2xl border border-yellow-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-5 bg-yellow-50 border-b border-yellow-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-yellow-100 text-yellow-700 flex items-center justify-center font-bold">
+                      AM
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-gray-500">
+                        2D
+                      </p>
+
+                      <h3 className="font-bold text-gray-800">
+                        Morning Lucky Number
+                      </h3>
+                    </div>
+                  </div>
+
+                  <span className="px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-700 text-xs font-semibold">
+                    2D AM
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-8 text-center">
+                <p className="text-sm text-gray-500">
+                  Today's Lucky Number
+                </p>
+
+                <p className="text-6xl font-bold text-yellow-600 mt-3 tracking-widest">
+                  {todayLuckyNumbers.twoDAM}
+                </p>
+
+                <div className="mt-5">
+                  <span className="inline-flex px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 text-xs font-medium">
+                    Random Suggestion
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* ==================================================
+                2D PM
+                ================================================== */}
+
+            <div className="bg-white rounded-2xl border border-indigo-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-5 bg-indigo-50 border-b border-indigo-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                      PM
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-gray-500">
+                        2D
+                      </p>
+
+                      <h3 className="font-bold text-gray-800">
+                        Evening Lucky Number
+                      </h3>
+                    </div>
+                  </div>
+
+                  <span className="px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">
+                    2D PM
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-8 text-center">
+                <p className="text-sm text-gray-500">
+                  Today's Lucky Number
+                </p>
+
+                <p className="text-6xl font-bold text-indigo-600 mt-3 tracking-widest">
+                  {todayLuckyNumbers.twoDPM}
+                </p>
+
+                <div className="mt-5">
+                  <span className="inline-flex px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 text-xs font-medium">
+                    Random Suggestion
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* ==================================================
+                3D
+                ================================================== */}
+
+            <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-5 bg-emerald-50 border-b border-emerald-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                      3D
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-gray-500">
+                        3D
+                      </p>
+
+                      <h3 className="font-bold text-gray-800">
+                        3D Lucky Number
+                      </h3>
+                    </div>
+                  </div>
+
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                    3D
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-8 text-center">
+                <p className="text-sm text-gray-500">
+                  Today's Lucky Number
+                </p>
+
+                <p className="text-6xl font-bold text-emerald-600 mt-3 tracking-widest">
+                  {todayLuckyNumbers.threeD}
+                </p>
+
+                <div className="mt-5">
+                  <span className="inline-flex px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 text-xs font-medium">
+                    Random Suggestion
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Disclaimer */}
+
+          <div className="mt-6 text-center">
+            <p className="text-xs text-gray-400">
+              🍀 Lucky numbers are randomly generated
+              and are not official lottery results.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ======================================================
+          PUBLIC HOLIDAY
+          ====================================================== */}
+
+      <section className="bg-gray-50 py-12">
+        <div className="max-w-7xl mx-auto px-4">
           <div className="mb-6">
             <div className="flex items-center gap-3">
-
               <div className="w-11 h-11 rounded-xl bg-red-100 text-red-600 flex items-center justify-center text-xl">
                 📅
               </div>
@@ -1073,16 +1283,11 @@ export default function Home() {
                   2D draw off-days and public holidays
                 </p>
               </div>
-
             </div>
           </div>
 
-          {/* No Holidays */}
-
           {publicHolidays.length === 0 ? (
-
             <div className="bg-white border border-gray-200 rounded-xl p-8 text-center shadow-sm">
-
               <div className="w-14 h-14 mx-auto rounded-full bg-green-100 text-green-600 flex items-center justify-center text-2xl">
                 ✓
               </div>
@@ -1092,28 +1297,16 @@ export default function Home() {
               </p>
 
               <p className="text-sm text-gray-500 mt-1">
-                There are no configured 2D public holidays
-                at this time.
+                There are no configured 2D public
+                holidays at this time.
               </p>
-
             </div>
-
           ) : (
-
             <div className="bg-white rounded-xl border border-red-100 shadow-sm overflow-hidden">
-
               <div className="overflow-x-auto">
-
                 <table className="w-full min-w-[650px]">
-
-                  {/* ==================================================
-                      TABLE HEADER
-                      ================================================== */}
-
                   <thead>
-
                     <tr className="bg-red-50 border-b border-red-200">
-
                       <th className="px-5 py-4 text-left text-sm font-semibold text-red-800">
                         Date
                       </th>
@@ -1129,131 +1322,98 @@ export default function Home() {
                       <th className="px-5 py-4 text-center text-sm font-semibold text-red-800">
                         2D Status
                       </th>
-
                     </tr>
-
                   </thead>
 
-                  {/* ==================================================
-                      TABLE BODY
-                      ================================================== */}
-
                   <tbody>
+                    {publicHolidays.map(
+                      (holiday, index) => (
+                        <tr
+                          key={holiday.date}
+                          className={`
+                            border-b border-red-100
+                            transition-colors
+                            hover:bg-red-50
+                            ${
+                              index % 2 === 0
+                                ? "bg-white"
+                                : "bg-red-50/30"
+                            }
+                          `}
+                        >
+                          {/* DATE */}
 
-                    {publicHolidays.map((holiday, index) => (
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-lg bg-red-100 text-red-600 flex items-center justify-center text-sm font-bold">
+                                📅
+                              </div>
 
-                      <tr
-                        key={holiday.date}
-                        className={`
-                          border-b border-red-100
-                          transition-colors
-                          hover:bg-red-50
-                          ${
-                            index % 2 === 0
-                              ? "bg-white"
-                              : "bg-red-50/30"
-                          }
-                        `}
-                      >
-
-                        {/* DATE */}
-
-                        <td className="px-5 py-4">
-
-                          <div className="flex items-center gap-3">
-
-                            <div className="w-9 h-9 rounded-lg bg-red-100 text-red-600 flex items-center justify-center text-sm font-bold">
-                              📅
+                              <span className="text-sm font-semibold text-gray-800">
+                                {holiday.date}
+                              </span>
                             </div>
+                          </td>
 
-                            <span className="text-sm font-semibold text-gray-800">
-                              {holiday.date}
+                          {/* DAY */}
+
+                          <td className="px-5 py-4">
+                            <span className="inline-flex px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-semibold">
+                              {holiday.day}
                             </span>
+                          </td>
 
-                          </div>
+                          {/* HOLIDAY */}
 
-                        </td>
+                          <td className="px-5 py-4">
+                            <div>
+                              <p className="text-sm font-semibold text-gray-800">
+                                {holiday.name}
+                              </p>
 
-                        {/* DAY */}
+                              <p className="text-xs text-gray-500 mt-1">
+                                2D draw is not available
+                              </p>
+                            </div>
+                          </td>
 
-                        <td className="px-5 py-4">
+                          {/* STATUS */}
 
-                          <span className="inline-flex px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-semibold">
-                            {holiday.day}
-                          </span>
-
-                        </td>
-
-                        {/* HOLIDAY NAME */}
-
-                        <td className="px-5 py-4">
-
-                          <div>
-
-                            <p className="text-sm font-semibold text-gray-800">
-                              {holiday.name}
-                            </p>
-
-                            <p className="text-xs text-gray-500 mt-1">
-                              2D draw is not available
-                            </p>
-
-                          </div>
-
-                        </td>
-
-                        {/* 2D STATUS */}
-
-                        <td className="px-5 py-4 text-center">
-
-                          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-100 text-red-700 text-xs font-bold">
-
-                            <span className="w-2 h-2 rounded-full bg-red-500" />
-
-                            2D OFF
-
-                          </span>
-
-                        </td>
-
-                      </tr>
-
-                    ))}
-
+                          <td className="px-5 py-4 text-center">
+                            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-100 text-red-700 text-xs font-bold">
+                              <span className="w-2 h-2 rounded-full bg-red-500" />
+                              2D OFF
+                            </span>
+                          </td>
+                        </tr>
+                      ),
+                    )}
                   </tbody>
-
                 </table>
-
               </div>
-
             </div>
-
           )}
-
         </div>
       </section>
-            
+
       {/* ======================================================
           LOTTERY INFORMATION
           ====================================================== */}
 
       <section className="bg-gray-50 py-12">
         <div className="max-w-7xl mx-auto px-4">
-          {/* Section Header */}
-
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-800">
               Lottery Information
             </h2>
 
             <p className="text-gray-500 mt-1">
-              Important information about 2D and 3D draw schedules
-              and public holidays.
+              Important information about 2D and 3D
+              draw schedules and public holidays.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
             {/* ==================================================
                 2D DRAW SCHEDULE
                 ================================================== */}
@@ -1274,12 +1434,11 @@ export default function Home() {
               </h3>
 
               <p className="text-gray-500 text-sm mt-2">
-                2D lottery results are published twice on
-                scheduled weekdays.
+                2D lottery results are published twice
+                on scheduled weekdays.
               </p>
 
               <div className="mt-5 space-y-3">
-
                 {/* AM */}
 
                 <div className="flex items-center justify-between p-3 rounded-lg bg-yellow-50 border border-yellow-100">
@@ -1315,7 +1474,6 @@ export default function Home() {
                     Scheduled
                   </span>
                 </div>
-
               </div>
 
               <p className="text-xs text-gray-400 mt-4">
@@ -1343,14 +1501,11 @@ export default function Home() {
               </h3>
 
               <p className="text-gray-500 text-sm mt-2">
-                3D draws are scheduled independently from the
-                daily 2D draws.
+                3D draws are scheduled independently
+                from the daily 2D draws.
               </p>
 
               <div className="mt-5 space-y-3">
-
-                {/* Draw Information */}
-
                 <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-100">
                   <p className="text-xs text-gray-500">
                     Draw Type
@@ -1370,12 +1525,11 @@ export default function Home() {
                     One 3-digit winning number
                   </p>
                 </div>
-
               </div>
 
               <p className="text-xs text-gray-400 mt-4">
-                3D draws are not automatically cancelled by
-                2D public holidays.
+                3D draws are not automatically
+                cancelled by 2D public holidays.
               </p>
             </div>
 
@@ -1399,14 +1553,11 @@ export default function Home() {
               </h3>
 
               <p className="text-gray-500 text-sm mt-2">
-                Public holidays and special holidays that affect
-                the 2D draw schedule.
+                Public holidays and special holidays
+                that affect the 2D draw schedule.
               </p>
 
               <div className="mt-5 space-y-3">
-
-                {/* Holiday Rule */}
-
                 <div className="p-4 rounded-lg bg-red-50 border border-red-100">
                   <p className="text-xs text-gray-500">
                     2D
@@ -1417,8 +1568,6 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* 3D Rule */}
-
                 <div className="p-4 rounded-lg bg-gray-50 border border-gray-100">
                   <p className="text-xs text-gray-500">
                     3D
@@ -1428,20 +1577,16 @@ export default function Home() {
                     Schedule Independently
                   </p>
                 </div>
-
               </div>
 
               <p className="text-xs text-gray-400 mt-4">
-                Check the Public Holiday table above for
-                configured holiday dates.
+                Check the Public Holiday table above
+                for configured holiday dates.
               </p>
             </div>
           </div>
         </div>
       </section>
-
-
     </div>
   );
 }
-
