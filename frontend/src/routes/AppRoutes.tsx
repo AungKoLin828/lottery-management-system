@@ -15,6 +15,7 @@ import Home from "@/pages/public/Home";
 import Contact from "@/pages/public/Contact";
 import Login from "@/pages/auth/Login";
 import Register from "@/pages/auth/Register";
+import ResultsHistory from "@/pages/public/ResultsHistory";
 
 export default function AppRoutes() {
   return (
@@ -39,6 +40,7 @@ export default function AppRoutes() {
       <Route element={<PublicLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/results-history" element={<ResultsHistory />} />
         <Route path="/register" element={<Register />} />
         <Route path="/contact" element={<Contact />} />
       </Route>
