@@ -43,8 +43,8 @@ export default function PlayerLayout() {
 
       {/* Footer */}
       <footer className="bg-gray-900 text-white text-center p-4">
-        © 2026 AAAA
-        {/* © 2026 Lottery Management System */}
+        © {new Date().getFullYear()} Lottery Management System. All rights
+        reserved.
       </footer>
     </div>
   );
