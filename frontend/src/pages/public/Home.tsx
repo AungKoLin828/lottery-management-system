@@ -3,7 +3,6 @@ import LatestResults from "@/components/home/LatestResults";
 import Weekly2DResults from "@/components/home/Weekly2DResults";
 import ThreeDResults from "@/components/home/ThreeDResults";
 import LuckyNumbers from "@/components/home/LuckyNumbers";
-import PublicHoliday from "@/components/home/PublicHoliday";
 import LotteryInformation from "@/components/home/LotteryInformation";
 
 export default function Home() {
@@ -18,8 +17,6 @@ export default function Home() {
       <ThreeDResults />
 
       <LuckyNumbers />
-
-      {/* <PublicHoliday /> */}
 
       <LotteryInformation />
     </div>
