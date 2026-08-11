@@ -14,24 +14,29 @@ function NavItem({ to, label, icon, active, onClick }: NavItemProps) {
     <Link
       to={to}
       onClick={onClick}
-      className={`group relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
+      className={`group relative flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${
         active
-          ? "bg-blue-50 text-blue-600"
-          : "text-gray-600 hover:bg-gray-50 hover:text-blue-600"
+          ? "bg-blue-100 text-blue-700 shadow-sm"
+          : "text-gray-600 hover:bg-blue-50 hover:text-blue-600"
       }`}
     >
+      {/* Icon */}
       <span
-        className={`transition-transform duration-200 group-hover:scale-110 ${
-          active ? "text-blue-600" : "text-gray-400 group-hover:text-blue-600"
+        className={`transition-all duration-200 ${
+          active
+            ? "text-blue-600"
+            : "text-gray-400 group-hover:scale-110 group-hover:text-blue-600"
         }`}
       >
         {icon}
       </span>
 
+      {/* Label */}
       <span>{label}</span>
 
+      {/* Active Indicator */}
       {active && (
-        <span className="absolute bottom-0 left-1/2 h-0.5 w-5 -translate-x-1/2 rounded-full bg-blue-600" />
+        <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-blue-600" />
       )}
     </Link>
   );
