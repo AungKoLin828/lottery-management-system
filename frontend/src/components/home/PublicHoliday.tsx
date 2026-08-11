@@ -18,105 +18,111 @@ export default function PublicHoliday() {
     .sort((a, b) => a.date.localeCompare(b.date));
 
   return (
-    <section className="bg-gray-50 py-12">
-      <div className="mx-auto max-w-7xl px-4">
-        <div className="mb-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-100 text-xl text-red-600">
-              📅
-            </div>
-
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">
-                Public Holiday
-              </h2>
-
-              <p className="mt-1 text-gray-500">
-                2D draw off-days and public holidays
-              </p>
-            </div>
-          </div>
+    <section className="w-full">
+      {/* Header */}
+      <div className="mb-3 flex items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100 text-lg">
+          📅
         </div>
 
-        {publicHolidays.length === 0 ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-2xl text-green-600">
-              ✓
-            </div>
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold text-gray-800">Public Holiday</h2>
 
-            <p className="mt-4 font-semibold text-gray-700">
-              No public holidays
-            </p>
-
-            <p className="mt-1 text-sm text-gray-500">
-              There are no configured 2D public holidays at this time.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-xl border border-red-100 bg-white shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[650px]">
-                <thead>
-                  <tr className="border-b border-red-200 bg-red-50">
-                    <th className="px-5 py-4 text-left text-sm font-semibold text-red-800">
-                      Date
-                    </th>
-
-                    <th className="px-5 py-4 text-left text-sm font-semibold text-red-800">
-                      Day
-                    </th>
-
-                    <th className="px-5 py-4 text-left text-sm font-semibold text-red-800">
-                      Holiday
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {publicHolidays.map((holiday, index) => (
-                    <tr
-                      key={holiday.date}
-                      className={`border-b border-red-100 transition-colors hover:bg-red-50 ${
-                        index % 2 === 0 ? "bg-white" : "bg-red-50/30"
-                      }`}
-                    >
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-100 text-sm text-red-600">
-                            📅
-                          </div>
-
-                          <span className="text-sm font-semibold text-gray-800">
-                            {holiday.date}
-                          </span>
-                        </div>
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <span className="inline-flex rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
-                          {holiday.day}
-                        </span>
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-800">
-                            {holiday.name}
-                          </p>
-
-                          <p className="mt-1 text-xs text-gray-500">
-                            2D draw is not available
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+          <p className="text-xs text-gray-500">
+            2D draw off-days and public holidays
+          </p>
+        </div>
       </div>
+
+      {/* Empty State */}
+      {publicHolidays.length === 0 ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center shadow-sm">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-xl text-green-600">
+            ✓
+          </div>
+
+          <p className="mt-3 font-semibold text-gray-700">No public holidays</p>
+
+          <p className="mt-1 text-xs text-gray-500">
+            There are no configured 2D public holidays at this time.
+          </p>
+        </div>
+      ) : (
+        <div className="w-full overflow-hidden rounded-xl border border-red-100 bg-white shadow-sm">
+          {/* Vertical Scroll Only */}
+          <div className="max-h-[300px] overflow-y-auto">
+            <table className="w-full table-fixed border-collapse">
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b border-red-200 bg-red-50">
+                  <th className="w-[27%] px-2 py-2 text-left text-[11px] font-semibold text-red-800">
+                    Date
+                  </th>
+
+                  <th className="w-[23%] px-2 py-2 text-left text-[11px] font-semibold text-red-800">
+                    Day
+                  </th>
+
+                  <th className="w-[50%] px-2 py-2 text-left text-[11px] font-semibold text-red-800">
+                    Holiday
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {publicHolidays.map((holiday, index) => (
+                  <tr
+                    key={holiday.date}
+                    className={`border-b border-red-100 transition-colors hover:bg-red-50 ${
+                      index % 2 === 0 ? "bg-white" : "bg-red-50/30"
+                    }`}
+                  >
+                    {/* Date */}
+                    <td className="px-2 py-1.5 align-middle">
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-red-100 text-[10px] text-red-600">
+                          📅
+                        </div>
+
+                        <span className="min-w-0 truncate text-[10px] font-semibold text-gray-800">
+                          {holiday.date}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Day */}
+                    <td className="px-2 py-1.5 align-middle">
+                      <span className="inline-flex max-w-full rounded-full bg-orange-100 px-1.5 py-0.5 text-[9px] font-semibold text-orange-700">
+                        <span className="truncate">{holiday.day}</span>
+                      </span>
+                    </td>
+
+                    {/* Holiday */}
+                    <td className="px-2 py-1.5 align-middle">
+                      <div className="min-w-0">
+                        <p className="break-words text-[10px] font-semibold leading-4 text-gray-800">
+                          {holiday.name}
+                        </p>
+
+                        <p className="mt-0.5 text-[9px] leading-3 text-gray-500">
+                          2D draw is not available
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-red-100 bg-red-50/40 px-2 py-1.5">
+            <p className="text-center text-[9px] text-gray-500">
+              {publicHolidays.length} public holiday
+              {publicHolidays.length !== 1 ? "s" : ""} configured
+            </p>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

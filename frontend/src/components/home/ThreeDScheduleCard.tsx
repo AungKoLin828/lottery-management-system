@@ -1,8 +1,8 @@
 export default function ThreeDScheduleCard() {
   return (
-    <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-lg">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-lg font-bold text-emerald-700">
           3D
         </div>
 

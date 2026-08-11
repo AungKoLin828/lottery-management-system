@@ -1,8 +1,8 @@
 export default function TwoDScheduleCard() {
   return (
-    <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-lg">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-lg font-bold text-blue-700">
           2D
         </div>
 
@@ -23,10 +23,10 @@ export default function TwoDScheduleCard() {
         <div className="rounded-lg border border-yellow-100 bg-yellow-50 p-3">
           <p className="text-[11px] text-gray-500">Morning</p>
 
-          <div className="mt-1 flex items-center justify-between gap-2">
+          <div className="mt-1">
             <p className="text-sm font-semibold text-yellow-700">2D AM</p>
 
-            <span className="text-[11px] font-semibold text-gray-600">
+            <span className="text-[10px] font-semibold text-gray-600">
               Scheduled
             </span>
           </div>
@@ -35,10 +35,10 @@ export default function TwoDScheduleCard() {
         <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-3">
           <p className="text-[11px] text-gray-500">Evening</p>
 
-          <div className="mt-1 flex items-center justify-between gap-2">
+          <div className="mt-1">
             <p className="text-sm font-semibold text-indigo-700">2D PM</p>
 
-            <span className="text-[11px] font-semibold text-gray-600">
+            <span className="text-[10px] font-semibold text-gray-600">
               Scheduled
             </span>
           </div>

@@ -19,19 +19,16 @@ export default function LotteryInformation() {
         </div>
 
         {/* Information Cards */}
-        <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-3">
-          {/* 2D Schedule */}
-          <div className="min-w-0">
+        <div className="grid w-full grid-cols-1 items-start gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="flex justify-center lg:justify-start">
             <TwoDScheduleCard />
           </div>
 
-          {/* 3D Schedule */}
-          <div className="min-w-0">
+          <div className="flex justify-center lg:justify-start">
             <ThreeDScheduleCard />
           </div>
 
-          {/* Public Holiday */}
-          <div className="min-w-0">
+          <div className="w-full">
             <PublicHolidayInfoCard />
           </div>
         </div>
