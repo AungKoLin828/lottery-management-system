@@ -1,8 +1,6 @@
-// src/layouts/PublicLayout.tsx
-
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { Menu, X, Home, BarChart3, MessageCircle } from "lucide-react";
+import { Menu, X, Home, BarChart3, MessageCircle, Dice5 } from "lucide-react";
 
 type NavItemProps = {
   to: string;
@@ -75,10 +73,14 @@ export default function PublicLayout() {
             ================================================== */}
             <Link
               to="/"
-              className="flex items-center gap-1"
               onClick={closeMobileMenu}
+              className="flex items-center gap-2"
             >
-              <div className="leading-none">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+                <Dice5 size={20} />
+              </div>
+
+              <div>
                 <span className="text-lg font-bold tracking-tight text-slate-900">
                   Lottery
                 </span>
@@ -167,6 +169,7 @@ export default function PublicLayout() {
             }`}
           >
             <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-2 shadow-sm">
+              {/* Mobile Links */}
               <nav className="space-y-1">
                 <NavItem
                   to="/"
@@ -231,7 +234,7 @@ export default function PublicLayout() {
           <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
             {/* About */}
             <div>
-              <div className="mb-3 flex items-center gap-1">
+              <div className="mb-3 flex items-center gap-0">
                 <h3 className="text-lg font-bold text-white">Lottery</h3>
 
                 <h3 className="text-lg font-bold text-indigo-400">Play</h3>
@@ -284,9 +287,7 @@ export default function PublicLayout() {
 
               <div className="space-y-2.5 text-sm">
                 <p>Phone: 09 123456789</p>
-
                 <p>Email: admin@lottery.com</p>
-
                 <p>Yangon, Myanmar</p>
               </div>
             </div>
