@@ -360,16 +360,6 @@ export default function Play3D() {
             {/* Limit Info */}
 
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
-              <div>
-                <p className="text-xs font-semibold text-indigo-700">
-                  Maximum per number
-                </p>
-
-                <p className="mt-0.5 text-sm font-bold text-indigo-900">
-                  {MAX_BET_PER_NUMBER.toLocaleString()} MMK
-                </p>
-              </div>
-
               <div className="text-right">
                 <p className="text-xs text-indigo-500">Selected</p>
 
