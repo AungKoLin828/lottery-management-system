@@ -1,6 +1,6 @@
 // src/layouts/PlayerLayout.tsx
 
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Ticket,
@@ -11,8 +11,11 @@ import {
   LogOut,
   Menu,
   X,
+  MessageCircle,
+  BarChart3,
+  ChevronDown,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const navigation = [
   {
@@ -41,32 +44,83 @@ const navigation = [
     icon: WalletCards,
   },
   {
-    name: "Profile",
-    path: "/player/profile",
-    icon: User,
+    name: "Results History",
+    path: "/results-history",
+    icon: BarChart3,
+  },
+  {
+    name: "Contact",
+    path: "/contact",
+    icon: MessageCircle,
   },
 ];
 
 export default function PlayerLayout() {
+  const location = useLocation();
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  // ============================================================
+  // CLOSE MOBILE MENU WHEN ROUTE CHANGES
+  // ============================================================
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setProfileMenuOpen(false);
+  }, [location.pathname]);
+
+  // ============================================================
+  // CLOSE PROFILE MENU WHEN CLICKING OUTSIDE
+  // ============================================================
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target as Node)
+      ) {
+        setProfileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // ============================================================
+  // LOGOUT
+  // ============================================================
+
+  const handleLogout = () => {
+    console.log("Logout");
+
+    // Add your real logout logic here.
+    // Example:
+    // localStorage.removeItem("token");
+    // navigate("/login");
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-slate-50">
       {/* =====================================================
           HEADER
       ====================================================== */}
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          {/* Logo */}
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          {/* =================================================
+              LOGO
+          ================================================== */}
           <NavLink
             to="/player"
             className="flex items-center gap-2"
             onClick={() => setMobileMenuOpen(false)}
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
-              <Dice5 size={20} />
-            </div>
-
             <div>
               <span className="text-lg font-bold tracking-tight text-slate-900">
                 Lottery
@@ -78,8 +132,10 @@ export default function PlayerLayout() {
             </div>
           </NavLink>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden items-center gap-1 lg:flex">
+          {/* =================================================
+              DESKTOP NAVIGATION
+          ================================================== */}
+          <nav className="hidden items-center gap-0 lg:flex">
             {navigation.map((item) => {
               const Icon = item.icon;
 
@@ -104,14 +160,22 @@ export default function PlayerLayout() {
             })}
           </nav>
 
-          {/* Right Side */}
+          {/* =================================================
+              RIGHT SIDE
+          ================================================== */}
           <div className="flex items-center gap-2">
-            {/* Wallet Balance */}
+            {/* =================================================
+                WALLET BALANCE
+            ================================================== */}
             <NavLink
               to="/player/wallet"
               className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 sm:flex"
             >
-              <WalletCards size={17} className="text-indigo-600" />
+              <WalletCards
+                size={17}
+                className="text-indigo-600"
+                strokeWidth={2}
+              />
 
               <div className="leading-tight">
                 <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
@@ -124,21 +188,101 @@ export default function PlayerLayout() {
               </div>
             </NavLink>
 
-            {/* Logout */}
-            <button
-              type="button"
-              className="hidden rounded-lg p-2 text-slate-500 transition hover:bg-red-50 hover:text-red-500 sm:block"
-              title="Logout"
-            >
-              <LogOut size={19} />
-            </button>
+            {/* =================================================
+                PROFILE DROPDOWN
+            ================================================== */}
+            <div className="relative hidden sm:block" ref={profileMenuRef}>
+              <button
+                type="button"
+                onClick={() => setProfileMenuOpen((current) => !current)}
+                className={`flex items-center gap-2 rounded-lg px-2 py-1.5 transition ${
+                  profileMenuOpen
+                    ? "bg-indigo-50 text-indigo-600"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+                aria-label="Open profile menu"
+                aria-expanded={profileMenuOpen}
+              >
+                {/* Avatar */}
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-600">
+                  AK
+                </div>
 
-            {/* Mobile Menu */}
+                {/* User */}
+                <div className="hidden text-left xl:block">
+                  <p className="text-xs font-semibold text-slate-800">Player</p>
+
+                  <p className="text-[10px] text-slate-400">
+                    player@example.com
+                  </p>
+                </div>
+
+                <ChevronDown
+                  size={15}
+                  className={`transition-transform ${
+                    profileMenuOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {/* =================================================
+                  DROPDOWN
+              ================================================== */}
+              {profileMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg shadow-slate-200/60">
+                  {/* User Information */}
+                  <div className="border-b border-slate-100 px-4 py-3">
+                    <p className="text-sm font-semibold text-slate-900">
+                      Player
+                    </p>
+
+                    <p className="mt-0.5 truncate text-xs text-slate-400">
+                      player@example.com
+                    </p>
+                  </div>
+
+                  {/* Profile */}
+                  <div className="p-1.5">
+                    <NavLink
+                      to="/player/profile"
+                      onClick={() => setProfileMenuOpen(false)}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                          isActive
+                            ? "bg-indigo-50 text-indigo-600"
+                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                        }`
+                      }
+                    >
+                      <User size={17} />
+
+                      <span>Profile</span>
+                    </NavLink>
+
+                    {/* Logout */}
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-500 transition hover:bg-red-50"
+                    >
+                      <LogOut size={17} />
+
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* =================================================
+                MOBILE MENU BUTTON
+            ================================================== */}
             <button
               type="button"
               onClick={() => setMobileMenuOpen((current) => !current)}
-              className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
+              className="rounded-lg p-2 text-slate-600 transition hover:bg-slate-100 lg:hidden"
               aria-label="Toggle navigation"
+              aria-expanded={mobileMenuOpen}
             >
               {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
@@ -151,6 +295,7 @@ export default function PlayerLayout() {
         {mobileMenuOpen && (
           <div className="border-t border-slate-200 bg-white lg:hidden">
             <nav className="mx-auto max-w-7xl space-y-1 px-4 py-3 sm:px-6">
+              {/* Main Navigation */}
               {navigation.map((item) => {
                 const Icon = item.icon;
 
@@ -168,20 +313,43 @@ export default function PlayerLayout() {
                       }`
                     }
                   >
-                    <Icon size={19} />
+                    <Icon size={19} strokeWidth={2} />
 
                     {item.name}
                   </NavLink>
                 );
               })}
 
-              <button
-                type="button"
-                className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50"
-              >
-                <LogOut size={19} />
-                Logout
-              </button>
+              {/* =================================================
+                  MOBILE ACCOUNT SECTION
+              ================================================== */}
+              <div className="mt-2 border-t border-slate-100 pt-2">
+                {/* Profile */}
+                <NavLink
+                  to="/player/profile"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${
+                      isActive
+                        ? "bg-indigo-50 text-indigo-600"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    }`
+                  }
+                >
+                  <User size={19} />
+                  Profile
+                </NavLink>
+
+                {/* Logout */}
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-red-500 transition hover:bg-red-50"
+                >
+                  <LogOut size={19} />
+                  Logout
+                </button>
+              </div>
             </nav>
           </div>
         )}

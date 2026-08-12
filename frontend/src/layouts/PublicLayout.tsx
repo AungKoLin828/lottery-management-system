@@ -76,10 +76,6 @@ export default function PublicLayout() {
               onClick={closeMobileMenu}
               className="flex items-center gap-2"
             >
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
-                <Dice5 size={20} />
-              </div>
-
               <div>
                 <span className="text-lg font-bold tracking-tight text-slate-900">
                   Lottery
