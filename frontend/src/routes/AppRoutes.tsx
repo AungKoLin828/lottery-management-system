@@ -7,9 +7,7 @@ import BalanceManagement from "@/pages/admin/BalanceManagement";
 import UserManagement from "@/pages/admin/UserManagement";
 import Settings from "@/pages/admin/Settings";
 import Reports from "@/pages/admin/Reports";
-import PlayerLayout from "@/layouts/PlayerLayout";
-import PlayerDashboard from "@/pages/player/PlayerDashboard";
-import Wallet from "@/pages/player/Wallet";
+import { PlayerRoutes } from "@/routes/PlayerRoutes";
 import PublicLayout from "@/layouts/PublicLayout";
 import Home from "@/pages/public/Home";
 import Contact from "@/pages/public/Contact";
@@ -31,10 +29,7 @@ export default function AppRoutes() {
       </Route>
 
       {/* Player */}
-      <Route element={<PlayerLayout />}>
-        <Route path="/player" element={<PlayerDashboard />} />
-        <Route path="/player/wallet" element={<Wallet />} />
-      </Route>
+      {PlayerRoutes()}
 
       {/* Public */}
       <Route element={<PublicLayout />}>

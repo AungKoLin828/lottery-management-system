@@ -1,5 +1,8 @@
+// src/layouts/PublicLayout.tsx
+
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
+import { Menu, X, Home, BarChart3, MessageCircle } from "lucide-react";
 
 type NavItemProps = {
   to: string;
@@ -60,114 +63,61 @@ export default function PublicLayout() {
   }, [location.pathname]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="min-h-screen bg-white text-gray-900">
       {/* =====================================================
           HEADER
-          ===================================================== */}
-      <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/95 shadow-sm backdrop-blur-md">
+      ====================================================== */}
+      <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/95 backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-[68px] items-center justify-between">
             {/* =================================================
                 LOGO
-                ================================================= */}
+            ================================================== */}
             <Link
               to="/"
-              className="group flex items-center gap-3"
+              className="flex items-center gap-1"
               onClick={closeMobileMenu}
             >
-              {/* Logo Icon */}
-              <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200 transition-transform duration-200 group-hover:scale-105">
-                <span className="text-lg font-extrabold">D</span>
-
-                <span className="absolute -right-2 -top-2 h-6 w-6 rounded-full bg-white/20" />
-              </div>
-
-              {/* Logo Text */}
-              <div className="leading-tight">
-                <h1 className="text-lg font-extrabold tracking-tight text-gray-900">
+              <div className="leading-none">
+                <span className="text-lg font-bold tracking-tight text-slate-900">
                   Lottery
-                </h1>
+                </span>
 
-                <p className="hidden text-[10px] font-medium tracking-wide text-gray-400 sm:block">
-                  LOTTERY MANAGEMENT SYSTEM
-                </p>
+                <span className="text-lg font-bold tracking-tight text-indigo-600">
+                  Play
+                </span>
               </div>
             </Link>
 
             {/* =================================================
                 DESKTOP NAVIGATION
-                ================================================= */}
+            ================================================== */}
             <nav className="hidden items-center rounded-xl border border-gray-100 bg-gray-50/70 p-1 md:flex">
               <NavItem
                 to="/"
                 label="Home"
                 active={isActive("/")}
-                icon={
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M3 10.5L12 3l9 7.5M5 9v11h14V9M9 20v-6h6v6"
-                    />
-                  </svg>
-                }
+                icon={<Home className="h-4 w-4" />}
               />
 
               <NavItem
                 to="/results-history"
                 label="Results History"
                 active={isActive("/results-history")}
-                icon={
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M4 19V5M4 19h16M8 16v-5M12 16V7M16 16v-3"
-                    />
-                  </svg>
-                }
+                icon={<BarChart3 className="h-4 w-4" />}
               />
 
               <NavItem
                 to="/contact"
                 label="Contact"
                 active={isActive("/contact")}
-                icon={
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M21 11.5a8.4 8.4 0 01-9 8.3 9.3 9.3 0 01-4-.9L3 20l1.3-4.2A8.2 8.2 0 013 11.5 8.4 8.4 0 0112 3.2a8.4 8.4 0 019 8.3z"
-                    />
-                  </svg>
-                }
+                icon={<MessageCircle className="h-4 w-4" />}
               />
             </nav>
 
             {/* =================================================
                 DESKTOP AUTH
-                ================================================= */}
+            ================================================== */}
             <div className="hidden items-center gap-2 md:flex">
               <Link
                 to="/login"
@@ -186,7 +136,7 @@ export default function PublicLayout() {
 
             {/* =================================================
                 MOBILE MENU BUTTON
-                ================================================= */}
+            ================================================== */}
             <button
               type="button"
               onClick={() => setMobileMenuOpen((open) => !open)}
@@ -199,42 +149,16 @@ export default function PublicLayout() {
               aria-expanded={mobileMenuOpen}
             >
               {mobileMenuOpen ? (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <X className="h-5 w-5" />
               ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                </svg>
+                <Menu className="h-5 w-5" />
               )}
             </button>
           </div>
 
           {/* =================================================
               MOBILE NAVIGATION
-              ================================================= */}
+          ================================================== */}
           <div
             className={`overflow-hidden transition-all duration-300 md:hidden ${
               mobileMenuOpen
@@ -243,29 +167,13 @@ export default function PublicLayout() {
             }`}
           >
             <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-2 shadow-sm">
-              {/* Mobile Links */}
               <nav className="space-y-1">
                 <NavItem
                   to="/"
                   label="Home"
                   active={isActive("/")}
                   onClick={closeMobileMenu}
-                  icon={
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M3 10.5L12 3l9 7.5M5 9v11h14V9M9 20v-6h6v6"
-                      />
-                    </svg>
-                  }
+                  icon={<Home className="h-5 w-5" />}
                 />
 
                 <NavItem
@@ -273,22 +181,7 @@ export default function PublicLayout() {
                   label="Results History"
                   active={isActive("/results-history")}
                   onClick={closeMobileMenu}
-                  icon={
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M4 19V5M4 19h16M8 16v-5M12 16V7M16 16v-3"
-                      />
-                    </svg>
-                  }
+                  icon={<BarChart3 className="h-5 w-5" />}
                 />
 
                 <NavItem
@@ -296,22 +189,7 @@ export default function PublicLayout() {
                   label="Contact"
                   active={isActive("/contact")}
                   onClick={closeMobileMenu}
-                  icon={
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M21 11.5a8.4 8.4 0 01-9 8.3 9.3 9.3 0 01-4-.9L3 20l1.3-4.2A8.2 8.2 0 013 11.5 8.4 8.4 0 019 3.2a8.4 8.4 0 019 8.3z"
-                      />
-                    </svg>
-                  }
+                  icon={<MessageCircle className="h-5 w-5" />}
                 />
               </nav>
 
@@ -340,25 +218,23 @@ export default function PublicLayout() {
 
       {/* =====================================================
           PAGE CONTENT
-          ===================================================== */}
+      ====================================================== */}
       <main className="min-h-[calc(100vh-4.25rem)]">
         <Outlet />
       </main>
 
       {/* =====================================================
           FOOTER
-          ===================================================== */}
+      ====================================================== */}
       <footer className="mt-16 bg-gray-950 text-gray-400">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
             {/* About */}
             <div>
-              <div className="mb-3 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 font-bold text-white">
-                  D
-                </div>
+              <div className="mb-3 flex items-center gap-1">
+                <h3 className="text-lg font-bold text-white">Lottery</h3>
 
-                <h3 className="text-lg font-bold text-white">2D Lottery</h3>
+                <h3 className="text-lg font-bold text-indigo-400">Play</h3>
               </div>
 
               <p className="max-w-md text-sm leading-6">
@@ -417,7 +293,7 @@ export default function PublicLayout() {
           </div>
 
           <div className="mt-8 border-t border-gray-800 pt-6 text-center text-sm">
-            © {new Date().getFullYear()} Lottery. All rights reserved.
+            © {new Date().getFullYear()} LotteryPlay. All rights reserved.
           </div>
         </div>
       </footer>
