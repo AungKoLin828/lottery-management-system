@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { Menu, X, Home, BarChart3, MessageCircle, Dice5 } from "lucide-react";
+import { Menu, X, Home, BarChart3, Info } from "lucide-react";
 
 type NavItemProps = {
   to: string;
@@ -106,10 +106,10 @@ export default function PublicLayout() {
               />
 
               <NavItem
-                to="/contact"
-                label="Contact"
-                active={isActive("/contact")}
-                icon={<MessageCircle className="h-4 w-4" />}
+                to="/about"
+                label="About"
+                active={isActive("/about")}
+                icon={<Info className="h-4 w-4" />}
               />
             </nav>
 
@@ -184,11 +184,11 @@ export default function PublicLayout() {
                 />
 
                 <NavItem
-                  to="/contact"
-                  label="Contact"
-                  active={isActive("/contact")}
+                  to="/about"
+                  label="About"
+                  active={isActive("/about")}
                   onClick={closeMobileMenu}
-                  icon={<MessageCircle className="h-5 w-5" />}
+                  icon={<Info className="h-5 w-5" />}
                 />
               </nav>
 
@@ -259,13 +259,6 @@ export default function PublicLayout() {
                   className="block transition-colors hover:text-white"
                 >
                   Results History
-                </Link>
-
-                <Link
-                  to="/contact"
-                  className="block transition-colors hover:text-white"
-                >
-                  Contact
                 </Link>
 
                 <Link

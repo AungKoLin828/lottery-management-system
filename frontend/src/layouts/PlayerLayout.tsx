@@ -45,12 +45,12 @@ const navigation = [
   },
   {
     name: "Results History",
-    path: "/results-history",
+    path: "/player/results-history",
     icon: BarChart3,
   },
   {
     name: "Contact",
-    path: "/contact",
+    path: "/player/contact",
     icon: MessageCircle,
   },
 ];
