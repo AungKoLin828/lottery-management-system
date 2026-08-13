@@ -1,173 +1,101 @@
-import {
-  Bell,
-  CheckCircle2,
-  CircleAlert,
-  CreditCard,
-  Gift,
-  Ticket,
-  Trophy,
-  UserPlus,
-  Wallet,
-  XCircle,
-} from "lucide-react";
+import { Check, Trash2, Wallet, AlertCircle, Info } from "lucide-react";
 
-import type { Notification } from "@/types/notification";
+import type { Notification } from "@/services/notificationService";
 
 interface NotificationItemProps {
   notification: Notification;
-  onRead: (id: string) => void;
-  onDelete: (id: string) => void;
-  onClick?: (notification: Notification) => void;
+  onRead: (notificationId: number) => void;
+  onDelete: (notificationId: number) => void;
 }
 
-function getIcon(type: Notification["type"]) {
+function getNotificationIcon(type: Notification["type"]) {
   switch (type) {
     case "DEPOSIT_REQUEST":
-      return CreditCard;
-
     case "DEPOSIT_APPROVED":
-      return CheckCircle2;
-
     case "DEPOSIT_REJECTED":
-      return XCircle;
+      return <Wallet size={18} />;
 
     case "WITHDRAW_REQUEST":
-      return Wallet;
-
     case "WITHDRAW_APPROVED":
-      return CheckCircle2;
-
     case "WITHDRAW_REJECTED":
-      return XCircle;
+      return <Wallet size={18} />;
 
-    case "TICKET_PURCHASED":
-      return Ticket;
-
-    case "TICKET_WIN":
-      return Trophy;
-
-    case "WALLET_CREDIT":
-      return Wallet;
-
-    case "WALLET_DEBIT":
-      return Wallet;
-
-    case "NEW_PLAYER":
-      return UserPlus;
-
-    case "RESULT_PUBLISHED":
-      return Gift;
-
-    case "ANNOUNCEMENT":
-      return Bell;
-
+    case "SYSTEM":
     default:
-      return CircleAlert;
+      return <Info size={18} />;
   }
-}
-
-function getTimeAgo(date: string): string {
-  const created = new Date(date).getTime();
-
-  const now = Date.now();
-
-  const seconds = Math.floor((now - created) / 1000);
-
-  if (seconds < 60) {
-    return "Just now";
-  }
-
-  const minutes = Math.floor(seconds / 60);
-
-  if (minutes < 60) {
-    return `${minutes}m ago`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-
-  if (hours < 24) {
-    return `${hours}h ago`;
-  }
-
-  const days = Math.floor(hours / 24);
-
-  if (days < 7) {
-    return `${days}d ago`;
-  }
-
-  return new Date(date).toLocaleDateString();
 }
 
 export default function NotificationItem({
   notification,
   onRead,
   onDelete,
-  onClick,
 }: NotificationItemProps) {
-  const Icon = getIcon(notification.type);
-
   return (
     <div
-      className={`group relative border-b border-slate-100 px-4 py-4 transition ${
-        notification.isRead ? "bg-white" : "bg-indigo-50/60"
+      className={`flex items-start gap-4 border-b border-slate-100 p-5 transition last:border-b-0 ${
+        notification.read ? "bg-white" : "bg-indigo-50/40"
       }`}
     >
-      <button
-        type="button"
-        onClick={() => {
-          if (!notification.isRead) {
-            onRead(notification.id);
-          }
-
-          onClick?.(notification);
-        }}
-        className="flex w-full gap-3 text-left"
+      {/* Icon */}
+      <div
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+          notification.read
+            ? "bg-slate-100 text-slate-500"
+            : "bg-indigo-100 text-indigo-600"
+        }`}
       >
-        <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-            notification.isRead
-              ? "bg-slate-100 text-slate-500"
-              : "bg-indigo-100 text-indigo-600"
-          }`}
-        >
-          <Icon size={18} />
-        </div>
+        {getNotificationIcon(notification.type)}
+      </div>
 
-        <div className="min-w-0 flex-1 pr-5">
-          <div className="flex items-start justify-between gap-2">
-            <p
-              className={`text-sm ${
-                notification.isRead
-                  ? "font-medium text-slate-700"
-                  : "font-bold text-slate-900"
+      {/* Content */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3
+              className={`text-sm font-semibold ${
+                notification.read ? "text-slate-700" : "text-slate-900"
               }`}
             >
               {notification.title}
-            </p>
+            </h3>
 
-            {!notification.isRead && (
-              <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-indigo-600" />
-            )}
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+              {notification.message}
+            </p>
           </div>
 
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            {notification.message}
-          </p>
-
-          <p className="mt-2 text-[11px] text-slate-400">
-            {getTimeAgo(notification.createdAt)}
-          </p>
+          {!notification.read && (
+            <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-indigo-600" />
+          )}
         </div>
-      </button>
 
-      <button
-        type="button"
-        onClick={() => onDelete(notification.id)}
-        className="absolute right-3 top-3 hidden rounded-md p-1 text-slate-300 transition hover:bg-slate-100 hover:text-slate-600 group-hover:block"
-        aria-label="Delete notification"
-      >
-        <XCircle size={15} />
-      </button>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <span className="text-xs text-slate-400">
+            {new Date(notification.createdAt).toLocaleString()}
+          </span>
+
+          {!notification.read && (
+            <button
+              type="button"
+              onClick={() => onRead(notification.id)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 transition hover:text-indigo-700"
+            >
+              <Check size={14} />
+              Mark as read
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => onDelete(notification.id)}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-500 transition hover:text-red-600"
+          >
+            <Trash2 size={14} />
+            Delete
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

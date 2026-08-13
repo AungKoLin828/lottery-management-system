@@ -1,3 +1,5 @@
+// src/pages/admin/BalanceManagement.tsx
+
 import { useState } from "react";
 
 import type { Wallet } from "@/types/wallet";
@@ -9,7 +11,18 @@ import Button from "@/components/common/Button";
 import Input from "@/components/common/Input";
 import Modal from "@/components/common/Modal";
 
+import {
+  notifyPlayerDepositApproved,
+  notifyPlayerDepositRejected,
+  notifyPlayerWithdrawApproved,
+  notifyPlayerWithdrawRejected,
+} from "@/services/notificationService";
+
 export default function BalanceManagement() {
+  /* ============================================================
+     STATE
+  ============================================================ */
+
   const [openModal, setOpenModal] = useState(false);
 
   const [selectedPlayer, setSelectedPlayer] = useState<Wallet | null>(null);
@@ -29,7 +42,13 @@ export default function BalanceManagement() {
   const [transactionNumber, setTransactionNumber] = useState("");
 
   const [note, setNote] = useState("");
-  // sample data
+
+  const [processing, setProcessing] = useState(false);
+
+  /* ============================================================
+     SAMPLE WALLETS
+  ============================================================ */
+
   const [wallets, setWallets] = useState<Wallet[]>([
     {
       id: 1,
@@ -38,7 +57,6 @@ export default function BalanceManagement() {
       phone: "09123456789",
       balance: 10000,
     },
-
     {
       id: 2,
       playerId: "P002",
@@ -48,50 +66,38 @@ export default function BalanceManagement() {
     },
   ]);
 
-  // sample data
+  /* ============================================================
+     SAMPLE DEPOSIT REQUESTS
+  ============================================================ */
+
   const [depositRequests, setDepositRequests] = useState<DepositRequest[]>([
     {
       id: 1,
-
       playerId: "P001",
-
       playerName: "Maung Maung",
-
       phone: "09123456789",
-
       requestedAmount: 5000,
-
       paymentMethod: "KBZPay",
-
       transactionNumber: "KBZ998877",
-
       status: "Pending",
-
       createdAt: "2026-08-05",
     },
-
     {
       id: 2,
-
       playerId: "P002",
-
       playerName: "Aung Aung",
-
       phone: "09987654321",
-
       requestedAmount: 10000,
-
       paymentMethod: "WavePay",
-
       transactionNumber: "WV123456",
-
       status: "Pending",
-
       createdAt: "2026-08-05",
     },
   ]);
 
-  // sample data
+  /* ============================================================
+     SAMPLE WITHDRAW REQUESTS
+  ============================================================ */
 
   const [withdrawRequests, setWithdrawRequests] = useState<WithdrawRequest[]>([
     {
@@ -107,603 +113,1141 @@ export default function BalanceManagement() {
     },
   ]);
 
-  const openApprove = (req: DepositRequest) => {
-    setSelectedRequest(req);
-    setApprovedAmount(String(req.requestedAmount));
-    setPaymentMethod(req.paymentMethod);
-    setTransactionNumber(req.transactionNumber);
-    setOpenApproveModal(true);
-  };
+  /* ============================================================
+     TRANSACTIONS
+  ============================================================ */
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
+  /* ============================================================
+     OPEN MANUAL DEPOSIT MODAL
+  ============================================================ */
+
   const openDeposit = (wallet: Wallet) => {
     setSelectedPlayer(wallet);
-
     setDepositAmount("");
-
     setNote("");
-
     setOpenModal(true);
   };
 
-  const handleDeposit = (e: React.FormEvent) => {
+  /* ============================================================
+     OPEN APPROVE DEPOSIT MODAL
+  ============================================================ */
+
+  const openApprove = (req: DepositRequest) => {
+    setSelectedRequest(req);
+
+    setApprovedAmount(String(req.requestedAmount));
+
+    setPaymentMethod(req.paymentMethod);
+
+    setTransactionNumber(req.transactionNumber);
+
+    setNote("");
+
+    setOpenApproveModal(true);
+  };
+
+  /* ============================================================
+     MANUAL DEPOSIT
+  ============================================================ */
+
+  const handleDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedPlayer) return;
+    if (!selectedPlayer) {
+      return;
+    }
 
     const amount = Number(depositAmount);
 
-    if (amount <= 0) {
-      alert("Invalid amount");
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("Please enter a valid deposit amount.");
       return;
     }
 
-    // update wallet balance
-    setWallets((prev) =>
-      prev.map((wallet) =>
-        wallet.id === selectedPlayer.id
-          ? {
-              ...wallet,
-              balance: wallet.balance + amount,
-            }
-          : wallet,
-      ),
-    );
+    try {
+      setProcessing(true);
 
-    // add transaction history
-    const transaction: Transaction = {
-      id: Date.now(),
+      const transactionId = Date.now();
 
-      playerId: selectedPlayer.playerId,
+      /* --------------------------------------------------------
+         Update wallet
+      -------------------------------------------------------- */
 
-      playerName: selectedPlayer.playerName,
+      setWallets((prev) =>
+        prev.map((wallet) =>
+          wallet.id === selectedPlayer.id
+            ? {
+                ...wallet,
+                balance: wallet.balance + amount,
+              }
+            : wallet,
+        ),
+      );
 
-      type: "Deposit",
+      /* --------------------------------------------------------
+         Create transaction
+      -------------------------------------------------------- */
 
-      amount,
+      const transaction: Transaction = {
+        id: transactionId,
 
-      note,
+        playerId: selectedPlayer.playerId,
 
-      createdBy: "admin",
+        playerName: selectedPlayer.playerName,
 
-      createdAt: new Date().toISOString().split("T")[0],
-    };
+        type: "Deposit",
 
-    setTransactions((prev) => [transaction, ...prev]);
+        amount,
 
-    setOpenModal(false);
+        note: note || "Manual deposit by admin",
+
+        createdBy: "admin",
+
+        createdAt: new Date().toISOString().split("T")[0],
+      };
+
+      setTransactions((prev) => [transaction, ...prev]);
+
+      /* --------------------------------------------------------
+         Notify player
+      -------------------------------------------------------- */
+
+      await notifyPlayerDepositApproved({
+        playerId: selectedPlayer.playerId,
+
+        depositId: String(transactionId),
+
+        amount,
+      });
+
+      /* --------------------------------------------------------
+         Close modal
+      -------------------------------------------------------- */
+
+      setOpenModal(false);
+
+      setSelectedPlayer(null);
+
+      setDepositAmount("");
+
+      setNote("");
+    } catch (error) {
+      console.error("Manual deposit error:", error);
+
+      alert("Deposit completed locally, but notification failed.");
+    } finally {
+      setProcessing(false);
+    }
   };
 
-  const handleApprove = (e: React.FormEvent) => {
+  /* ============================================================
+     APPROVE DEPOSIT
+  ============================================================ */
+
+  const handleApprove = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedRequest) return;
+    if (!selectedRequest) {
+      return;
+    }
 
     const amount = Number(approvedAmount);
 
-    if (amount <= 0) {
-      alert("Invalid amount");
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("Please enter a valid amount.");
       return;
     }
 
-    // Update player wallet balance
-    setWallets((prev) =>
-      prev.map((wallet) =>
-        wallet.playerId === selectedRequest.playerId
-          ? {
-              ...wallet,
-              balance: wallet.balance + amount,
-            }
-          : wallet,
-      ),
+    if (!paymentMethod.trim()) {
+      alert("Please enter payment method.");
+      return;
+    }
+
+    if (!transactionNumber.trim()) {
+      alert("Please enter transaction number.");
+      return;
+    }
+
+    const wallet = wallets.find(
+      (item) => item.playerId === selectedRequest.playerId,
     );
 
-    // Add transaction history
-    const transaction: Transaction = {
-      id: Date.now(),
+    if (!wallet) {
+      alert("Player wallet not found.");
+      return;
+    }
 
-      playerId: selectedRequest.playerId,
+    try {
+      setProcessing(true);
 
-      playerName: selectedRequest.playerName,
+      const transactionId = Date.now();
 
-      type: "Deposit",
+      /* --------------------------------------------------------
+         1. Update wallet
+      -------------------------------------------------------- */
 
-      amount,
+      setWallets((prev) =>
+        prev.map((wallet) =>
+          wallet.playerId === selectedRequest.playerId
+            ? {
+                ...wallet,
+                balance: wallet.balance + amount,
+              }
+            : wallet,
+        ),
+      );
 
-      note: `Approved via ${paymentMethod} - ${transactionNumber}`,
+      /* --------------------------------------------------------
+         2. Add transaction
+      -------------------------------------------------------- */
 
-      createdBy: "admin",
+      const transaction: Transaction = {
+        id: transactionId,
 
-      createdAt: new Date().toISOString().split("T")[0],
-    };
+        playerId: selectedRequest.playerId,
 
-    setTransactions((prev) => [transaction, ...prev]);
+        playerName: selectedRequest.playerName,
 
-    // Update request status
-    setDepositRequests((prev) =>
-      prev.map((req) =>
-        req.id === selectedRequest.id
-          ? {
-              ...req,
-              status: "Approved",
-              requestedAmount: amount,
-              paymentMethod,
-              transactionNumber,
-            }
-          : req,
-      ),
-    );
+        type: "Deposit",
 
-    // Close modal
-    setOpenApproveModal(false);
+        amount,
 
-    // Reset
-    setSelectedRequest(null);
-    setApprovedAmount("");
-    setPaymentMethod("");
-    setTransactionNumber("");
+        paymentMethod,
+
+        transactionNumber,
+
+        note:
+          note ||
+          `Deposit approved via ${paymentMethod} - ${transactionNumber}`,
+
+        createdBy: "admin",
+
+        createdAt: new Date().toISOString().split("T")[0],
+      };
+
+      setTransactions((prev) => [transaction, ...prev]);
+
+      /* --------------------------------------------------------
+         3. Update request
+      -------------------------------------------------------- */
+
+      setDepositRequests((prev) =>
+        prev.map((req) =>
+          req.id === selectedRequest.id
+            ? {
+                ...req,
+                status: "Approved",
+                requestedAmount: amount,
+                paymentMethod,
+                transactionNumber,
+              }
+            : req,
+        ),
+      );
+
+      /* --------------------------------------------------------
+         4. Notify player
+      -------------------------------------------------------- */
+
+      await notifyPlayerDepositApproved({
+        playerId: selectedRequest.playerId,
+
+        depositId: String(selectedRequest.id),
+
+        amount,
+      });
+
+      /* --------------------------------------------------------
+         5. Close modal
+      -------------------------------------------------------- */
+
+      setOpenApproveModal(false);
+
+      setSelectedRequest(null);
+
+      setApprovedAmount("");
+
+      setPaymentMethod("");
+
+      setTransactionNumber("");
+
+      setNote("");
+    } catch (error) {
+      console.error("Approve deposit error:", error);
+
+      alert("Deposit approval completed, but notification failed.");
+    } finally {
+      setProcessing(false);
+    }
   };
 
-  const handleReject = (req: DepositRequest) => {
+  /* ============================================================
+     REJECT DEPOSIT
+  ============================================================ */
+
+  const handleReject = async (req: DepositRequest) => {
     const confirmReject = window.confirm(
       `Reject deposit request from ${req.playerName}?`,
     );
 
-    if (!confirmReject) return;
+    if (!confirmReject) {
+      return;
+    }
 
-    setDepositRequests((prev) =>
-      prev.map((item) =>
-        item.id === req.id
-          ? {
-              ...item,
-              status: "Rejected",
-            }
-          : item,
-      ),
-    );
+    try {
+      setProcessing(true);
 
-    const transaction: Transaction = {
-      id: Date.now(),
+      /* --------------------------------------------------------
+         Update request
+      -------------------------------------------------------- */
 
-      playerId: req.playerId,
+      setDepositRequests((prev) =>
+        prev.map((item) =>
+          item.id === req.id
+            ? {
+                ...item,
+                status: "Rejected",
+              }
+            : item,
+        ),
+      );
 
-      playerName: req.playerName,
+      /* --------------------------------------------------------
+         Add transaction
+         
+         Use "Adjustment" because your Transaction
+         type may only allow:
+         Deposit | Withdraw | Adjustment
+      -------------------------------------------------------- */
 
-      type: "Reject Deposit",
+      const transaction: Transaction = {
+        id: Date.now(),
 
-      amount: req.requestedAmount,
+        playerId: req.playerId,
 
-      note: "Deposit request rejected",
+        playerName: req.playerName,
 
-      createdBy: "admin",
+        type: "Adjustment",
 
-      createdAt: new Date().toISOString().split("T")[0],
-    };
+        amount: 0,
 
-    setTransactions((prev) => [transaction, ...prev]);
+        paymentMethod: req.paymentMethod,
+
+        transactionNumber: req.transactionNumber,
+
+        note: `Deposit request rejected. Requested amount: ${req.requestedAmount}`,
+
+        createdBy: "admin",
+
+        createdAt: new Date().toISOString().split("T")[0],
+      };
+
+      setTransactions((prev) => [transaction, ...prev]);
+
+      /* --------------------------------------------------------
+         Notify player
+      -------------------------------------------------------- */
+
+      await notifyPlayerDepositRejected({
+        playerId: req.playerId,
+
+        depositId: String(req.id),
+
+        amount: req.requestedAmount,
+
+        reason: "Payment request was rejected by admin.",
+      });
+    } catch (error) {
+      console.error("Reject deposit error:", error);
+
+      alert("Deposit rejection completed, but notification failed.");
+    } finally {
+      setProcessing(false);
+    }
   };
 
-  const handleApproveWithdraw = (req: WithdrawRequest) => {
+  /* ============================================================
+     APPROVE WITHDRAW
+  ============================================================ */
+
+  const handleApproveWithdraw = async (req: WithdrawRequest) => {
     const amount = req.requestedAmount;
 
     const wallet = wallets.find((w) => w.playerId === req.playerId);
 
-    if (!wallet) return;
-
-    if (wallet.balance < amount) {
-      alert("Insufficient wallet balance");
+    if (!wallet) {
+      alert("Player wallet not found.");
       return;
     }
 
-    // Deduct balance
+    if (amount <= 0) {
+      alert("Invalid withdrawal amount.");
+      return;
+    }
 
-    setWallets((prev) =>
-      prev.map((wallet) =>
-        wallet.playerId === req.playerId
-          ? {
-              ...wallet,
-              balance: wallet.balance - amount,
-            }
-          : wallet,
-      ),
+    if (wallet.balance < amount) {
+      alert("Insufficient wallet balance.");
+      return;
+    }
+
+    const confirmApprove = window.confirm(
+      `Approve withdrawal of ${amount.toLocaleString()} MMK for ${req.playerName}?`,
     );
 
-    // Add transaction
+    if (!confirmApprove) {
+      return;
+    }
 
-    const transaction: Transaction = {
-      id: Date.now(),
+    try {
+      setProcessing(true);
 
-      playerId: req.playerId,
+      const transactionId = Date.now();
 
-      playerName: req.playerName,
+      /* --------------------------------------------------------
+         1. Deduct wallet balance
+      -------------------------------------------------------- */
 
-      type: "Withdraw",
+      setWallets((prev) =>
+        prev.map((wallet) =>
+          wallet.playerId === req.playerId
+            ? {
+                ...wallet,
+                balance: wallet.balance - amount,
+              }
+            : wallet,
+        ),
+      );
 
-      amount,
+      /* --------------------------------------------------------
+         2. Add transaction
+      -------------------------------------------------------- */
 
-      paymentMethod: req.paymentMethod,
+      const transaction: Transaction = {
+        id: transactionId,
 
-      transactionNumber: req.accountNumber,
+        playerId: req.playerId,
 
-      note: "Withdraw approved",
+        playerName: req.playerName,
 
-      createdBy: "admin",
+        type: "Withdraw",
 
-      createdAt: new Date().toISOString().split("T")[0],
-    };
+        amount,
 
-    setTransactions((prev) => [transaction, ...prev]);
+        paymentMethod: req.paymentMethod,
 
-    // update status
+        transactionNumber: req.accountNumber,
 
-    setWithdrawRequests((prev) =>
-      prev.map((item) =>
-        item.id === req.id
-          ? {
-              ...item,
-              status: "Approved",
-            }
-          : item,
-      ),
-    );
+        note: "Withdraw approved",
+
+        createdBy: "admin",
+
+        createdAt: new Date().toISOString().split("T")[0],
+      };
+
+      setTransactions((prev) => [transaction, ...prev]);
+
+      /* --------------------------------------------------------
+         3. Update withdraw request
+      -------------------------------------------------------- */
+
+      setWithdrawRequests((prev) =>
+        prev.map((item) =>
+          item.id === req.id
+            ? {
+                ...item,
+                status: "Approved",
+              }
+            : item,
+        ),
+      );
+
+      /* --------------------------------------------------------
+         4. Notify player
+      -------------------------------------------------------- */
+
+      await notifyPlayerWithdrawApproved({
+        playerId: req.playerId,
+
+        withdrawId: String(req.id),
+
+        amount,
+      });
+    } catch (error) {
+      console.error("Approve withdraw error:", error);
+
+      alert("Withdrawal approval completed, but notification failed.");
+    } finally {
+      setProcessing(false);
+    }
   };
 
-  const handleRejectWithdraw = (req: WithdrawRequest) => {
+  /* ============================================================
+     REJECT WITHDRAW
+  ============================================================ */
+
+  const handleRejectWithdraw = async (req: WithdrawRequest) => {
     const confirmReject = window.confirm(
       `Reject withdraw request from ${req.playerName}?`,
     );
 
-    if (!confirmReject) return;
+    if (!confirmReject) {
+      return;
+    }
 
-    setWithdrawRequests((prev) =>
-      prev.map((item) =>
-        item.id === req.id
-          ? {
-              ...item,
-              status: "Rejected",
-            }
-          : item,
-      ),
-    );
+    try {
+      setProcessing(true);
+
+      /* --------------------------------------------------------
+         Update status
+      -------------------------------------------------------- */
+
+      setWithdrawRequests((prev) =>
+        prev.map((item) =>
+          item.id === req.id
+            ? {
+                ...item,
+                status: "Rejected",
+              }
+            : item,
+        ),
+      );
+
+      /* --------------------------------------------------------
+         Add transaction
+      -------------------------------------------------------- */
+
+      const transaction: Transaction = {
+        id: Date.now(),
+
+        playerId: req.playerId,
+
+        playerName: req.playerName,
+
+        type: "Adjustment",
+
+        amount: 0,
+
+        paymentMethod: req.paymentMethod,
+
+        transactionNumber: req.accountNumber,
+
+        note: `Withdraw request rejected. Requested amount: ${req.requestedAmount}`,
+
+        createdBy: "admin",
+
+        createdAt: new Date().toISOString().split("T")[0],
+      };
+
+      setTransactions((prev) => [transaction, ...prev]);
+
+      /* --------------------------------------------------------
+         Notify player
+      -------------------------------------------------------- */
+
+      await notifyPlayerWithdrawRejected({
+        playerId: req.playerId,
+
+        withdrawId: String(req.id),
+
+        amount: req.requestedAmount,
+
+        reason: "Withdrawal request was rejected by admin.",
+      });
+    } catch (error) {
+      console.error("Reject withdraw error:", error);
+
+      alert("Withdrawal rejection completed, but notification failed.");
+    } finally {
+      setProcessing(false);
+    }
   };
 
+  /* ============================================================
+     STATUS BADGE
+  ============================================================ */
+
+  const statusClass = (status: string) => {
+    switch (status) {
+      case "Approved":
+        return "bg-green-100 text-green-700";
+
+      case "Rejected":
+        return "bg-red-100 text-red-700";
+
+      default:
+        return "bg-yellow-100 text-yellow-700";
+    }
+  };
+
+  /* ============================================================
+     RENDER
+  ============================================================ */
+
   return (
-    <div>
-      {/* Header */}
+    <div className="space-y-6">
+      {/* ======================================================
+          PAGE HEADER
+      ====================================================== */}
 
-      <div
-        className="
-        flex
-        justify-between
-        mb-6
-      "
-      >
-        <h1
-          className="
-          text-2xl
-          font-bold
-        "
-        >
-          Balance Management
-        </h1>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Balance Management</h1>
+
+        <p className="mt-1 text-sm text-gray-500">
+          Manage player wallets, deposits, withdrawals and transactions.
+        </p>
       </div>
 
-      {/* Wallet List */}
+      {/* ======================================================
+          WALLET LIST
+      ====================================================== */}
 
-      <div
-        className="
-        bg-white
-        rounded-xl
-        shadow
-        p-5
-        overflow-x-auto
-      "
-      >
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-100 border-b">
-              <th className="p-3 text-left">Player</th>
+      <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+        <div className="border-b px-6 py-4">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Player Wallets
+          </h2>
+        </div>
 
-              <th className="p-3 text-left">Phone</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3">Player ID</th>
 
-              <th className="p-3 text-left">Balance</th>
+                <th className="px-6 py-3">Player</th>
 
-              <th className="p-3">Action</th>
-            </tr>
-          </thead>
+                <th className="px-6 py-3">Phone</th>
 
-          <tbody>
-            {wallets.map((wallet) => (
-              <tr key={wallet.id} className="border-b">
-                <td className="p-3">{wallet.playerName}</td>
+                <th className="px-6 py-3">Balance</th>
 
-                <td className="p-3">{wallet.phone}</td>
-
-                <td className="p-3 font-bold">
-                  {wallet.balance.toLocaleString()} MMK
-                </td>
-
-                <td className="p-3">
-                  <Button variant="success" onClick={() => openDeposit(wallet)}>
-                    Deposit
-                  </Button>
-                </td>
+                <th className="px-6 py-3 text-right">Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+
+            <tbody className="divide-y">
+              {wallets.map((wallet) => (
+                <tr key={wallet.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 font-medium">{wallet.playerId}</td>
+
+                  <td className="px-6 py-4">{wallet.playerName}</td>
+
+                  <td className="px-6 py-4">{wallet.phone}</td>
+
+                  <td className="px-6 py-4 font-semibold text-green-600">
+                    {wallet.balance.toLocaleString()} MMK
+                  </td>
+
+                  <td className="px-6 py-4 text-right">
+                    <Button type="button" onClick={() => openDeposit(wallet)}>
+                      Deposit
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+
+              {wallets.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
+                    No wallets found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <h2 className="text-xl font-bold mb-4">Deposit Requests</h2>
+      {/* ======================================================
+          DEPOSIT REQUESTS
+      ====================================================== */}
 
-      <table className="w-full bg-white shadow rounded">
-        <thead>
-          <tr className="bg-gray-100">
-            <th className="p-3">Player</th>
+      <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b px-6 py-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Deposit Requests
+            </h2>
 
-            <th>Amount</th>
+            <p className="text-sm text-gray-500">
+              Review pending player deposits.
+            </p>
+          </div>
 
-            <th>Method</th>
+          <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700">
+            {depositRequests.filter((item) => item.status === "Pending").length}{" "}
+            Pending
+          </span>
+        </div>
 
-            <th>Transaction No</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3">Player</th>
 
-            <th>Status</th>
+                <th className="px-6 py-3">Amount</th>
 
-            <th>Action</th>
-          </tr>
-        </thead>
+                <th className="px-6 py-3">Payment</th>
 
-        <tbody>
-          {depositRequests.map((req) => (
-            <tr key={req.id} className="border-b">
-              <td className="p-3">{req.playerName}</td>
+                <th className="px-6 py-3">Transaction No.</th>
 
-              <td>
-                {req.requestedAmount}
-                MMK
-              </td>
+                <th className="px-6 py-3">Status</th>
 
-              <td>{req.paymentMethod}</td>
+                <th className="px-6 py-3">Date</th>
 
-              <td>{req.transactionNumber}</td>
-
-              <td>{req.status}</td>
-
-              <td className="flex gap-2 p-3">
-                {req.status === "Pending" && (
-                  <>
-                    <Button variant="success" onClick={() => openApprove(req)}>
-                      Approve
-                    </Button>
-
-                    <Button variant="danger" onClick={() => handleReject(req)}>
-                      Reject
-                    </Button>
-                  </>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <h2 className="text-xl font-bold mt-8 mb-4">Withdraw Requests</h2>
-
-      <table className="w-full bg-white shadow rounded">
-        <thead>
-          <tr className="bg-gray-100">
-            <th className="p-3">Player</th>
-
-            <th>Amount</th>
-
-            <th>Method</th>
-
-            <th>Account</th>
-
-            <th>Status</th>
-
-            <th>Action</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {withdrawRequests.map((req) => (
-            <tr key={req.id} className="border-b">
-              <td className="p-3">{req.playerName}</td>
-
-              <td>
-                {req.requestedAmount.toLocaleString()}
-                MMK
-              </td>
-
-              <td>{req.paymentMethod}</td>
-
-              <td>{req.accountNumber}</td>
-
-              <td>{req.status}</td>
-
-              <td className="flex gap-2 p-3">
-                {req.status === "Pending" && (
-                  <>
-                    <Button
-                      variant="success"
-                      onClick={() => handleApproveWithdraw(req)}
-                    >
-                      Approve
-                    </Button>
-
-                    <Button
-                      variant="danger"
-                      onClick={() => handleRejectWithdraw(req)}
-                    >
-                      Reject
-                    </Button>
-                  </>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {/* Transaction History */}
-
-      <div
-        className="
-        mt-8
-        bg-white
-        rounded-xl
-        shadow
-        p-5
-      "
-      >
-        <h2
-          className="
-          text-xl
-          font-bold
-          mb-4
-        "
-        >
-          Transaction History
-        </h2>
-
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="p-3">Player</th>
-
-              <th className="p-3">Type</th>
-
-              <th className="p-3">Amount</th>
-
-              <th className="p-3">Date</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {transactions.map((tx) => (
-              <tr key={tx.id} className="border-b">
-                <td className="p-3">{tx.playerName}</td>
-
-                <td className="p-3">{tx.type}</td>
-
-                <td className="p-3">{tx.amount.toLocaleString()} MMK</td>
-
-                <td className="p-3">{tx.createdAt}</td>
+                <th className="px-6 py-3 text-right">Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+
+            <tbody className="divide-y">
+              {depositRequests.map((req) => (
+                <tr key={req.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    <div className="font-medium">{req.playerName}</div>
+
+                    <div className="text-xs text-gray-500">{req.playerId}</div>
+                  </td>
+
+                  <td className="px-6 py-4 font-semibold">
+                    {req.requestedAmount.toLocaleString()} MMK
+                  </td>
+
+                  <td className="px-6 py-4">{req.paymentMethod}</td>
+
+                  <td className="px-6 py-4">{req.transactionNumber}</td>
+
+                  <td className="px-6 py-4">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(
+                        req.status,
+                      )}`}
+                    >
+                      {req.status}
+                    </span>
+                  </td>
+
+                  <td className="px-6 py-4">{req.createdAt}</td>
+
+                  <td className="px-6 py-4">
+                    {req.status === "Pending" && (
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          onClick={() => openApprove(req)}
+                          disabled={processing}
+                        >
+                          Approve
+                        </Button>
+
+                        <button
+                          type="button"
+                          disabled={processing}
+                          onClick={() => handleReject(req)}
+                          className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+
+              {depositRequests.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
+                    No deposit requests.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Deposit Modal */}
+      {/* ======================================================
+          WITHDRAW REQUESTS
+      ====================================================== */}
+
+      <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b px-6 py-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Withdraw Requests
+            </h2>
+
+            <p className="text-sm text-gray-500">
+              Review player withdrawal requests.
+            </p>
+          </div>
+
+          <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700">
+            {
+              withdrawRequests.filter((item) => item.status === "Pending")
+                .length
+            }{" "}
+            Pending
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3">Player</th>
+
+                <th className="px-6 py-3">Amount</th>
+
+                <th className="px-6 py-3">Payment</th>
+
+                <th className="px-6 py-3">Account</th>
+
+                <th className="px-6 py-3">Status</th>
+
+                <th className="px-6 py-3">Date</th>
+
+                <th className="px-6 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y">
+              {withdrawRequests.map((req) => (
+                <tr key={req.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    <div className="font-medium">{req.playerName}</div>
+
+                    <div className="text-xs text-gray-500">{req.playerId}</div>
+                  </td>
+
+                  <td className="px-6 py-4 font-semibold">
+                    {req.requestedAmount.toLocaleString()} MMK
+                  </td>
+
+                  <td className="px-6 py-4">{req.paymentMethod}</td>
+
+                  <td className="px-6 py-4">{req.accountNumber}</td>
+
+                  <td className="px-6 py-4">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(
+                        req.status,
+                      )}`}
+                    >
+                      {req.status}
+                    </span>
+                  </td>
+
+                  <td className="px-6 py-4">{req.createdAt}</td>
+
+                  <td className="px-6 py-4">
+                    {req.status === "Pending" && (
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          disabled={processing}
+                          onClick={() => handleApproveWithdraw(req)}
+                        >
+                          Approve
+                        </Button>
+
+                        <button
+                          type="button"
+                          disabled={processing}
+                          onClick={() => handleRejectWithdraw(req)}
+                          className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+
+              {withdrawRequests.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
+                    No withdraw requests.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ======================================================
+          TRANSACTION HISTORY
+      ====================================================== */}
+
+      <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+        <div className="border-b px-6 py-4">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Recent Transactions
+          </h2>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3">Player</th>
+
+                <th className="px-6 py-3">Type</th>
+
+                <th className="px-6 py-3">Amount</th>
+
+                <th className="px-6 py-3">Payment</th>
+
+                <th className="px-6 py-3">Transaction No.</th>
+
+                <th className="px-6 py-3">Note</th>
+
+                <th className="px-6 py-3">Date</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y">
+              {transactions.map((transaction) => (
+                <tr key={transaction.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    <div className="font-medium">{transaction.playerName}</div>
+
+                    <div className="text-xs text-gray-500">
+                      {transaction.playerId}
+                    </div>
+                  </td>
+
+                  <td className="px-6 py-4">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        transaction.type === "Deposit"
+                          ? "bg-green-100 text-green-700"
+                          : transaction.type === "Withdraw"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-gray-100 text-gray-700"
+                      }`}
+                    >
+                      {transaction.type}
+                    </span>
+                  </td>
+
+                  <td className="px-6 py-4 font-semibold">
+                    {transaction.amount.toLocaleString()} MMK
+                  </td>
+
+                  <td className="px-6 py-4">
+                    {transaction.paymentMethod || "-"}
+                  </td>
+
+                  <td className="px-6 py-4">
+                    {transaction.transactionNumber || "-"}
+                  </td>
+
+                  <td className="max-w-xs px-6 py-4 text-gray-600">
+                    {transaction.note || "-"}
+                  </td>
+
+                  <td className="px-6 py-4">{transaction.createdAt}</td>
+                </tr>
+              ))}
+
+              {transactions.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
+                    No transactions yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ======================================================
+          MANUAL DEPOSIT MODAL
+      ====================================================== */}
 
       <Modal
         open={openModal}
-        title="Deposit Balance"
-        onClose={() => setOpenModal(false)}
+        onClose={() => {
+          if (!processing) {
+            setOpenModal(false);
+            setSelectedPlayer(null);
+          }
+        }}
+        title="Manual Deposit"
       >
         <form onSubmit={handleDeposit} className="space-y-4">
-          <Input
-            label="Player"
-            value={selectedPlayer?.playerName ?? ""}
-            disabled
-          />
+          {selectedPlayer && (
+            <>
+              <div className="rounded-lg bg-gray-50 p-4">
+                <p className="text-sm text-gray-500">Player</p>
 
-          <Input
-            label="Deposit Amount"
-            type="number"
-            value={depositAmount}
-            onChange={(e) => setDepositAmount(e.target.value)}
-            placeholder="5000"
-          />
+                <p className="font-semibold text-gray-900">
+                  {selectedPlayer.playerName}
+                </p>
 
-          <Input
-            label="Note"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Cash deposit"
-          />
+                <p className="text-sm text-gray-500">
+                  {selectedPlayer.playerId}
+                </p>
 
-          <div
-            className="
-            flex
-            justify-end
-            gap-3
-          "
-          >
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpenModal(false)}
-            >
-              Cancel
-            </Button>
+                <p className="mt-2 text-sm text-gray-500">Current Balance</p>
 
-            <Button type="submit" variant="success">
-              Deposit
-            </Button>
-          </div>
+                <p className="font-semibold text-green-600">
+                  {selectedPlayer.balance.toLocaleString()} MMK
+                </p>
+              </div>
+
+              <Input
+                label="Deposit Amount"
+                type="number"
+                min="1"
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(e.target.value)}
+                placeholder="Enter amount"
+                required
+              />
+
+              <Input
+                label="Note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Optional note"
+              />
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={processing}
+                  onClick={() => setOpenModal(false)}
+                  className="rounded-md border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+
+                <Button type="submit" disabled={processing}>
+                  {processing ? "Processing..." : "Deposit"}
+                </Button>
+              </div>
+            </>
+          )}
         </form>
       </Modal>
 
-      {/* Approve Modal */}
+      {/* ======================================================
+          APPROVE DEPOSIT MODAL
+      ====================================================== */}
+
       <Modal
         open={openApproveModal}
-        title="Approve Deposit"
         onClose={() => {
-          setOpenApproveModal(false);
-          setSelectedRequest(null);
+          if (!processing) {
+            setOpenApproveModal(false);
+            setSelectedRequest(null);
+          }
         }}
+        title="Approve Deposit"
       >
         <form onSubmit={handleApprove} className="space-y-4">
-          <Input
-            label="Player"
-            value={selectedRequest?.playerName ?? ""}
-            disabled
-          />
+          {selectedRequest && (
+            <>
+              <div className="rounded-lg bg-gray-50 p-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-500">Player</p>
 
-          <Input
-            label="Approved Amount"
-            type="number"
-            value={approvedAmount}
-            onChange={(e) => setApprovedAmount(e.target.value)}
-          />
+                    <p className="font-semibold">
+                      {selectedRequest.playerName}
+                    </p>
+                  </div>
 
-          <select
-            className="border p-2 w-full"
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value)}
-          >
-            <option>KBZPay</option>
+                  <div>
+                    <p className="text-gray-500">Player ID</p>
 
-            <option>WavePay</option>
+                    <p className="font-semibold">{selectedRequest.playerId}</p>
+                  </div>
 
-            <option>AYA Pay</option>
+                  <div>
+                    <p className="text-gray-500">Requested Amount</p>
 
-            <option>Bank Transfer</option>
-          </select>
+                    <p className="font-semibold text-green-600">
+                      {selectedRequest.requestedAmount.toLocaleString()} MMK
+                    </p>
+                  </div>
 
-          <Input
-            label="Transaction Number"
-            value={transactionNumber}
-            onChange={(e) => setTransactionNumber(e.target.value)}
-          />
+                  <div>
+                    <p className="text-gray-500">Requested Payment</p>
 
-          <div className="flex justify-end gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpenApproveModal(false)}
-            >
-              Cancel
-            </Button>
+                    <p className="font-semibold">
+                      {selectedRequest.paymentMethod}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-            <Button type="submit" variant="success">
-              Approve
-            </Button>
-          </div>
+              <Input
+                label="Approved Amount"
+                type="number"
+                min="1"
+                value={approvedAmount}
+                onChange={(e) => setApprovedAmount(e.target.value)}
+                required
+              />
+
+              <Input
+                label="Payment Method"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                placeholder="KBZPay / WavePay / Bank Transfer"
+                required
+              />
+
+              <Input
+                label="Transaction Number"
+                value={transactionNumber}
+                onChange={(e) => setTransactionNumber(e.target.value)}
+                placeholder="Enter transaction number"
+                required
+              />
+
+              <Input
+                label="Note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Optional note"
+              />
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={processing}
+                  onClick={() => setOpenApproveModal(false)}
+                  className="rounded-md border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+
+                <Button type="submit" disabled={processing}>
+                  {processing ? "Processing..." : "Approve Deposit"}
+                </Button>
+              </div>
+            </>
+          )}
         </form>
       </Modal>
     </div>

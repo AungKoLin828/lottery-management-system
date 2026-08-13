@@ -1,11 +1,16 @@
+// src/hooks/useNotifications.ts
+
 import { useCallback, useEffect, useState } from "react";
 
-import type { Notification, NotificationRole } from "@/types/notification";
+import type {
+  Notification,
+  NotificationRole,
+} from "@/services/notificationService";
 
 import {
   clearNotifications,
   deleteNotification,
-  getNotifications,
+  getNotificationsByRole,
   getUnreadNotificationCount,
   markAllNotificationsAsRead,
   markNotificationAsRead,
@@ -14,18 +19,24 @@ import {
 export function useNotifications(role: NotificationRole) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const loadNotifications = useCallback(async () => {
+  /* ============================================================
+     LOAD
+  ============================================================ */
+
+  const loadNotifications = useCallback(() => {
     try {
-      const [notificationData, unread] = await Promise.all([
-        getNotifications(role),
-        getUnreadNotificationCount(role),
-      ]);
+      setLoading(true);
 
-      setNotifications(notificationData);
+      const data = getNotificationsByRole(role);
+
+      const unread = getUnreadNotificationCount(role);
+
+      setNotifications(data);
+
       setUnreadCount(unread);
     } catch (error) {
       console.error("Failed to load notifications:", error);
@@ -34,110 +45,175 @@ export function useNotifications(role: NotificationRole) {
     }
   }, [role]);
 
+  /* ============================================================
+     INITIAL LOAD + POLLING
+  ============================================================ */
+
   useEffect(() => {
     loadNotifications();
 
-    const handleNotificationChange = () => {
+    const handleNotificationCreated = () => {
+      loadNotifications();
+    };
+
+    const handleNotificationUpdated = () => {
       loadNotifications();
     };
 
     window.addEventListener(
       "lottery-notification-created",
-      handleNotificationChange,
+      handleNotificationCreated,
     );
 
     window.addEventListener(
       "lottery-notification-updated",
-      handleNotificationChange,
+      handleNotificationUpdated,
     );
 
-    /**
-     * Poll every 15 seconds.
-     *
-     * Later this can be replaced by
-     * Socket.IO/WebSocket.
-     */
     const interval = window.setInterval(loadNotifications, 15000);
 
     return () => {
       window.removeEventListener(
         "lottery-notification-created",
-        handleNotificationChange,
+        handleNotificationCreated,
       );
 
       window.removeEventListener(
         "lottery-notification-updated",
-        handleNotificationChange,
+        handleNotificationUpdated,
       );
 
       window.clearInterval(interval);
     };
   }, [loadNotifications]);
 
-  const markAsRead = async (notificationId: string) => {
-    await markNotificationAsRead(notificationId);
+  /* ============================================================
+     MARK ONE AS READ
+  ============================================================ */
 
-    setNotifications((current) =>
-      current.map((notification) =>
-        notification.id === notificationId
-          ? {
-              ...notification,
-              isRead: true,
-              readAt: new Date().toISOString(),
-            }
-          : notification,
-      ),
-    );
+  const markAsRead = useCallback(
+    (notificationId: number) => {
+      const target = notifications.find(
+        (notification) => notification.id === notificationId,
+      );
 
-    setUnreadCount((current) => Math.max(0, current - 1));
-  };
+      if (!target) {
+        return;
+      }
 
-  const markAllAsRead = async () => {
-    await markAllNotificationsAsRead(role);
+      if (target.read) {
+        return;
+      }
 
-    setNotifications((current) =>
-      current.map((notification) => ({
-        ...notification,
-        isRead: true,
-        readAt: notification.readAt ?? new Date().toISOString(),
-      })),
-    );
+      try {
+        markNotificationAsRead(notificationId);
 
-    setUnreadCount(0);
-  };
+        setNotifications((current) =>
+          current.map((notification) =>
+            notification.id === notificationId
+              ? {
+                  ...notification,
+                  read: true,
+                }
+              : notification,
+          ),
+        );
 
-  const removeNotification = async (notificationId: string) => {
-    const target = notifications.find(
-      (notification) => notification.id === notificationId,
-    );
+        setUnreadCount((current) => Math.max(0, current - 1));
+      } catch (error) {
+        console.error("Failed to mark notification as read:", error);
+      }
+    },
+    [notifications],
+  );
 
-    await deleteNotification(notificationId);
+  /* ============================================================
+     MARK ALL AS READ
+  ============================================================ */
 
-    setNotifications((current) =>
-      current.filter((notification) => notification.id !== notificationId),
-    );
+  const markAllAsRead = useCallback(() => {
+    try {
+      markAllNotificationsAsRead(role);
 
-    if (target && !target.isRead) {
-      setUnreadCount((current) => Math.max(0, current - 1));
+      setNotifications((current) =>
+        current.map((notification) => ({
+          ...notification,
+          read: true,
+        })),
+      );
+
+      setUnreadCount(0);
+    } catch (error) {
+      console.error("Failed to mark all notifications as read:", error);
     }
-  };
+  }, [role]);
 
-  const clearAll = async () => {
-    await clearNotifications(role);
+  /* ============================================================
+     DELETE
+  ============================================================ */
 
-    setNotifications([]);
+  const removeNotification = useCallback(
+    (notificationId: number) => {
+      const target = notifications.find(
+        (notification) => notification.id === notificationId,
+      );
 
-    setUnreadCount(0);
-  };
+      if (!target) {
+        return;
+      }
+
+      try {
+        deleteNotification(notificationId);
+
+        setNotifications((current) =>
+          current.filter((notification) => notification.id !== notificationId),
+        );
+
+        if (!target.read) {
+          setUnreadCount((current) => Math.max(0, current - 1));
+        }
+      } catch (error) {
+        console.error("Failed to delete notification:", error);
+      }
+    },
+    [notifications],
+  );
+
+  /* ============================================================
+     CLEAR ALL
+  ============================================================ */
+
+  const clearAll = useCallback(() => {
+    try {
+      clearNotifications(role);
+
+      setNotifications([]);
+
+      setUnreadCount(0);
+    } catch (error) {
+      console.error("Failed to clear notifications:", error);
+    }
+  }, [role]);
+
+  /* ============================================================
+     RETURN
+  ============================================================ */
 
   return {
     notifications,
+
     unreadCount,
+
     loading,
+
     refresh: loadNotifications,
+
     markAsRead,
+
     markAllAsRead,
+
     removeNotification,
+
     clearAll,
   };
 }

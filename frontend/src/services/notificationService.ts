@@ -1,86 +1,142 @@
-import type {
-  Notification,
-  NotificationRole,
-  NotificationType,
-  NotificationReferenceType,
-} from "@/types/notification";
+// src/services/notificationService.ts
+
+export type NotificationType =
+  | "DEPOSIT_REQUEST"
+  | "DEPOSIT_APPROVED"
+  | "DEPOSIT_REJECTED"
+  | "WITHDRAW_REQUEST"
+  | "WITHDRAW_APPROVED"
+  | "WITHDRAW_REJECTED"
+  | "SYSTEM";
+
+export type NotificationRole = "ADMIN" | "PLAYER";
+
+export interface Notification {
+  id: number;
+
+  userId: string;
+
+  role: NotificationRole;
+
+  type: NotificationType;
+
+  title: string;
+
+  message: string;
+
+  referenceId?: string;
+
+  referenceType?: string;
+
+  read: boolean;
+
+  createdAt: string;
+}
 
 const STORAGE_KEY = "lottery_notifications";
 
-const CURRENT_PLAYER_ID = "P001";
-const CURRENT_ADMIN_ID = "ADMIN001";
+const NOTIFICATION_CREATED_EVENT = "lottery-notification-created";
 
-function getStoredNotifications(): Notification[] {
+const NOTIFICATION_UPDATED_EVENT = "lottery-notification-updated";
+
+/* ============================================================
+   INTERNAL HELPERS
+============================================================ */
+
+function notifyCreated(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(NOTIFICATION_CREATED_EVENT));
+  }
+}
+
+function notifyUpdated(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(NOTIFICATION_UPDATED_EVENT));
+  }
+}
+
+/* ============================================================
+   GET ALL NOTIFICATIONS
+============================================================ */
+
+export function getNotifications(): Notification[] {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const data = localStorage.getItem(STORAGE_KEY);
 
-    if (!stored) {
+    if (!data) {
       return [];
     }
 
-    return JSON.parse(stored) as Notification[];
+    const parsed: unknown = JSON.parse(data);
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed as Notification[];
   } catch (error) {
     console.error("Failed to read notifications:", error);
+
     return [];
   }
 }
 
-function saveNotifications(notifications: Notification[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
+/* ============================================================
+   SAVE NOTIFICATIONS
+============================================================ */
+
+function saveNotifications(notifications: Notification[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
+  } catch (error) {
+    console.error("Failed to save notifications:", error);
+  }
 }
 
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-}
+/* ============================================================
+   GET NOTIFICATIONS BY ROLE
+============================================================ */
 
-/**
- * Get notifications for current user.
- */
-export async function getNotifications(
-  role: NotificationRole,
-): Promise<Notification[]> {
-  const notifications = getStoredNotifications();
-
-  const userId = role === "PLAYER" ? CURRENT_PLAYER_ID : CURRENT_ADMIN_ID;
-
-  return notifications
-    .filter(
-      (notification) =>
-        notification.userId === userId && notification.role === role,
-    )
+export function getNotificationsByRole(role: NotificationRole): Notification[] {
+  return getNotifications()
+    .filter((notification) => notification.role === role)
     .sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
 }
 
-/**
- * Get unread notification count.
- */
-export async function getUnreadNotificationCount(
-  role: NotificationRole,
-): Promise<number> {
-  const notifications = await getNotifications(role);
+/* ============================================================
+   GET UNREAD COUNT
+============================================================ */
 
-  return notifications.filter((notification) => !notification.isRead).length;
+export function getUnreadNotificationCount(role: NotificationRole): number {
+  return getNotifications().filter(
+    (notification) => notification.role === role && !notification.read,
+  ).length;
 }
 
-/**
- * Create notification.
- */
-export async function createNotification(params: {
-  userId: string;
-  role: NotificationRole;
-  type: NotificationType;
-  title: string;
-  message: string;
-  referenceId?: string;
-  referenceType?: NotificationReferenceType;
-}): Promise<Notification> {
-  const notifications = getStoredNotifications();
+/* ============================================================
+   CREATE NOTIFICATION
+============================================================ */
 
+export function createNotification(params: {
+  userId: string;
+
+  role: NotificationRole;
+
+  type: NotificationType;
+
+  title: string;
+
+  message: string;
+
+  referenceId?: string;
+
+  referenceType?: string;
+}): Notification {
   const notification: Notification = {
-    id: generateId(),
+    id: Date.now(),
 
     userId: params.userId,
 
@@ -96,140 +152,124 @@ export async function createNotification(params: {
 
     referenceType: params.referenceType,
 
-    isRead: false,
+    read: false,
 
     createdAt: new Date().toISOString(),
   };
 
-  notifications.unshift(notification);
+  const notifications = getNotifications();
 
-  saveNotifications(notifications);
+  saveNotifications([notification, ...notifications]);
 
-  window.dispatchEvent(new CustomEvent("lottery-notification-created"));
+  notifyCreated();
 
   return notification;
 }
 
-/**
- * Mark one notification as read.
- */
-export async function markNotificationAsRead(
-  notificationId: string,
-): Promise<void> {
-  const notifications = getStoredNotifications();
+/* ============================================================
+   MARK ONE NOTIFICATION AS READ
+============================================================ */
 
-  const updated = notifications.map((notification) =>
+export function markNotificationAsRead(notificationId: number): void {
+  const notifications = getNotifications();
+
+  const target = notifications.find(
+    (notification) => notification.id === notificationId,
+  );
+
+  if (!target) {
+    return;
+  }
+
+  if (target.read) {
+    return;
+  }
+
+  const updatedNotifications = notifications.map((notification) =>
     notification.id === notificationId
       ? {
           ...notification,
-          isRead: true,
-          readAt: new Date().toISOString(),
+          read: true,
         }
       : notification,
   );
 
-  saveNotifications(updated);
+  saveNotifications(updatedNotifications);
 
-  window.dispatchEvent(new CustomEvent("lottery-notification-updated"));
+  notifyUpdated();
 }
 
-/**
- * Mark all notifications as read.
- */
-export async function markAllNotificationsAsRead(
-  role: NotificationRole,
-): Promise<void> {
-  const userId = role === "PLAYER" ? CURRENT_PLAYER_ID : CURRENT_ADMIN_ID;
+/* ============================================================
+   MARK ALL AS READ
+============================================================ */
 
-  const notifications = getStoredNotifications();
+export function markAllNotificationsAsRead(role: NotificationRole): void {
+  const notifications = getNotifications();
 
-  const updated = notifications.map((notification) =>
-    notification.userId === userId && notification.role === role
-      ? {
-          ...notification,
-          isRead: true,
-          readAt: notification.readAt ?? new Date().toISOString(),
-        }
-      : notification,
-  );
+  const updatedNotifications = notifications.map((notification) => {
+    if (notification.role === role && !notification.read) {
+      return {
+        ...notification,
+        read: true,
+      };
+    }
 
-  saveNotifications(updated);
+    return notification;
+  });
 
-  window.dispatchEvent(new CustomEvent("lottery-notification-updated"));
+  saveNotifications(updatedNotifications);
+
+  notifyUpdated();
 }
 
-/**
- * Delete one notification.
- */
-export async function deleteNotification(
-  notificationId: string,
-): Promise<void> {
-  const notifications = getStoredNotifications();
+/* ============================================================
+   DELETE NOTIFICATION
+============================================================ */
 
-  const updated = notifications.filter(
+export function deleteNotification(notificationId: number): void {
+  const notifications = getNotifications();
+
+  const updatedNotifications = notifications.filter(
     (notification) => notification.id !== notificationId,
   );
 
-  saveNotifications(updated);
+  saveNotifications(updatedNotifications);
 
-  window.dispatchEvent(new CustomEvent("lottery-notification-updated"));
+  notifyUpdated();
 }
 
-/**
- * Delete all notifications for a role.
- */
-export async function clearNotifications(
-  role: NotificationRole,
-): Promise<void> {
-  const userId = role === "PLAYER" ? CURRENT_PLAYER_ID : CURRENT_ADMIN_ID;
+/* ============================================================
+   CLEAR NOTIFICATIONS FOR ROLE
+============================================================ */
 
-  const notifications = getStoredNotifications();
+export function clearNotifications(role: NotificationRole): void {
+  const notifications = getNotifications();
 
-  const updated = notifications.filter(
-    (notification) =>
-      !(notification.userId === userId && notification.role === role),
+  const updatedNotifications = notifications.filter(
+    (notification) => notification.role !== role,
   );
 
-  saveNotifications(updated);
+  saveNotifications(updatedNotifications);
 
-  window.dispatchEvent(new CustomEvent("lottery-notification-updated"));
+  notifyUpdated();
 }
+
+/* ============================================================
+   PLAYER NOTIFICATIONS
+============================================================ */
 
 /**
- * ------------------------------------------------------------
- * BUSINESS NOTIFICATION HELPERS
- * ------------------------------------------------------------
+ * Deposit approved
  */
+export function notifyPlayerDepositApproved(params: {
+  playerId: string;
 
-export async function notifyAdminDepositRequest(params: {
   depositId: string;
-  playerName: string;
+
   amount: number;
-  paymentMethod: string;
-}) {
+}): Notification {
   return createNotification({
-    userId: CURRENT_ADMIN_ID,
-
-    role: "ADMIN",
-
-    type: "DEPOSIT_REQUEST",
-
-    title: "New Deposit Request",
-
-    message: `${params.playerName} requested ${params.amount.toLocaleString()} MMK via ${params.paymentMethod}.`,
-
-    referenceId: params.depositId,
-
-    referenceType: "DEPOSIT",
-  });
-}
-
-export async function notifyPlayerDepositApproved(params: {
-  depositId: string;
-  amount: number;
-}) {
-  return createNotification({
-    userId: CURRENT_PLAYER_ID,
+    userId: params.playerId,
 
     role: "PLAYER",
 
@@ -237,7 +277,9 @@ export async function notifyPlayerDepositApproved(params: {
 
     title: "Deposit Approved",
 
-    message: `${params.amount.toLocaleString()} MMK has been added to your wallet.`,
+    message:
+      `${params.amount.toLocaleString()} MMK ` +
+      "has been added to your wallet.",
 
     referenceId: params.depositId,
 
@@ -245,13 +287,20 @@ export async function notifyPlayerDepositApproved(params: {
   });
 }
 
-export async function notifyPlayerDepositRejected(params: {
+/**
+ * Deposit rejected
+ */
+export function notifyPlayerDepositRejected(params: {
+  playerId: string;
+
   depositId: string;
+
   amount: number;
+
   reason?: string;
-}) {
+}): Notification {
   return createNotification({
-    userId: CURRENT_PLAYER_ID,
+    userId: params.playerId,
 
     role: "PLAYER",
 
@@ -259,9 +308,10 @@ export async function notifyPlayerDepositRejected(params: {
 
     title: "Deposit Rejected",
 
-    message: `Your deposit request for ${params.amount.toLocaleString()} MMK was rejected.${
-      params.reason ? ` Reason: ${params.reason}` : ""
-    }`,
+    message:
+      `Your deposit request for ` +
+      `${params.amount.toLocaleString()} MMK ` +
+      `was rejected.${params.reason ? ` ${params.reason}` : ""}`,
 
     referenceId: params.depositId,
 
@@ -269,42 +319,29 @@ export async function notifyPlayerDepositRejected(params: {
   });
 }
 
-export async function notifyAdminWithdrawRequest(params: {
+/**
+ * Withdraw approved
+ */
+export function notifyPlayerWithdrawApproved(params: {
+  playerId: string;
+
   withdrawId: string;
-  playerName: string;
+
   amount: number;
-}) {
+}): Notification {
   return createNotification({
-    userId: CURRENT_ADMIN_ID,
-
-    role: "ADMIN",
-
-    type: "WITHDRAW_REQUEST",
-
-    title: "New Withdraw Request",
-
-    message: `${params.playerName} requested a withdrawal of ${params.amount.toLocaleString()} MMK.`,
-
-    referenceId: params.withdrawId,
-
-    referenceType: "WITHDRAW",
-  });
-}
-
-export async function notifyPlayerWithdrawApproved(params: {
-  withdrawId: string;
-  amount: number;
-}) {
-  return createNotification({
-    userId: CURRENT_PLAYER_ID,
+    userId: params.playerId,
 
     role: "PLAYER",
 
     type: "WITHDRAW_APPROVED",
 
-    title: "Withdraw Approved",
+    title: "Withdrawal Approved",
 
-    message: `Your withdrawal of ${params.amount.toLocaleString()} MMK has been approved.`,
+    message:
+      `Your withdrawal request for ` +
+      `${params.amount.toLocaleString()} MMK ` +
+      "has been approved.",
 
     referenceId: params.withdrawId,
 
@@ -312,23 +349,31 @@ export async function notifyPlayerWithdrawApproved(params: {
   });
 }
 
-export async function notifyPlayerWithdrawRejected(params: {
+/**
+ * Withdraw rejected
+ */
+export function notifyPlayerWithdrawRejected(params: {
+  playerId: string;
+
   withdrawId: string;
+
   amount: number;
+
   reason?: string;
-}) {
+}): Notification {
   return createNotification({
-    userId: CURRENT_PLAYER_ID,
+    userId: params.playerId,
 
     role: "PLAYER",
 
     type: "WITHDRAW_REJECTED",
 
-    title: "Withdraw Rejected",
+    title: "Withdrawal Rejected",
 
-    message: `Your withdrawal of ${params.amount.toLocaleString()} MMK was rejected.${
-      params.reason ? ` Reason: ${params.reason}` : ""
-    }`,
+    message:
+      `Your withdrawal request for ` +
+      `${params.amount.toLocaleString()} MMK ` +
+      `was rejected.${params.reason ? ` ${params.reason}` : ""}`,
 
     referenceId: params.withdrawId,
 
@@ -336,69 +381,68 @@ export async function notifyPlayerWithdrawRejected(params: {
   });
 }
 
-export async function notifyPlayerTicketPurchased(params: {
-  ticketId: string;
-  lotteryType: "2D" | "3D";
-  number: string;
-  amount: number;
-}) {
-  return createNotification({
-    userId: CURRENT_PLAYER_ID,
+/* ============================================================
+   ADMIN NOTIFICATIONS
+============================================================ */
 
-    role: "PLAYER",
+/**
+ * New deposit request
+ */
+export function notifyAdminDepositRequest(params: {
+  depositId: string;
 
-    type: "TICKET_PURCHASED",
-
-    title: "Ticket Purchased",
-
-    message: `${params.lotteryType} ticket ${params.number} purchased for ${params.amount.toLocaleString()} MMK.`,
-
-    referenceId: params.ticketId,
-
-    referenceType: "TICKET",
-  });
-}
-
-export async function notifyPlayerTicketWin(params: {
-  ticketId: string;
-  lotteryType: "2D" | "3D";
-  number: string;
-  prize: number;
-}) {
-  return createNotification({
-    userId: CURRENT_PLAYER_ID,
-
-    role: "PLAYER",
-
-    type: "TICKET_WIN",
-
-    title: "🎉 Winning Ticket!",
-
-    message: `Congratulations! Your ${params.lotteryType} ticket ${params.number} won ${params.prize.toLocaleString()} MMK.`,
-
-    referenceId: params.ticketId,
-
-    referenceType: "TICKET",
-  });
-}
-
-export async function notifyAdminNewPlayer(params: {
   playerId: string;
+
   playerName: string;
-}) {
+
+  amount: number;
+}): Notification {
   return createNotification({
-    userId: CURRENT_ADMIN_ID,
+    userId: "ADMIN",
 
     role: "ADMIN",
 
-    type: "NEW_PLAYER",
+    type: "DEPOSIT_REQUEST",
 
-    title: "New Player Registered",
+    title: "New Deposit Request",
 
-    message: `${params.playerName} has registered as a new player.`,
+    message:
+      `${params.playerName} requested ` +
+      `${params.amount.toLocaleString()} MMK deposit.`,
 
-    referenceId: params.playerId,
+    referenceId: params.depositId,
 
-    referenceType: "PLAYER",
+    referenceType: "DEPOSIT",
+  });
+}
+
+/**
+ * New withdraw request
+ */
+export function notifyAdminWithdrawRequest(params: {
+  withdrawId: string;
+
+  playerId: string;
+
+  playerName: string;
+
+  amount: number;
+}): Notification {
+  return createNotification({
+    userId: "ADMIN",
+
+    role: "ADMIN",
+
+    type: "WITHDRAW_REQUEST",
+
+    title: "New Withdrawal Request",
+
+    message:
+      `${params.playerName} requested ` +
+      `${params.amount.toLocaleString()} MMK withdrawal.`,
+
+    referenceId: params.withdrawId,
+
+    referenceType: "WITHDRAW",
   });
 }

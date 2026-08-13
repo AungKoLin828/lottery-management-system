@@ -5,7 +5,12 @@ export interface Transaction {
 
   playerName: string;
 
-  type: "Deposit" | "Withdraw" | "Adjustment" | "Reject Deposit";
+  type:
+    | "Deposit"
+    | "Withdraw"
+    | "Adjustment"
+    | "Reject Deposit"
+    | "Reject Withdraw";
 
   amount: number;
 
