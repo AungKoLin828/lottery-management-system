@@ -4,7 +4,7 @@ import NotificationItem from "@/components/common/notification/NotificationItem"
 
 import { useNotifications } from "@/hooks/useNotifications";
 
-export default function PlayerNotifications() {
+export default function AdminNotifications() {
   const {
     notifications,
     unreadCount,
@@ -13,7 +13,7 @@ export default function PlayerNotifications() {
     markAllAsRead,
     removeNotification,
     clearAll,
-  } = useNotifications("PLAYER");
+  } = useNotifications("ADMIN");
 
   return (
     <div className="space-y-6">
@@ -31,7 +31,7 @@ export default function PlayerNotifications() {
               </h1>
 
               <p className="mt-1 text-sm text-slate-500">
-                Stay updated with your account activity.
+                Monitor important system and player activities.
               </p>
             </div>
           </div>
@@ -62,7 +62,7 @@ export default function PlayerNotifications() {
         </div>
       </div>
 
-      {/* Notification Card */}
+      {/* Notifications */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {loading ? (
           <div className="p-10 text-center text-sm text-slate-400">
@@ -79,7 +79,8 @@ export default function PlayerNotifications() {
             </h2>
 
             <p className="mt-1 max-w-sm text-sm text-slate-500">
-              You don't have any notifications yet.
+              New deposit, withdrawal, registration and system events will
+              appear here.
             </p>
           </div>
         ) : (

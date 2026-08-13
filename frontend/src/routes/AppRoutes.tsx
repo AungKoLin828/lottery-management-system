@@ -14,6 +14,7 @@ import Login from "@/pages/auth/Login";
 import Register from "@/pages/auth/Register";
 import ResultsHistory from "@/pages/public/ResultsHistory";
 import About from "@/pages/public/About";
+import AdminNotifications from "@/pages/admin/Notifications";
 
 export default function AppRoutes() {
   return (
@@ -26,6 +27,7 @@ export default function AppRoutes() {
         <Route path="/admin/users" element={<UserManagement />} />
         <Route path="/admin/settings" element={<Settings />} />
         <Route path="/admin/reports" element={<Reports />} />
+        <Route path="notifications" element={<AdminNotifications />} />
       </Route>
 
       {/* Player */}

@@ -9,8 +9,9 @@ import Play3D from "@/pages/player/Play3D";
 import MyTickets from "@/pages/player/MyTickets";
 import Wallet from "@/pages/player/Wallet";
 import Profile from "@/pages/player/Profile";
-import Contact from "@/pages/public/Contact";
+import Contact from "@/pages/player/Contact";
 import ResultsHistory from "@/pages/public/ResultsHistory";
+import PlayerNotifications from "@/pages/player/Notifications";
 
 export function PlayerRoutes() {
   return (
@@ -30,6 +31,8 @@ export function PlayerRoutes() {
       <Route path="contact" element={<Contact />} />
 
       <Route path="results-history" element={<ResultsHistory />} />
+
+      <Route path="notifications" element={<PlayerNotifications />} />
     </Route>
   );
 }

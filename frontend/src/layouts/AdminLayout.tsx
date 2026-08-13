@@ -1,4 +1,5 @@
 import { Outlet, Link } from "react-router-dom";
+import NotificationBell from "@/components/common/notification/NotificationBell";
 
 export default function AdminLayout() {
   return (
@@ -66,7 +67,7 @@ export default function AdminLayout() {
         {/* Header */}
         <header className="flex items-center justify-between border-b bg-white px-6 py-4 shadow-sm">
           <h2 className="font-semibold text-gray-800">Admin Dashboard</h2>
-
+          <NotificationBell role="ADMIN" />
           <button className="text-red-600 transition hover:text-red-800">
             Logout
           </button>

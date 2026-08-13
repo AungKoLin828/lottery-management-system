@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import NotificationBell from "@/components/common/notification/NotificationBell";
+
 const navigation = [
   {
     name: "Dashboard",
@@ -186,6 +188,9 @@ export default function PlayerLayout() {
                   125,000 MMK
                 </p>
               </div>
+
+              {/* Notifications */}
+              <NotificationBell role="PLAYER" />
             </NavLink>
 
             {/* =================================================
@@ -324,6 +329,9 @@ export default function PlayerLayout() {
                   MOBILE ACCOUNT SECTION
               ================================================== */}
               <div className="mt-2 border-t border-slate-100 pt-2">
+                {/* Notifications */}
+                <NotificationBell role="PLAYER" />
+
                 {/* Profile */}
                 <NavLink
                   to="/player/profile"
