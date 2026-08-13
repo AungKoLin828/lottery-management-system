@@ -12,6 +12,8 @@ import Profile from "@/pages/player/Profile";
 import Contact from "@/pages/player/Contact";
 import ResultsHistory from "@/pages/public/ResultsHistory";
 import PlayerNotifications from "@/pages/player/Notifications";
+import Deposit from "@/pages/player/Deposit";
+import Withdraw from "@/pages/player/Withdraw";
 
 export function PlayerRoutes() {
   return (
@@ -33,6 +35,10 @@ export function PlayerRoutes() {
       <Route path="results-history" element={<ResultsHistory />} />
 
       <Route path="notifications" element={<PlayerNotifications />} />
+
+      <Route path="deposit" element={<Deposit />} />
+
+      <Route path="withdraw" element={<Withdraw />} />
     </Route>
   );
 }
