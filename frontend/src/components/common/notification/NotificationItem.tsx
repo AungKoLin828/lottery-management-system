@@ -1,4 +1,4 @@
-import { Check, Trash2, Wallet, AlertCircle, Info } from "lucide-react";
+import { Check, Trash2, Wallet, Info } from "lucide-react";
 
 import type { Notification } from "@/services/notificationService";
 
