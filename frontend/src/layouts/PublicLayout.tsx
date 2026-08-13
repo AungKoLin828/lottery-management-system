@@ -1,6 +1,16 @@
-import { useEffect, useState } from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
-import { Menu, X, Home, BarChart3, Info } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+
+import {
+  Menu,
+  X,
+  Home,
+  BarChart3,
+  Info,
+  Dice5,
+  Boxes,
+  ChevronDown,
+} from "lucide-react";
 
 type NavItemProps = {
   to: string;
@@ -45,32 +55,92 @@ function NavItem({ to, label, icon, active, onClick }: NavItemProps) {
 
 export default function PublicLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const [playMenuOpen, setPlayMenuOpen] = useState(false);
+
+  const playMenuRef = useRef<HTMLDivElement>(null);
+
+  /* ============================================================
+     ACTIVE ROUTE
+  ============================================================ */
 
   const isActive = (path: string) => {
     return location.pathname === path;
   };
 
+  const isPlayActive =
+    location.pathname === "/player/play-2d" ||
+    location.pathname === "/player/play-3d";
+
+  /* ============================================================
+     CLOSE MOBILE MENU
+  ============================================================ */
+
   const closeMobileMenu = () => {
     setMobileMenuOpen(false);
+    setPlayMenuOpen(false);
   };
 
-  // Close mobile menu when route changes
+  /* ============================================================
+     CLOSE MOBILE MENU WHEN ROUTE CHANGES
+  ============================================================ */
+
   useEffect(() => {
     setMobileMenuOpen(false);
+    setPlayMenuOpen(false);
   }, [location.pathname]);
+
+  /* ============================================================
+     CLOSE PLAY MENU WHEN CLICKING OUTSIDE
+  ============================================================ */
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        playMenuRef.current &&
+        !playMenuRef.current.contains(event.target as Node)
+      ) {
+        setPlayMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  /* ============================================================
+     PLAY LOGIN REDIRECT
+  ============================================================ */
+
+  const handlePlay = (destination: string) => {
+    navigate("/login", {
+      state: {
+        from: destination,
+      },
+    });
+
+    closeMobileMenu();
+  };
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
       {/* =====================================================
           HEADER
       ====================================================== */}
+
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/95 backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-[68px] items-center justify-between">
             {/* =================================================
                 LOGO
             ================================================== */}
+
             <Link
               to="/"
               onClick={closeMobileMenu}
@@ -90,7 +160,10 @@ export default function PublicLayout() {
             {/* =================================================
                 DESKTOP NAVIGATION
             ================================================== */}
+
             <nav className="hidden items-center rounded-xl border border-gray-100 bg-gray-50/70 p-1 md:flex">
+              {/* Home */}
+
               <NavItem
                 to="/"
                 label="Home"
@@ -98,12 +171,100 @@ export default function PublicLayout() {
                 icon={<Home className="h-4 w-4" />}
               />
 
+              {/* =================================================
+                  PLAY DROPDOWN
+              ================================================== */}
+
+              <div ref={playMenuRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setPlayMenuOpen((current) => !current)}
+                  className={`group relative flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                    isPlayActive
+                      ? "bg-blue-100 text-blue-700 shadow-sm"
+                      : "text-gray-600 hover:bg-blue-50 hover:text-blue-600"
+                  }`}
+                >
+                  <span
+                    className={`transition-all duration-200 ${
+                      isPlayActive
+                        ? "text-blue-600"
+                        : "text-gray-400 group-hover:text-blue-600"
+                    }`}
+                  >
+                    <Dice5 className="h-4 w-4" />
+                  </span>
+
+                  <span>Play</span>
+
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${
+                      playMenuOpen ? "rotate-180" : ""
+                    }`}
+                  />
+
+                  {isPlayActive && (
+                    <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-blue-600" />
+                  )}
+                </button>
+
+                {/* Play Dropdown */}
+
+                {playMenuOpen && (
+                  <div className="absolute left-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-xl border border-gray-100 bg-white p-1.5 shadow-lg shadow-gray-200/60">
+                    {/* 2D */}
+
+                    <button
+                      type="button"
+                      onClick={() => handlePlay("/player/play-2d")}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-semibold text-gray-600 transition hover:bg-blue-50 hover:text-blue-600"
+                    >
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                        <Dice5 size={18} />
+                      </div>
+
+                      <div>
+                        <p>2D Play</p>
+
+                        <p className="mt-0.5 text-xs font-normal text-gray-400">
+                          Play 2D Lottery
+                        </p>
+                      </div>
+                    </button>
+
+                    {/* 3D */}
+
+                    <button
+                      type="button"
+                      onClick={() => handlePlay("/player/play-3d")}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-semibold text-gray-600 transition hover:bg-indigo-50 hover:text-indigo-600"
+                    >
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                        <Boxes size={18} />
+                      </div>
+
+                      <div>
+                        <p>3D Play</p>
+
+                        <p className="mt-0.5 text-xs font-normal text-gray-400">
+                          Play 3D Lottery
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Results History */}
+
               <NavItem
                 to="/results-history"
                 label="Results History"
                 active={isActive("/results-history")}
                 icon={<BarChart3 className="h-4 w-4" />}
               />
+
+              {/* About */}
 
               <NavItem
                 to="/about"
@@ -116,6 +277,7 @@ export default function PublicLayout() {
             {/* =================================================
                 DESKTOP AUTH
             ================================================== */}
+
             <div className="hidden items-center gap-2 md:flex">
               <Link
                 to="/login"
@@ -135,6 +297,7 @@ export default function PublicLayout() {
             {/* =================================================
                 MOBILE MENU BUTTON
             ================================================== */}
+
             <button
               type="button"
               onClick={() => setMobileMenuOpen((open) => !open)}
@@ -157,16 +320,18 @@ export default function PublicLayout() {
           {/* =================================================
               MOBILE NAVIGATION
           ================================================== */}
+
           <div
             className={`overflow-hidden transition-all duration-300 md:hidden ${
               mobileMenuOpen
-                ? "max-h-[420px] pb-4 opacity-100"
+                ? "max-h-[650px] pb-4 opacity-100"
                 : "max-h-0 opacity-0"
             }`}
           >
             <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-2 shadow-sm">
-              {/* Mobile Links */}
               <nav className="space-y-1">
+                {/* Home */}
+
                 <NavItem
                   to="/"
                   label="Home"
@@ -175,6 +340,63 @@ export default function PublicLayout() {
                   icon={<Home className="h-5 w-5" />}
                 />
 
+                {/* =================================================
+                    MOBILE PLAY
+                ================================================== */}
+
+                <div className="rounded-xl bg-white p-1">
+                  <button
+                    type="button"
+                    onClick={() => setPlayMenuOpen((current) => !current)}
+                    className={`flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm font-semibold transition ${
+                      isPlayActive
+                        ? "bg-blue-100 text-blue-700"
+                        : "text-gray-600 hover:bg-blue-50 hover:text-blue-600"
+                    }`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Dice5 className="h-5 w-5" />
+                      Play
+                    </span>
+
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${
+                        playMenuOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {playMenuOpen && (
+                    <div className="mt-1 space-y-1 border-t border-gray-100 pt-1">
+                      {/* 2D */}
+
+                      <button
+                        type="button"
+                        onClick={() => handlePlay("/player/play-2d")}
+                        className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium text-gray-600 transition hover:bg-blue-50 hover:text-blue-600"
+                      >
+                        <Dice5 size={18} />
+
+                        <span>2D Play</span>
+                      </button>
+
+                      {/* 3D */}
+
+                      <button
+                        type="button"
+                        onClick={() => handlePlay("/player/play-3d")}
+                        className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium text-gray-600 transition hover:bg-indigo-50 hover:text-indigo-600"
+                      >
+                        <Boxes size={18} />
+
+                        <span>3D Play</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Results */}
+
                 <NavItem
                   to="/results-history"
                   label="Results History"
@@ -182,6 +404,8 @@ export default function PublicLayout() {
                   onClick={closeMobileMenu}
                   icon={<BarChart3 className="h-5 w-5" />}
                 />
+
+                {/* About */}
 
                 <NavItem
                   to="/about"
@@ -192,7 +416,10 @@ export default function PublicLayout() {
                 />
               </nav>
 
-              {/* Mobile Authentication */}
+              {/* =================================================
+                  MOBILE AUTHENTICATION
+              ================================================== */}
+
               <div className="mt-2 grid grid-cols-2 gap-2 border-t border-gray-200 pt-3">
                 <Link
                   to="/login"
@@ -218,6 +445,7 @@ export default function PublicLayout() {
       {/* =====================================================
           PAGE CONTENT
       ====================================================== */}
+
       <main className="min-h-[calc(100vh-4.25rem)]">
         <Outlet />
       </main>
@@ -225,10 +453,12 @@ export default function PublicLayout() {
       {/* =====================================================
           FOOTER
       ====================================================== */}
+
       <footer className="mt-16 bg-gray-950 text-gray-400">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
             {/* About */}
+
             <div>
               <div className="mb-3 flex items-center gap-0">
                 <h3 className="text-lg font-bold text-white">Lottery</h3>
@@ -243,6 +473,7 @@ export default function PublicLayout() {
             </div>
 
             {/* Quick Links */}
+
             <div>
               <h3 className="mb-4 font-bold text-white">Quick Links</h3>
 
@@ -271,12 +502,15 @@ export default function PublicLayout() {
             </div>
 
             {/* Contact */}
+
             <div>
               <h3 className="mb-4 font-bold text-white">Contact</h3>
 
               <div className="space-y-2.5 text-sm">
                 <p>Phone: 09 123456789</p>
+
                 <p>Email: admin@lottery.com</p>
+
                 <p>Yangon, Myanmar</p>
               </div>
             </div>
