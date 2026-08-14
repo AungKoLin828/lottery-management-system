@@ -1,7 +1,14 @@
 // src/pages/player/Play3D.tsx
 
 import { useMemo, useState } from "react";
-import { Boxes, ChevronLeft, ChevronRight, Trash2, X } from "lucide-react";
+import {
+  Boxes,
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
 import type { Bet3D } from "@/types/player";
 
 /* ============================================================
@@ -49,6 +56,10 @@ export default function Play3D() {
   const [selectedNumbers, setSelectedNumbers] = useState<string[]>([]);
 
   const [bets, setBets] = useState<Bet3D[]>([]);
+
+  const [editingBetId, setEditingBetId] = useState<string | null>(null);
+
+  const [editingAmount, setEditingAmount] = useState("");
 
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -235,6 +246,55 @@ export default function Play3D() {
     setSelectedNumbers([]);
     setNumber("");
     setAmount("");
+  };
+
+  /* ============================================================
+   EDIT BET AMOUNT
+============================================================ */
+
+  const startEditBet = (bet: Bet3D) => {
+    setEditingBetId(bet.id);
+    setEditingAmount(String(bet.amount));
+  };
+
+  const cancelEditBet = () => {
+    setEditingBetId(null);
+    setEditingAmount("");
+  };
+
+  const saveEditBet = (bet: Bet3D) => {
+    const newAmount = Number(editingAmount);
+
+    if (!newAmount || newAmount < MIN_BET_AMOUNT) {
+      return;
+    }
+
+    /*
+     * Current bet amount is already part of the number's
+     * current total. Exclude it before calculating the
+     * maximum amount allowed for this edit.
+     */
+    const currentNumberAmount = getNumberBetAmount(bet.number);
+
+    const maxEditableAmount =
+      MAX_BET_PER_NUMBER - (currentNumberAmount - bet.amount);
+
+    if (newAmount > maxEditableAmount) {
+      return;
+    }
+
+    setBets((current) =>
+      current.map((item) =>
+        item.id === bet.id
+          ? {
+              ...item,
+              amount: newAmount,
+            }
+          : item,
+      ),
+    );
+
+    cancelEditBet();
   };
 
   /* ============================================================
@@ -686,11 +746,26 @@ export default function Play3D() {
               bets.map((bet) => {
                 const progress = getNumberProgress(bet.number);
 
+                const isEditing = editingBetId === bet.id;
+
+                const currentNumberAmount = getNumberBetAmount(bet.number);
+
+                /*
+                 * Exclude this bet's current amount when calculating
+                 * how much can be entered during editing.
+                 */
+                const maxEditableAmount =
+                  MAX_BET_PER_NUMBER - (currentNumberAmount - bet.amount);
+
                 return (
                   <div
                     key={bet.id}
                     className="rounded-xl border border-gray-100 bg-gray-50 p-4 transition-all hover:border-blue-100 hover:bg-blue-50/40"
                   >
+                    {/* =================================================
+          BET HEADER
+      ================================================== */}
+
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="flex h-11 w-16 items-center justify-center rounded-xl bg-white text-lg font-bold tracking-widest text-gray-900 shadow-sm ring-1 ring-gray-100">
@@ -708,17 +783,105 @@ export default function Play3D() {
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => removeBet(bet.id)}
-                        className="rounded-lg p-2 text-gray-400 transition-all hover:bg-red-50 hover:text-red-500"
-                        title="Remove bet"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {/* =================================================
+            ACTIONS
+        ================================================== */}
+
+                      {!isEditing && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => startEditBet(bet)}
+                            className="rounded-lg p-2 text-gray-400 transition-all hover:bg-blue-50 hover:text-blue-600"
+                            title="Edit amount"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => removeBet(bet.id)}
+                            className="rounded-lg p-2 text-gray-400 transition-all hover:bg-red-50 hover:text-red-500"
+                            title="Delete bet"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Progress */}
+                    {/* =================================================
+          EDIT AMOUNT
+      ================================================== */}
+
+                    {isEditing && (
+                      <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/50 p-3">
+                        <label className="mb-2 block text-xs font-semibold text-gray-600">
+                          Edit Bet Amount
+                        </label>
+
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <input
+                              type="number"
+                              min={MIN_BET_AMOUNT}
+                              max={maxEditableAmount}
+                              value={editingAmount}
+                              onChange={(event) =>
+                                setEditingAmount(event.target.value)
+                              }
+                              autoFocus
+                              className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 pr-12 text-sm font-semibold text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+                            />
+
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-gray-400">
+                              MMK
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => saveEditBet(bet)}
+                            disabled={
+                              !Number(editingAmount) ||
+                              Number(editingAmount) < MIN_BET_AMOUNT ||
+                              Number(editingAmount) > maxEditableAmount
+                            }
+                            className="rounded-lg bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                          >
+                            Save
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={cancelEditBet}
+                            className="rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-500 transition hover:bg-gray-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+
+                        <div className="mt-2 flex items-center justify-between">
+                          <p className="text-[11px] text-gray-400">
+                            Minimum:{" "}
+                            <span className="font-semibold text-gray-600">
+                              {MIN_BET_AMOUNT.toLocaleString()} MMK
+                            </span>
+                          </p>
+
+                          <p className="text-[11px] text-gray-400">
+                            Maximum:{" "}
+                            <span className="font-semibold text-gray-600">
+                              {maxEditableAmount.toLocaleString()} MMK
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* =================================================
+                        PROGRESS
+                    ================================================== */}
 
                     <div className="mt-3">
                       <div className="mb-1 flex items-center justify-between text-[10px]">
