@@ -1,7 +1,7 @@
 // src/pages/player/Play2D.tsx
 
 import { useMemo, useState } from "react";
-import { Check, Dice5, Lock, Trash2, X } from "lucide-react";
+import { Check, Dice5, Lock, Pencil, Trash2, X } from "lucide-react";
 import type { Bet2D, Session2D } from "@/types/player";
 
 /* ============================================================
@@ -79,6 +79,10 @@ export default function Play2D() {
   const [amount, setAmount] = useState("");
 
   const [bets, setBets] = useState<Bet2D[]>([]);
+
+  const [editingBetId, setEditingBetId] = useState<string | null>(null);
+
+  const [editingAmount, setEditingAmount] = useState("");
 
   /*
    * Usage from backend/admin configuration.
@@ -240,6 +244,55 @@ export default function Play2D() {
 
     setSelectedNumbers([]);
     setAmount("");
+  };
+
+  /* ============================================================
+   EDIT BET AMOUNT
+============================================================ */
+
+  const startEditBet = (bet: Bet2D) => {
+    setEditingBetId(bet.id);
+    setEditingAmount(String(bet.amount));
+  };
+
+  const cancelEditBet = () => {
+    setEditingBetId(null);
+    setEditingAmount("");
+  };
+
+  const saveEditBet = (bet: Bet2D) => {
+    const newAmount = Number(editingAmount);
+
+    if (!newAmount || newAmount < 100) {
+      return;
+    }
+
+    /*
+     * The current bet amount is already included in the
+     * backend/admin usage, so add it back when calculating
+     * how much this edited bet can use.
+     */
+    const currentAmount = bet.amount;
+    const usedAmount = getUsedAmount(bet.number);
+
+    const availableForEdit = MAX_BET_AMOUNT - (usedAmount - currentAmount);
+
+    if (newAmount > availableForEdit) {
+      return;
+    }
+
+    setBets((current) =>
+      current.map((item) =>
+        item.id === bet.id
+          ? {
+              ...item,
+              amount: newAmount,
+            }
+          : item,
+      ),
+    );
+
+    cancelEditBet();
   };
 
   /* ==========================================================
@@ -659,49 +712,137 @@ export default function Play2D() {
                 </p>
               </div>
             ) : (
-              bets.map((bet) => (
-                <div
-                  key={bet.id}
-                  className="group flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 p-4 transition-all hover:border-blue-100 hover:bg-blue-50/40"
-                >
-                  <div className="flex items-center gap-3">
-                    {/* Number */}
+              bets.map((bet) => {
+                const isEditing = editingBetId === bet.id;
 
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-lg font-bold tracking-wider text-gray-900 shadow-sm ring-1 ring-gray-100">
-                      {bet.number}
-                    </div>
+                const usedAmount = getUsedAmount(bet.number);
 
-                    {/* Details */}
+                /*
+                 * Since this bet already exists, its current amount
+                 * should be excluded from the used amount when editing.
+                 */
+                const maxEditableAmount =
+                  MAX_BET_AMOUNT - (usedAmount - bet.amount);
 
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-gray-800">
-                          {formatAmount(bet.amount)} MMK
-                        </span>
+                return (
+                  <div
+                    key={bet.id}
+                    className="rounded-xl border border-gray-100 bg-gray-50 p-4 transition-all hover:border-blue-100 hover:bg-blue-50/40"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      {/* Number */}
 
-                        <span className="rounded-md bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
-                          {bet.session}
-                        </span>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-lg font-bold tracking-wider text-gray-900 shadow-sm ring-1 ring-gray-100">
+                          {bet.number}
+                        </div>
+
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-md bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                              {bet.session}
+                            </span>
+                          </div>
+
+                          <p className="mt-1 text-xs text-gray-400">
+                            {bet.session} Session
+                          </p>
+                        </div>
                       </div>
 
-                      <p className="mt-1 text-xs text-gray-400">
-                        {bet.session} Session
-                      </p>
+                      {/* Actions */}
+
+                      {!isEditing && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => startEditBet(bet)}
+                            className="rounded-lg p-2 text-gray-400 transition-all hover:bg-blue-50 hover:text-blue-600"
+                            title="Edit amount"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => removeBet(bet.id)}
+                            className="rounded-lg p-2 text-gray-400 transition-all hover:bg-red-50 hover:text-red-500"
+                            title="Delete bet"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Amount */}
+
+                    {isEditing ? (
+                      <div className="mt-4">
+                        <label className="mb-2 block text-xs font-semibold text-gray-600">
+                          Bet Amount
+                        </label>
+
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <input
+                              type="number"
+                              min="100"
+                              max={maxEditableAmount}
+                              value={editingAmount}
+                              onChange={(event) =>
+                                setEditingAmount(event.target.value)
+                              }
+                              autoFocus
+                              className="w-full rounded-lg border border-blue-300 bg-white px-3 py-2 pr-12 text-sm font-semibold text-gray-900 outline-none focus:ring-4 focus:ring-blue-50"
+                            />
+
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-gray-400">
+                              MMK
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => saveEditBet(bet)}
+                            disabled={
+                              !Number(editingAmount) ||
+                              Number(editingAmount) < 100 ||
+                              Number(editingAmount) > maxEditableAmount
+                            }
+                            className="rounded-lg bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                          >
+                            Save
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={cancelEditBet}
+                            className="rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-500 transition hover:bg-gray-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+
+                        <p className="mt-2 text-[11px] text-gray-400">
+                          Maximum allowed:{" "}
+                          <span className="font-semibold text-gray-600">
+                            {formatAmount(maxEditableAmount)} MMK
+                          </span>
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="mt-3 flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-gray-100">
+                        <span className="text-xs text-gray-400">Amount</span>
+
+                        <span className="text-sm font-bold text-gray-800">
+                          {formatAmount(bet.amount)} MMK
+                        </span>
+                      </div>
+                    )}
                   </div>
-
-                  {/* Remove */}
-
-                  <button
-                    type="button"
-                    onClick={() => removeBet(bet.id)}
-                    className="rounded-lg p-2 text-gray-400 transition-all hover:bg-red-50 hover:text-red-500"
-                    title="Remove bet"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
