@@ -1,3 +1,5 @@
+// src/pages/player/MyTickets.tsx
+
 import { useState } from "react";
 import {
   Ticket,
@@ -100,16 +102,20 @@ const tickets: TicketData[] = [
 export default function MyTickets() {
   const [selectedTicket, setSelectedTicket] = useState<TicketData | null>(null);
 
+  /* ============================================================
+     STATUS
+  ============================================================ */
+
   const getStatusStyle = (status: TicketData["status"]) => {
     switch (status) {
       case "Won":
-        return "bg-emerald-500/10 text-emerald-400";
+        return "border border-emerald-200 bg-emerald-50 text-emerald-700";
 
       case "Lost":
-        return "bg-red-500/10 text-red-400";
+        return "border border-red-200 bg-red-50 text-red-700";
 
       default:
-        return "bg-amber-500/10 text-amber-400";
+        return "border border-amber-200 bg-amber-50 text-amber-700";
     }
   };
 
@@ -121,11 +127,11 @@ export default function MyTickets() {
         ====================================================== */}
 
         <div>
-          <p className="text-sm text-emerald-400">Player</p>
+          <p className="text-sm font-medium text-indigo-600">Player</p>
 
-          <h1 className="mt-1 text-3xl font-bold text-white">My Tickets</h1>
+          <h1 className="mt-1 text-3xl font-bold text-slate-900">My Tickets</h1>
 
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 text-sm text-slate-500">
             View your lottery tickets and selected numbers.
           </p>
         </div>
@@ -134,40 +140,51 @@ export default function MyTickets() {
             TICKET LIST
         ====================================================== */}
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           {tickets.map((ticket) => (
             <button
               key={ticket.id}
               type="button"
               onClick={() => setSelectedTicket(ticket)}
-              className="group flex w-full flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-left transition-all duration-200 hover:border-emerald-500/30 hover:bg-white/[0.05] hover:shadow-lg hover:shadow-emerald-500/5 sm:flex-row sm:items-center sm:justify-between"
+              className="group flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition-all duration-150 hover:border-indigo-200 hover:bg-indigo-50/40"
             >
-              {/* Left */}
+              {/* LEFT */}
 
-              <div className="flex items-center gap-4">
-                <div className="rounded-xl bg-emerald-500/10 p-3 text-emerald-400 transition group-hover:bg-emerald-500/20">
-                  <Ticket size={20} />
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 transition group-hover:bg-indigo-100">
+                  <Ticket size={18} />
                 </div>
 
-                <div>
-                  <p className="font-semibold text-white">{ticket.id}</p>
-
-                  <p className="mt-1 text-sm text-slate-500">
-                    {ticket.type} · {ticket.date}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-slate-900">
+                    {ticket.id}
                   </p>
+
+                  <div className="mt-0.5 flex items-center gap-1.5 text-xs">
+                    <span className="font-semibold text-slate-700">
+                      {ticket.type}
+                    </span>
+
+                    <span className="text-slate-300">•</span>
+
+                    <span className="text-slate-500">{ticket.date}</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Right */}
+              {/* RIGHT */}
 
-              <div className="flex items-center justify-between gap-4 sm:justify-end">
-                <div className="text-left sm:text-right">
-                  <p className="font-semibold text-white">
-                    {ticket.amount.toLocaleString()} MMK
+              <div className="flex shrink-0 items-center gap-3">
+                <div className="text-right">
+                  <p className="text-sm font-bold text-slate-900">
+                    {ticket.amount.toLocaleString()}{" "}
+                    <span className="text-xs font-semibold text-slate-500">
+                      MMK
+                    </span>
                   </p>
 
                   <span
-                    className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusStyle(
+                    className={`mt-1 inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold ${getStatusStyle(
                       ticket.status,
                     )}`}
                   >
@@ -175,7 +192,7 @@ export default function MyTickets() {
                   </span>
                 </div>
 
-                <span className="text-xs font-semibold text-slate-500 transition group-hover:text-emerald-400">
+                <span className="hidden text-xs font-semibold text-slate-500 transition group-hover:text-indigo-600 sm:block">
                   View
                 </span>
               </div>
@@ -190,34 +207,38 @@ export default function MyTickets() {
 
       {selectedTicket && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-3 backdrop-blur-sm"
           onClick={() => setSelectedTicket(null)}
         >
           <div
-            className="w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl"
+            className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             {/* =================================================
                 MODAL HEADER
             ================================================== */}
 
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Ticket className="h-5 w-5 text-emerald-400" />
-
-                  <h2 className="font-bold text-white">Ticket Details</h2>
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                  <Ticket size={18} />
                 </div>
 
-                <p className="mt-1 text-xs text-slate-500">
-                  {selectedTicket.id}
-                </p>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Ticket Details
+                  </h2>
+
+                  <p className="mt-0.5 text-xs font-medium text-slate-500">
+                    {selectedTicket.id}
+                  </p>
+                </div>
               </div>
 
               <button
                 type="button"
                 onClick={() => setSelectedTicket(null)}
-                className="rounded-lg p-2 text-slate-400 transition hover:bg-white/10 hover:text-white"
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                 title="Close"
               >
                 <X className="h-5 w-5" />
@@ -225,73 +246,84 @@ export default function MyTickets() {
             </div>
 
             {/* =================================================
-                TICKET INFORMATION
+                CONTENT
             ================================================== */}
 
-            <div className="max-h-[75vh] overflow-y-auto p-5">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="max-h-[70vh] overflow-y-auto p-4">
+              {/* =================================================
+                  TICKET INFORMATION
+              ================================================== */}
+
+              <div className="grid grid-cols-2 gap-2.5">
                 {/* Type */}
 
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <Hash className="h-4 w-4" />
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                  <div className="flex items-center gap-1.5 text-slate-500">
+                    <Hash className="h-3.5 w-3.5" />
 
-                    <span className="text-xs">Lottery Type</span>
+                    <span className="text-[11px] font-medium">
+                      Lottery Type
+                    </span>
                   </div>
 
-                  <p className="mt-2 font-bold text-white">
+                  <p className="mt-1 text-sm font-bold text-slate-900">
                     {selectedTicket.type}
                   </p>
                 </div>
 
                 {/* Date */}
 
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <CalendarDays className="h-4 w-4" />
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                  <div className="flex items-center gap-1.5 text-slate-500">
+                    <CalendarDays className="h-3.5 w-3.5" />
 
-                    <span className="text-xs">Date</span>
+                    <span className="text-[11px] font-medium">Date</span>
                   </div>
 
-                  <p className="mt-2 font-bold text-white">
+                  <p className="mt-1 text-sm font-bold text-slate-900">
                     {selectedTicket.date}
                   </p>
                 </div>
 
                 {/* Amount */}
 
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <CircleDollarSign className="h-4 w-4" />
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                  <div className="flex items-center gap-1.5 text-slate-500">
+                    <CircleDollarSign className="h-3.5 w-3.5" />
 
-                    <span className="text-xs">Total Amount</span>
+                    <span className="text-[11px] font-medium">
+                      Total Amount
+                    </span>
                   </div>
 
-                  <p className="mt-2 font-bold text-white">
-                    {selectedTicket.amount.toLocaleString()} MMK
+                  <p className="mt-1 text-sm font-bold text-slate-900">
+                    {selectedTicket.amount.toLocaleString()}{" "}
+                    <span className="text-xs font-semibold text-slate-500">
+                      MMK
+                    </span>
                   </p>
                 </div>
 
                 {/* Status */}
 
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                  <div className="flex items-center gap-2 text-slate-500">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                  <div className="flex items-center gap-1.5 text-slate-500">
                     {selectedTicket.status === "Won" ? (
-                      <Trophy className="h-4 w-4" />
+                      <Trophy className="h-3.5 w-3.5" />
                     ) : (
-                      <Clock3 className="h-4 w-4" />
+                      <Clock3 className="h-3.5 w-3.5" />
                     )}
 
-                    <span className="text-xs">Status</span>
+                    <span className="text-[11px] font-medium">Status</span>
                   </div>
 
                   <p
-                    className={`mt-2 font-bold ${
+                    className={`mt-1 text-sm font-bold ${
                       selectedTicket.status === "Won"
-                        ? "text-emerald-400"
+                        ? "text-emerald-600"
                         : selectedTicket.status === "Lost"
-                          ? "text-red-400"
-                          : "text-amber-400"
+                          ? "text-red-600"
+                          : "text-amber-600"
                     }`}
                   >
                     {selectedTicket.status}
@@ -303,49 +335,56 @@ export default function MyTickets() {
                   SELECTED NUMBERS
               ================================================== */}
 
-              <div className="mt-6">
-                <div className="mb-3 flex items-center justify-between">
+              <div className="mt-5">
+                <div className="mb-2.5 flex items-center justify-between">
                   <div>
-                    <h3 className="font-bold text-white">Selected Numbers</h3>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Selected Numbers
+                    </h3>
 
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-0.5 text-[11px] font-medium text-slate-500">
                       {selectedTicket.bets.length} number
                       {selectedTicket.bets.length !== 1 ? "s" : ""}
                     </p>
                   </div>
 
-                  <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-400">
+                  <span className="rounded-md bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-600">
                     {selectedTicket.type}
                   </span>
                 </div>
 
-                <div className="space-y-2">
+                {/* BET LIST */}
+
+                <div className="space-y-1.5">
                   {selectedTicket.bets.map((bet, index) => (
                     <div
                       key={`${bet.number}-${index}`}
-                      className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                      className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2"
                     >
                       <div className="flex items-center gap-3">
                         {/* Number */}
 
-                        <div className="flex h-10 min-w-12 items-center justify-center rounded-lg bg-emerald-500/10 px-2 font-bold tracking-wider text-emerald-400">
+                        <div className="flex h-8 min-w-12 items-center justify-center rounded-md bg-indigo-50 px-2 text-sm font-bold tracking-wider text-indigo-700">
                           {bet.number}
                         </div>
 
                         <div>
-                          <p className="text-sm font-semibold text-white">
-                            {bet.amount.toLocaleString()} MMK
+                          <p className="text-sm font-semibold text-slate-900">
+                            {bet.amount.toLocaleString()}{" "}
+                            <span className="text-xs font-semibold text-slate-500">
+                              MMK
+                            </span>
                           </p>
 
                           {selectedTicket.type === "2D" && bet.session && (
-                            <p className="mt-0.5 text-xs text-slate-500">
+                            <p className="mt-0.5 text-[10px] font-medium text-slate-500">
                               {bet.session} Session
                             </p>
                           )}
                         </div>
                       </div>
 
-                      <span className="text-xs font-semibold text-slate-500">
+                      <span className="text-[10px] font-medium text-slate-400">
                         #{index + 1}
                       </span>
                     </div>
@@ -357,14 +396,18 @@ export default function MyTickets() {
                   TOTAL
               ================================================== */}
 
-              <div className="mt-5 flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-                <span className="text-sm text-slate-400">Total Bet</span>
+              <div className="mt-4 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+                <span className="text-xs font-semibold text-slate-700">
+                  Total Bet
+                </span>
 
-                <span className="text-lg font-bold text-emerald-400">
+                <span className="text-base font-bold text-emerald-700">
                   {selectedTicket.bets
                     .reduce((sum, bet) => sum + bet.amount, 0)
                     .toLocaleString()}{" "}
-                  MMK
+                  <span className="text-xs font-semibold text-emerald-600">
+                    MMK
+                  </span>
                 </span>
               </div>
             </div>
@@ -373,11 +416,11 @@ export default function MyTickets() {
                 CLOSE
             ================================================== */}
 
-            <div className="border-t border-white/10 p-4">
+            <div className="border-t border-slate-200 p-3">
               <button
                 type="button"
                 onClick={() => setSelectedTicket(null)}
-                className="w-full rounded-xl bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+                className="w-full rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 hover:text-slate-900"
               >
                 Close
               </button>

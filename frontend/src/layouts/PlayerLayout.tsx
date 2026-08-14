@@ -184,7 +184,7 @@ export default function PlayerLayout() {
 
           <NavLink
             to="/player"
-            className="flex shrink-0 items-center gap-2"
+            className="flex shrink-0 items-center gap-0"
             onClick={() => setMobileMenuOpen(false)}
           >
             <span className="text-lg font-bold tracking-tight text-slate-900">
