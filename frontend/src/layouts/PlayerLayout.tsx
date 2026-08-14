@@ -12,7 +12,7 @@ import {
   MessageCircle,
   BarChart3,
   ChevronDown,
-  Bell,
+  Sparkles,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -47,11 +47,13 @@ const navigation = [
 const playNavigation = [
   {
     name: "2D Play",
+    description: "Play 2D Lottery",
     path: "/player/play-2d",
     icon: Dice5,
   },
   {
     name: "3D Play",
+    description: "Play 3D Lottery",
     path: "/player/play-3d",
     icon: Boxes,
   },
@@ -82,17 +84,12 @@ export default function PlayerLayout() {
   const location = useLocation();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-
   const [playMenuOpen, setPlayMenuOpen] = useState(false);
-
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
 
   const profileMenuRef = useRef<HTMLDivElement>(null);
-
   const playMenuRef = useRef<HTMLDivElement>(null);
-
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
   /* ============================================================
@@ -154,9 +151,20 @@ export default function PlayerLayout() {
     console.log("Logout");
 
     // Replace with your real logout logic.
+    //
     // Example:
     // localStorage.removeItem("token");
     // navigate("/login");
+  };
+
+  /* ============================================================
+     CLOSE MOBILE MENU
+  ============================================================ */
+
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
+    setPlayMenuOpen(false);
+    setMoreMenuOpen(false);
   };
 
   /* ============================================================
@@ -164,44 +172,56 @@ export default function PlayerLayout() {
   ============================================================ */
 
   const navClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+    `group flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
       isActive
-        ? "bg-indigo-50 text-indigo-600"
-        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+        ? "bg-gradient-to-r from-indigo-50 to-violet-50 text-indigo-700 shadow-sm"
+        : "text-slate-600 hover:bg-slate-50 hover:text-indigo-600"
     }`;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
       {/* ======================================================
           HEADER
       ======================================================= */}
 
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
+        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* ==================================================
               LOGO
           =================================================== */}
 
           <NavLink
             to="/player"
-            className="flex shrink-0 items-center gap-0"
-            onClick={() => setMobileMenuOpen(false)}
+            className="group flex shrink-0 items-center gap-2.5"
+            onClick={closeMobileMenu}
           >
-            <span className="text-lg font-bold tracking-tight text-slate-900">
-              Lottery
-            </span>
+            {/* Logo Icon */}
 
-            <span className="text-lg font-bold tracking-tight text-indigo-600">
-              Play
-            </span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-200 transition-transform duration-200 group-hover:scale-105">
+              <Ticket className="h-5 w-5" />
+            </div>
+
+            {/* Logo */}
+
+            <div className="flex items-center">
+              <span className="text-lg font-extrabold tracking-tight text-slate-900">
+                Lottery
+              </span>
+
+              <span className="text-lg font-extrabold tracking-tight text-indigo-600">
+                Play
+              </span>
+            </div>
           </NavLink>
 
           {/* ==================================================
               DESKTOP NAVIGATION
           =================================================== */}
 
-          <nav className="hidden items-center gap-1 lg:flex">
-            {/* Dashboard */}
+          <nav className="hidden items-center rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-sm lg:flex">
+            {/* =================================================
+                DASHBOARD
+            ================================================= */}
 
             {navigation
               .filter((item) => item.name === "Dashboard")
@@ -215,7 +235,10 @@ export default function PlayerLayout() {
                     end
                     className={navClass}
                   >
-                    <Icon size={17} />
+                    <Icon
+                      size={17}
+                      className="transition-transform group-hover:scale-105"
+                    />
 
                     {item.name}
                   </NavLink>
@@ -230,44 +253,103 @@ export default function PlayerLayout() {
               <button
                 type="button"
                 onClick={() => setPlayMenuOpen((current) => !current)}
-                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                className={`group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
                   isPlayActive
-                    ? "bg-indigo-50 text-indigo-600"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-200"
+                    : "text-slate-600 hover:bg-indigo-50 hover:text-indigo-600"
                 }`}
               >
-                <Dice5 size={17} />
+                <Dice5
+                  size={17}
+                  className={`transition-transform duration-200 ${
+                    playMenuOpen ? "rotate-6" : ""
+                  }`}
+                />
 
                 <span>Play</span>
 
                 <ChevronDown
                   size={14}
-                  className={`transition-transform ${
+                  className={`transition-transform duration-200 ${
                     playMenuOpen ? "rotate-180" : ""
                   }`}
                 />
+
+                {isPlayActive && (
+                  <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
+                )}
               </button>
 
+              {/* =================================================
+                  PLAY DROPDOWN
+              ================================================= */}
+
               {playMenuOpen && (
-                <div className="absolute left-0 top-full mt-2 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
-                  {playNavigation.map((item) => {
+                <div className="absolute left-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-300/30">
+                  {/* Dropdown Title */}
+
+                  <div className="px-3 pb-2 pt-1">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
+
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                        Choose Game
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Games */}
+
+                  {playNavigation.map((item, index) => {
                     const Icon = item.icon;
+
+                    const is2D = index === 0;
 
                     return (
                       <NavLink
                         key={item.path}
                         to={item.path}
                         className={({ isActive }) =>
-                          `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
+                          `group flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-200 ${
                             isActive
-                              ? "bg-indigo-50 text-indigo-600"
-                              : "text-slate-600 hover:bg-slate-50"
+                              ? is2D
+                                ? "bg-indigo-50"
+                                : "bg-violet-50"
+                              : is2D
+                                ? "hover:bg-indigo-50"
+                                : "hover:bg-violet-50"
                           }`
                         }
                       >
-                        <Icon size={17} />
+                        {/* Icon */}
 
-                        {item.name}
+                        <div
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                            is2D
+                              ? "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100"
+                              : "bg-violet-50 text-violet-600 group-hover:bg-violet-100"
+                          }`}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </div>
+
+                        {/* Text */}
+
+                        <div>
+                          <p
+                            className={`text-sm font-bold ${
+                              is2D
+                                ? "text-slate-800 group-hover:text-indigo-700"
+                                : "text-slate-800 group-hover:text-violet-700"
+                            }`}
+                          >
+                            {item.name}
+                          </p>
+
+                          <p className="mt-0.5 text-xs text-slate-400">
+                            {item.description}
+                          </p>
+                        </div>
                       </NavLink>
                     );
                   })}
@@ -275,14 +357,18 @@ export default function PlayerLayout() {
               )}
             </div>
 
-            {/* My Tickets */}
+            {/* =================================================
+                MY TICKETS
+            ================================================= */}
 
             <NavLink to="/player/tickets" className={navClass}>
               <Ticket size={17} />
               My Tickets
             </NavLink>
 
-            {/* Wallet */}
+            {/* =================================================
+                WALLET
+            ================================================= */}
 
             <NavLink to="/player/wallet" className={navClass}>
               <WalletCards size={17} />
@@ -297,24 +383,26 @@ export default function PlayerLayout() {
               <button
                 type="button"
                 onClick={() => setMoreMenuOpen((current) => !current)}
-                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
                   isMoreActive
-                    ? "bg-indigo-50 text-indigo-600"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    ? "bg-gradient-to-r from-indigo-50 to-violet-50 text-indigo-700"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-indigo-600"
                 }`}
               >
                 <span>More</span>
 
                 <ChevronDown
                   size={14}
-                  className={`transition-transform ${
+                  className={`transition-transform duration-200 ${
                     moreMenuOpen ? "rotate-180" : ""
                   }`}
                 />
               </button>
 
+              {/* More Dropdown */}
+
               {moreMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
+                <div className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-300/30">
                   {moreNavigation.map((item) => {
                     const Icon = item.icon;
 
@@ -323,10 +411,10 @@ export default function PlayerLayout() {
                         key={item.path}
                         to={item.path}
                         className={({ isActive }) =>
-                          `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
+                          `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
                             isActive
                               ? "bg-indigo-50 text-indigo-600"
-                              : "text-slate-600 hover:bg-slate-50"
+                              : "text-slate-600 hover:bg-slate-50 hover:text-indigo-600"
                           }`
                         }
                       >
@@ -346,28 +434,32 @@ export default function PlayerLayout() {
           =================================================== */}
 
           <div className="flex items-center gap-2">
-            {/* Wallet Balance */}
+            {/* =================================================
+                WALLET BALANCE
+            ================================================= */}
 
             <NavLink
               to="/player/wallet"
-              className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 sm:flex"
+              className="hidden items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 transition-all hover:border-emerald-200 hover:bg-emerald-100 sm:flex"
             >
-              <WalletCards size={17} className="text-indigo-600" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-emerald-600 shadow-sm">
+                <WalletCards size={16} />
+              </div>
 
               <div className="leading-tight">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600/70">
                   Balance
                 </p>
 
-                <p className="text-sm font-semibold text-slate-800">
-                  125,000 MMK
-                </p>
+                <p className="text-sm font-bold text-slate-800">125,000 MMK</p>
               </div>
             </NavLink>
 
-            {/* Notification */}
+            {/* =================================================
+                NOTIFICATIONS
+            ================================================= */}
 
-            <div className="hidden sm:block">
+            <div className="hidden rounded-xl sm:block">
               <NotificationBell role="PLAYER" />
             </div>
 
@@ -379,55 +471,75 @@ export default function PlayerLayout() {
               <button
                 type="button"
                 onClick={() => setProfileMenuOpen((current) => !current)}
-                className={`flex items-center gap-2 rounded-lg px-2 py-1.5 transition ${
+                className={`flex items-center gap-2 rounded-xl px-2 py-1.5 transition-all duration-200 ${
                   profileMenuOpen
                     ? "bg-indigo-50 text-indigo-600"
-                    : "text-slate-600 hover:bg-slate-100"
+                    : "text-slate-600 hover:bg-slate-50"
                 }`}
                 aria-label="Open profile menu"
                 aria-expanded={profileMenuOpen}
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-600">
+                {/* Avatar */}
+
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white shadow-sm">
                   AK
                 </div>
 
-                <div className="hidden text-left xl:block">
-                  <p className="text-xs font-semibold text-slate-800">Player</p>
+                {/* User Info */}
 
-                  <p className="text-[10px] text-slate-400">
+                <div className="hidden text-left xl:block">
+                  <p className="text-xs font-bold text-slate-800">Player</p>
+
+                  <p className="max-w-[130px] truncate text-[10px] text-slate-400">
                     player@example.com
                   </p>
                 </div>
 
                 <ChevronDown
                   size={15}
-                  className={`transition-transform ${
+                  className={`transition-transform duration-200 ${
                     profileMenuOpen ? "rotate-180" : ""
                   }`}
                 />
               </button>
 
-              {profileMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-                  <div className="border-b border-slate-100 px-4 py-3">
-                    <p className="text-sm font-semibold text-slate-900">
-                      Player
-                    </p>
+              {/* Profile Dropdown */}
 
-                    <p className="mt-0.5 truncate text-xs text-slate-400">
-                      player@example.com
-                    </p>
+              {profileMenuOpen && (
+                <div className="absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-300/30">
+                  {/* User Header */}
+
+                  <div className="bg-gradient-to-r from-indigo-50 to-violet-50 px-4 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white">
+                        AK
+                      </div>
+
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-900">
+                          Player
+                        </p>
+
+                        <p className="truncate text-xs text-slate-500">
+                          player@example.com
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="p-1.5">
+                  {/* Menu */}
+
+                  <div className="p-2">
+                    {/* Profile */}
+
                     <NavLink
                       to="/player/profile"
                       onClick={() => setProfileMenuOpen(false)}
                       className={({ isActive }) =>
-                        `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
+                        `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
                           isActive
                             ? "bg-indigo-50 text-indigo-600"
-                            : "text-slate-600 hover:bg-slate-50"
+                            : "text-slate-600 hover:bg-slate-50 hover:text-indigo-600"
                         }`
                       }
                     >
@@ -435,10 +547,12 @@ export default function PlayerLayout() {
                       Profile
                     </NavLink>
 
+                    {/* Logout */}
+
                     <button
                       type="button"
                       onClick={handleLogout}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50"
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-red-500 transition hover:bg-red-50"
                     >
                       <LogOut size={17} />
                       Logout
@@ -448,15 +562,28 @@ export default function PlayerLayout() {
               )}
             </div>
 
-            {/* Mobile Menu */}
+            {/* =================================================
+                MOBILE MENU BUTTON
+            ================================================= */}
 
             <button
               type="button"
               onClick={() => setMobileMenuOpen((current) => !current)}
-              className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
-              aria-label="Toggle navigation"
+              className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 lg:hidden ${
+                mobileMenuOpen
+                  ? "border-indigo-200 bg-indigo-50 text-indigo-600"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600"
+              }`}
+              aria-label={
+                mobileMenuOpen ? "Close navigation" : "Open navigation"
+              }
+              aria-expanded={mobileMenuOpen}
             >
-              {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+              {mobileMenuOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
             </button>
           </div>
         </div>
@@ -468,16 +595,19 @@ export default function PlayerLayout() {
         {mobileMenuOpen && (
           <div className="border-t border-slate-200 bg-white lg:hidden">
             <nav className="mx-auto max-w-7xl space-y-1 px-4 py-3 sm:px-6">
-              {/* Dashboard */}
+              {/* =================================================
+                  DASHBOARD
+              ================================================= */}
 
               <NavLink
                 to="/player"
                 end
+                onClick={closeMobileMenu}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium ${
+                  `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
                     isActive
-                      ? "bg-indigo-50 text-indigo-600"
-                      : "text-slate-600 hover:bg-slate-50"
+                      ? "bg-gradient-to-r from-indigo-50 to-violet-50 text-indigo-700"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-indigo-600"
                   }`
                 }
               >
@@ -489,44 +619,79 @@ export default function PlayerLayout() {
                   MOBILE PLAY
               ================================================= */}
 
-              <div className="rounded-xl bg-slate-50 p-1">
-                <div className="flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-700">
-                  <Dice5 size={19} />
-                  Play
+              <div className="my-1 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
+                {/* Play Header */}
+
+                <div className="flex items-center gap-3 rounded-xl px-3 py-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 text-white">
+                    <Dice5 size={17} />
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">Play</p>
+
+                    <p className="text-[11px] text-slate-400">
+                      Choose your lottery
+                    </p>
+                  </div>
                 </div>
 
-                {playNavigation.map((item) => {
+                {/* 2D / 3D */}
+
+                {playNavigation.map((item, index) => {
                   const Icon = item.icon;
+
+                  const is2D = index === 0;
 
                   return (
                     <NavLink
                       key={item.path}
                       to={item.path}
+                      onClick={closeMobileMenu}
                       className={({ isActive }) =>
-                        `ml-4 flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm ${
+                        `group flex items-center gap-3 rounded-xl px-3 py-3 transition ${
                           isActive
-                            ? "bg-indigo-50 font-semibold text-indigo-600"
+                            ? is2D
+                              ? "bg-indigo-100 text-indigo-700"
+                              : "bg-violet-100 text-violet-700"
                             : "text-slate-600 hover:bg-white"
                         }`
                       }
                     >
-                      <Icon size={17} />
+                      <div
+                        className={`flex h-9 w-9 items-center justify-center rounded-lg ${
+                          is2D
+                            ? "bg-indigo-50 text-indigo-600"
+                            : "bg-violet-50 text-violet-600"
+                        }`}
+                      >
+                        <Icon size={18} />
+                      </div>
 
-                      {item.name}
+                      <div>
+                        <p className="text-sm font-semibold">{item.name}</p>
+
+                        <p className="text-[11px] text-slate-400">
+                          {item.description}
+                        </p>
+                      </div>
                     </NavLink>
                   );
                 })}
               </div>
 
-              {/* My Tickets */}
+              {/* =================================================
+                  MY TICKETS
+              ================================================= */}
 
               <NavLink
                 to="/player/tickets"
+                onClick={closeMobileMenu}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium ${
+                  `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
                     isActive
-                      ? "bg-indigo-50 text-indigo-600"
-                      : "text-slate-600 hover:bg-slate-50"
+                      ? "bg-gradient-to-r from-indigo-50 to-violet-50 text-indigo-700"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-indigo-600"
                   }`
                 }
               >
@@ -534,23 +699,31 @@ export default function PlayerLayout() {
                 My Tickets
               </NavLink>
 
-              {/* Wallet */}
+              {/* =================================================
+                  WALLET
+              ================================================= */}
 
               <NavLink
                 to="/player/wallet"
+                onClick={closeMobileMenu}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium ${
+                  `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
                     isActive
-                      ? "bg-indigo-50 text-indigo-600"
-                      : "text-slate-600 hover:bg-slate-50"
+                      ? "bg-gradient-to-r from-indigo-50 to-violet-50 text-indigo-700"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-indigo-600"
                   }`
                 }
               >
                 <WalletCards size={19} />
                 Wallet
+                <span className="ml-auto text-xs font-bold text-emerald-600">
+                  125,000 MMK
+                </span>
               </NavLink>
 
-              {/* More */}
+              {/* =================================================
+                  MORE
+              ================================================= */}
 
               <div className="mt-2 border-t border-slate-100 pt-2">
                 {moreNavigation.map((item) => {
@@ -560,11 +733,12 @@ export default function PlayerLayout() {
                     <NavLink
                       key={item.path}
                       to={item.path}
+                      onClick={closeMobileMenu}
                       className={({ isActive }) =>
-                        `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium ${
+                        `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
                           isActive
-                            ? "bg-indigo-50 text-indigo-600"
-                            : "text-slate-600 hover:bg-slate-50"
+                            ? "bg-gradient-to-r from-indigo-50 to-violet-50 text-indigo-700"
+                            : "text-slate-600 hover:bg-slate-50 hover:text-indigo-600"
                         }`
                       }
                     >
@@ -575,21 +749,26 @@ export default function PlayerLayout() {
                   );
                 })}
 
-                {/* Notifications */}
+                {/* =================================================
+                    NOTIFICATIONS
+                ================================================= */}
 
-                <div className="mt-1 rounded-xl px-4 py-3">
+                <div className="mt-1 flex items-center rounded-xl px-4 py-3">
                   <NotificationBell role="PLAYER" />
                 </div>
 
-                {/* Profile */}
+                {/* =================================================
+                    PROFILE
+                ================================================= */}
 
                 <NavLink
                   to="/player/profile"
+                  onClick={closeMobileMenu}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium ${
+                    `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
                       isActive
-                        ? "bg-indigo-50 text-indigo-600"
-                        : "text-slate-600 hover:bg-slate-50"
+                        ? "bg-gradient-to-r from-indigo-50 to-violet-50 text-indigo-700"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-indigo-600"
                     }`
                   }
                 >
@@ -597,12 +776,14 @@ export default function PlayerLayout() {
                   Profile
                 </NavLink>
 
-                {/* Logout */}
+                {/* =================================================
+                    LOGOUT
+                ================================================= */}
 
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50"
+                  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-red-500 transition hover:bg-red-50"
                 >
                   <LogOut size={19} />
                   Logout
@@ -617,7 +798,7 @@ export default function PlayerLayout() {
           MAIN CONTENT
       ======================================================= */}
 
-      <main className="mx-auto min-h-[calc(100vh-64px)] max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
+      <main className="mx-auto min-h-[calc(100vh-4.5rem)] max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <Outlet />
       </main>
     </div>
