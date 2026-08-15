@@ -4,21 +4,40 @@ import Input from "@/components/common/Input";
 import Button from "@/components/common/Button";
 
 export default function Login() {
-  const [phone, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    console.log({
-      phone,
-      password,
+  try {
+    const response = await fetch("/.netlify/functions/auth-login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        phone,
+        password,
+      }),
     });
 
-    // TODO:
-    // Call login API
-    // await api.post("/auth/login", data)
-  };
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.message);
+      return;
+    }
+
+    console.log("Logged in:", data.data.user);
+
+    // Navigate according to role here.
+  } catch (error) {
+    console.error(error);
+    alert("Unable to connect to server");
+  }
+};
 
   return (
     <div
@@ -54,10 +73,11 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="Phone"
-            type="phone"
+            name="phone"
+            type="tel"
             placeholder="Enter phone"
             value={phone}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => setPhone(e.target.value)}
           />
 
           <Input

@@ -142,7 +142,7 @@ CREATE TABLE "users" (
 	"email" varchar(255),
 	"password_hash" varchar(255) NOT NULL,
 	"full_name" varchar(150),
-	"phone" varchar(30),
+	"phone" varchar(30) NOT NULL,
 	"role" "user_role" DEFAULT 'PLAYER' NOT NULL,
 	"status" "user_status" DEFAULT 'ACTIVE' NOT NULL,
 	"is_verified" boolean DEFAULT false NOT NULL,

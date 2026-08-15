@@ -1,5 +1,5 @@
 {
-  "id": "7e4d41cd-ba2d-4a3c-8076-df38099cb5d1",
+  "id": "31b12243-422d-4f07-b292-fb5b110bfe10",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -953,7 +953,7 @@
           "name": "phone",
           "type": "varchar(30)",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "role": {
           "name": "role",

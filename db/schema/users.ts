@@ -7,7 +7,10 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 
-export const userRoleEnum = pgEnum("user_role", ["ADMIN", "PLAYER"]);
+export const userRoleEnum = pgEnum("user_role", [
+  "ADMIN",
+  "PLAYER",
+]);
 
 export const userStatusEnum = pgEnum("user_status", [
   "ACTIVE",
@@ -16,8 +19,15 @@ export const userStatusEnum = pgEnum("user_status", [
 ]);
 
 export const users = pgTable("users", {
-  id: uuid("id").defaultRandom().primaryKey(),
+  id: uuid("id")
+    .defaultRandom()
+    .primaryKey(),
 
+  /*
+   * Automatically generated for players.
+   * Example:
+   * player_a82f7d91c2ab
+   */
   username: varchar("username", {
     length: 50,
   })
@@ -36,15 +46,29 @@ export const users = pgTable("users", {
     length: 150,
   }),
 
+  /*
+   * Phone is the login identifier.
+   */
   phone: varchar("phone", {
     length: 30,
-  }).unique(),
+  })
+    .notNull()
+    .unique(),
 
-  role: userRoleEnum("role").notNull().default("PLAYER"),
+  role: userRoleEnum("role")
+    .notNull()
+    .default("PLAYER"),
 
-  status: userStatusEnum("status").notNull().default("ACTIVE"),
+  status: userStatusEnum("status")
+    .notNull()
+    .default("ACTIVE"),
 
-  isVerified: boolean("is_verified").notNull().default(false),
+  /*
+   * false until phone verification is completed.
+   */
+  isVerified: boolean("is_verified")
+    .notNull()
+    .default(false),
 
   lastLoginAt: timestamp("last_login_at", {
     withTimezone: true,
