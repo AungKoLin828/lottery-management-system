@@ -51,7 +51,7 @@ const navigation = [
 ];
 
 /* ============================================================
-   PLAY MENU
+   PLAY NAVIGATION
 ============================================================ */
 
 const playNavigation = [
@@ -70,7 +70,7 @@ const playNavigation = [
 ];
 
 /* ============================================================
-   MORE MENU
+   MORE NAVIGATION
 ============================================================ */
 
 const moreNavigation = [
@@ -93,6 +93,10 @@ const moreNavigation = [
 export default function PlayerLayout() {
   const location = useLocation();
 
+  /* ============================================================
+     STATE
+  ============================================================ */
+
   const [mobileMenuOpen, setMobileMenuOpen] =
     useState(false);
 
@@ -104,6 +108,10 @@ export default function PlayerLayout() {
 
   const [moreMenuOpen, setMoreMenuOpen] =
     useState(false);
+
+  /* ============================================================
+     REFS
+  ============================================================ */
 
   const profileMenuRef =
     useRef<HTMLDivElement>(null);
@@ -119,8 +127,12 @@ export default function PlayerLayout() {
   ============================================================ */
 
   const isPlayActive =
-    location.pathname.startsWith("/player/play-2d") ||
-    location.pathname.startsWith("/player/play-3d");
+    location.pathname.startsWith(
+      "/player/play-2d"
+    ) ||
+    location.pathname.startsWith(
+      "/player/play-3d"
+    );
 
   const isMoreActive =
     location.pathname.startsWith(
@@ -129,6 +141,63 @@ export default function PlayerLayout() {
     location.pathname.startsWith(
       "/player/contact"
     );
+
+  /* ============================================================
+     CLOSE ALL MENUS
+  ============================================================ */
+
+  const closeAllMenus = () => {
+    setMobileMenuOpen(false);
+    setProfileMenuOpen(false);
+    setPlayMenuOpen(false);
+    setMoreMenuOpen(false);
+  };
+
+  /* ============================================================
+     CLOSE MOBILE MENU
+  ============================================================ */
+
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
+    setPlayMenuOpen(false);
+    setMoreMenuOpen(false);
+  };
+
+  /* ============================================================
+     TOGGLE PLAY MENU
+  ============================================================ */
+
+  const togglePlayMenu = () => {
+    setPlayMenuOpen((current) => !current);
+
+    // Close other desktop dropdowns.
+    setProfileMenuOpen(false);
+    setMoreMenuOpen(false);
+  };
+
+  /* ============================================================
+     TOGGLE MORE MENU
+  ============================================================ */
+
+  const toggleMoreMenu = () => {
+    setMoreMenuOpen((current) => !current);
+
+    // Close other dropdowns.
+    setPlayMenuOpen(false);
+    setProfileMenuOpen(false);
+  };
+
+  /* ============================================================
+     TOGGLE PROFILE MENU
+  ============================================================ */
+
+  const toggleProfileMenu = () => {
+    setProfileMenuOpen((current) => !current);
+
+    // Close other dropdowns.
+    setPlayMenuOpen(false);
+    setMoreMenuOpen(false);
+  };
 
   /* ============================================================
      CLOSE MENUS WHEN ROUTE CHANGES
@@ -193,21 +262,11 @@ export default function PlayerLayout() {
   const handleLogout = () => {
     console.log("Logout");
 
-    // Replace with your real logout logic.
+    // Replace this with your actual logout logic.
     //
     // Example:
     // localStorage.removeItem("token");
     // navigate("/login");
-  };
-
-  /* ============================================================
-     CLOSE MOBILE MENU
-  ============================================================ */
-
-  const closeMobileMenu = () => {
-    setMobileMenuOpen(false);
-    setPlayMenuOpen(false);
-    setMoreMenuOpen(false);
   };
 
   /* ============================================================
@@ -219,11 +278,33 @@ export default function PlayerLayout() {
   }: {
     isActive: boolean;
   }) =>
-    `group flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
+    `group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
       isActive
         ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
         : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
     }`;
+
+  /* ============================================================
+     PLAY DROPDOWN ITEM CLASS
+  ============================================================ */
+
+  const playItemClass = (
+    isActive: boolean,
+    is2D: boolean
+  ) =>
+    `group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200 ${
+      isActive
+        ? is2D
+          ? "bg-indigo-500/20"
+          : "bg-violet-500/20"
+        : is2D
+          ? "hover:bg-indigo-500/15"
+          : "hover:bg-violet-500/15"
+    }`;
+
+  /* ============================================================
+     RENDER
+  ============================================================ */
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -239,16 +320,12 @@ export default function PlayerLayout() {
 
           <NavLink
             to="/player"
+            onClick={closeAllMenus}
             className="group flex shrink-0 items-center gap-2.5"
-            onClick={closeMobileMenu}
           >
-            {/* Logo Icon */}
-
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30 transition-transform duration-200 group-hover:scale-105">
               <Ticket className="h-5 w-5" />
             </div>
-
-            {/* Logo */}
 
             <div className="flex items-center">
               <span className="text-lg font-extrabold tracking-tight text-white">
@@ -266,31 +343,22 @@ export default function PlayerLayout() {
           =================================================== */}
 
           <nav className="hidden items-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 lg:flex">
-            {/* Dashboard */}
+            {/* =================================================
+                DASHBOARD
+            ================================================= */}
 
-            {navigation
-              .filter(
-                (item) => item.name === "Dashboard"
-              )
-              .map((item) => {
-                const Icon = item.icon;
+            <NavLink
+              to="/player"
+              end
+              className={navClass}
+            >
+              <LayoutDashboard
+                size={17}
+                className="transition-transform duration-200 group-hover:scale-105"
+              />
 
-                return (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    end
-                    className={navClass}
-                  >
-                    <Icon
-                      size={17}
-                      className="transition-transform group-hover:scale-105"
-                    />
-
-                    {item.name}
-                  </NavLink>
-                );
-              })}
+              Dashboard
+            </NavLink>
 
             {/* =================================================
                 PLAY DROPDOWN
@@ -300,38 +368,47 @@ export default function PlayerLayout() {
               ref={playMenuRef}
               className="relative"
             >
+              {/* Play Button */}
+
               <button
                 type="button"
-                onClick={() =>
-                  setPlayMenuOpen(
-                    (current) => !current
-                  )
-                }
+                onClick={togglePlayMenu}
+                aria-haspopup="menu"
+                aria-expanded={playMenuOpen}
                 className={`group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
                   isPlayActive
                     ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
                     : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
                 }`}
               >
+                {/* Play Icon */}
+
                 <Dice5
                   size={17}
-                  className={`transition-transform duration-200 ${
+                  className={`transition-all duration-200 ${
                     playMenuOpen
-                      ? "rotate-6"
+                      ? "rotate-6 text-indigo-300"
                       : ""
                   }`}
                 />
+
+                {/* Label */}
 
                 <span>Play</span>
 
+                {/* Arrow */}
+
                 <ChevronDown
-                  size={14}
+                  size={15}
+                  strokeWidth={2.5}
                   className={`transition-transform duration-200 ${
                     playMenuOpen
                       ? "rotate-180"
-                      : ""
+                      : "rotate-0"
                   }`}
                 />
+
+                {/* Active Indicator */}
 
                 {isPlayActive && (
                   <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
@@ -343,8 +420,11 @@ export default function PlayerLayout() {
               ================================================= */}
 
               {playMenuOpen && (
-                <div className="absolute left-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-2 shadow-xl shadow-slate-950/40">
-                  {/* Dropdown Title */}
+                <div
+                  className="absolute left-0 top-full z-[100] mt-2 w-64 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-2 shadow-2xl shadow-slate-950/50"
+                  role="menu"
+                >
+                  {/* Dropdown Header */}
 
                   <div className="px-3 pb-2 pt-1">
                     <div className="flex items-center gap-2">
@@ -356,63 +436,65 @@ export default function PlayerLayout() {
                     </div>
                   </div>
 
-                  {/* Games */}
+                  {/* =================================================
+                      2D PLAY
+                  ================================================= */}
 
-                  {playNavigation.map(
-                    (item, index) => {
-                      const Icon = item.icon;
-
-                      const is2D = index === 0;
-
-                      return (
-                        <NavLink
-                          key={item.path}
-                          to={item.path}
-                          className={({ isActive }) =>
-                            `group flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-200 ${
-                              isActive
-                                ? is2D
-                                  ? "bg-indigo-500/20"
-                                  : "bg-violet-500/20"
-                                : is2D
-                                  ? "hover:bg-indigo-500/15"
-                                  : "hover:bg-violet-500/15"
-                            }`
-                          }
-                        >
-                          {/* Icon */}
-
-                          <div
-                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                              is2D
-                                ? "bg-indigo-500/15 text-indigo-400 group-hover:bg-indigo-500/25"
-                                : "bg-violet-500/15 text-violet-400 group-hover:bg-violet-500/25"
-                            }`}
-                          >
-                            <Icon className="h-5 w-5" />
-                          </div>
-
-                          {/* Text */}
-
-                          <div>
-                            <p
-                              className={`text-sm font-bold ${
-                                is2D
-                                  ? "text-white group-hover:text-indigo-300"
-                                  : "text-white group-hover:text-violet-300"
-                              }`}
-                            >
-                              {item.name}
-                            </p>
-
-                            <p className="mt-0.5 text-xs text-slate-400">
-                              {item.description}
-                            </p>
-                          </div>
-                        </NavLink>
-                      );
+                  <NavLink
+                    to="/player/play-2d"
+                    role="menuitem"
+                    onClick={() => {
+                      setPlayMenuOpen(false);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={({ isActive }) =>
+                      playItemClass(isActive, true)
                     }
-                  )}
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-400 transition-colors duration-200 group-hover:bg-indigo-500/25">
+                      <Dice5 className="h-5 w-5" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-white transition-colors group-hover:text-indigo-300">
+                        2D Play
+                      </p>
+
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        Play 2D Lottery
+                      </p>
+                    </div>
+                  </NavLink>
+
+                  {/* =================================================
+                      3D PLAY
+                  ================================================= */}
+
+                  <NavLink
+                    to="/player/play-3d"
+                    role="menuitem"
+                    onClick={() => {
+                      setPlayMenuOpen(false);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={({ isActive }) =>
+                      playItemClass(isActive, false)
+                    }
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 transition-colors duration-200 group-hover:bg-violet-500/25">
+                      <Boxes className="h-5 w-5" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-white transition-colors group-hover:text-violet-300">
+                        3D Play
+                      </p>
+
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        Play 3D Lottery
+                      </p>
+                    </div>
+                  </NavLink>
                 </div>
               )}
             </div>
@@ -451,11 +533,9 @@ export default function PlayerLayout() {
             >
               <button
                 type="button"
-                onClick={() =>
-                  setMoreMenuOpen(
-                    (current) => !current
-                  )
-                }
+                onClick={toggleMoreMenu}
+                aria-haspopup="menu"
+                aria-expanded={moreMenuOpen}
                 className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
                   isMoreActive
                     ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
@@ -465,19 +545,24 @@ export default function PlayerLayout() {
                 <span>More</span>
 
                 <ChevronDown
-                  size={14}
+                  size={15}
+                  strokeWidth={2.5}
                   className={`transition-transform duration-200 ${
                     moreMenuOpen
                       ? "rotate-180"
                       : ""
                   }`}
                 />
+
+                {isMoreActive && (
+                  <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
+                )}
               </button>
 
               {/* More Dropdown */}
 
               {moreMenuOpen && (
-                <div className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-2 shadow-xl shadow-slate-950/40">
+                <div className="absolute right-0 top-full z-[100] mt-2 w-56 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-2 shadow-2xl shadow-slate-950/50">
                   {moreNavigation.map((item) => {
                     const Icon = item.icon;
 
@@ -485,6 +570,9 @@ export default function PlayerLayout() {
                       <NavLink
                         key={item.path}
                         to={item.path}
+                        onClick={() =>
+                          setMoreMenuOpen(false)
+                        }
                         className={({ isActive }) =>
                           `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
                             isActive
@@ -550,18 +638,15 @@ export default function PlayerLayout() {
             >
               <button
                 type="button"
-                onClick={() =>
-                  setProfileMenuOpen(
-                    (current) => !current
-                  )
-                }
+                onClick={toggleProfileMenu}
+                aria-label="Open profile menu"
+                aria-haspopup="menu"
+                aria-expanded={profileMenuOpen}
                 className={`flex items-center gap-2 rounded-xl px-2 py-1.5 transition-all duration-200 ${
                   profileMenuOpen
                     ? "bg-indigo-500/20 text-indigo-300"
                     : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
                 }`}
-                aria-label="Open profile menu"
-                aria-expanded={profileMenuOpen}
               >
                 {/* Avatar */}
 
@@ -581,6 +666,8 @@ export default function PlayerLayout() {
                   </p>
                 </div>
 
+                {/* Arrow */}
+
                 <ChevronDown
                   size={15}
                   className={`transition-transform duration-200 ${
@@ -594,7 +681,7 @@ export default function PlayerLayout() {
               {/* Profile Dropdown */}
 
               {profileMenuOpen && (
-                <div className="absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 shadow-xl shadow-slate-950/40">
+                <div className="absolute right-0 top-full z-[100] mt-2 w-60 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 shadow-2xl shadow-slate-950/50">
                   {/* User Header */}
 
                   <div className="bg-gradient-to-r from-indigo-600/20 to-violet-600/20 px-4 py-4">
@@ -615,11 +702,9 @@ export default function PlayerLayout() {
                     </div>
                   </div>
 
-                  {/* Menu */}
+                  {/* Profile Menu */}
 
                   <div className="p-2">
-                    {/* Profile */}
-
                     <NavLink
                       to="/player/profile"
                       onClick={() =>
@@ -636,8 +721,6 @@ export default function PlayerLayout() {
                       <User size={17} />
                       Profile
                     </NavLink>
-
-                    {/* Logout */}
 
                     <button
                       type="button"
@@ -690,7 +773,7 @@ export default function PlayerLayout() {
 
         {mobileMenuOpen && (
           <div className="border-t border-slate-700 bg-slate-900 lg:hidden">
-            <nav className="mx-auto max-w-7xl space-y-1 px-4 py-3 sm:px-6">
+            <nav className="mx-auto max-w-7xl space-y-1 px-3 py-3 sm:px-5">
               {/* =================================================
                   DASHBOARD
               ================================================= */}
@@ -700,85 +783,145 @@ export default function PlayerLayout() {
                 end
                 onClick={closeMobileMenu}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                  `flex min-h-10 items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition ${
                     isActive
-                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
+                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm"
                       : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
                   }`
                 }
               >
-                <LayoutDashboard size={19} />
-                Dashboard
+                <LayoutDashboard size={17} />
+
+                <span>Dashboard</span>
               </NavLink>
 
               {/* =================================================
-                  MOBILE PLAY
+                  MOBILE PLAY DROPDOWN
               ================================================= */}
 
-              <div className="my-1 rounded-2xl border border-slate-700 bg-slate-800 p-1.5">
-                {/* Play Header */}
+              <div
+                className={`rounded-xl border p-1 transition-colors ${
+                  isPlayActive
+                    ? "border-indigo-500/30 bg-indigo-500/5"
+                    : "border-slate-700 bg-slate-800/80"
+                }`}
+              >
+                {/* Play Button */}
 
-                <div className="flex items-center gap-3 rounded-xl px-3 py-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 text-white">
-                    <Dice5 size={17} />
-                  </div>
+                <button
+                  type="button"
+                  onClick={togglePlayMenu}
+                  aria-haspopup="menu"
+                  aria-expanded={playMenuOpen}
+                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition-all ${
+                    isPlayActive
+                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm"
+                      : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <div
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                        isPlayActive
+                          ? "bg-white/15 text-white"
+                          : "bg-gradient-to-br from-indigo-600 to-violet-600 text-white"
+                      }`}
+                    >
+                      <Dice5 size={16} />
+                    </div>
 
-                  <div>
-                    <p className="text-sm font-bold text-white">
-                      Play
-                    </p>
+                    <span>
+                      <span className="block text-[13px] font-bold leading-tight">
+                        Play
+                      </span>
 
-                    <p className="text-[11px] text-slate-400">
-                      Choose your lottery
-                    </p>
-                  </div>
-                </div>
-
-                {/* 2D / 3D */}
-
-                {playNavigation.map(
-                  (item, index) => {
-                    const Icon = item.icon;
-
-                    const is2D = index === 0;
-
-                    return (
-                      <NavLink
-                        key={item.path}
-                        to={item.path}
-                        onClick={closeMobileMenu}
-                        className={({ isActive }) =>
-                          `group flex items-center gap-3 rounded-xl px-3 py-3 transition ${
-                            isActive
-                              ? is2D
-                                ? "bg-indigo-500/20 text-indigo-300"
-                                : "bg-violet-500/20 text-violet-300"
-                              : "text-slate-300 hover:bg-slate-700/60 hover:text-white"
-                          }`
-                        }
+                      <span
+                        className={`block text-[10px] leading-tight ${
+                          isPlayActive
+                            ? "text-indigo-100"
+                            : "text-slate-500"
+                        }`}
                       >
-                        <div
-                          className={`flex h-9 w-9 items-center justify-center rounded-lg ${
-                            is2D
-                              ? "bg-indigo-500/15 text-indigo-400"
-                              : "bg-violet-500/15 text-violet-400"
-                          }`}
-                        >
-                          <Icon size={18} />
-                        </div>
+                        Choose your lottery
+                      </span>
+                    </span>
+                  </span>
 
-                        <div>
-                          <p className="text-sm font-semibold">
-                            {item.name}
-                          </p>
+                  {/* Mobile Arrow */}
 
-                          <p className="text-[11px] text-slate-500">
-                            {item.description}
-                          </p>
-                        </div>
-                      </NavLink>
-                    );
-                  }
+                  <ChevronDown
+                    size={17}
+                    strokeWidth={2.5}
+                    className={`shrink-0 transition-transform duration-200 ${
+                      playMenuOpen
+                        ? "rotate-180"
+                        : "rotate-0"
+                    }`}
+                  />
+                </button>
+
+                {/* =================================================
+                    MOBILE PLAY ITEMS
+                ================================================= */}
+
+                {playMenuOpen && (
+                  <div className="mt-1 space-y-1 border-t border-slate-700 pt-1">
+                    {/* 2D */}
+
+                    <NavLink
+                      to="/player/play-2d"
+                      onClick={closeMobileMenu}
+                      className={({ isActive }) =>
+                        `group flex items-center gap-3 rounded-xl px-3 py-2.5 transition ${
+                          isActive
+                            ? "bg-indigo-500/20 text-indigo-300"
+                            : "text-slate-300 hover:bg-slate-700/60 hover:text-white"
+                        }`
+                      }
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-400">
+                        <Dice5 size={17} />
+                      </div>
+
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-semibold leading-tight">
+                          2D Play
+                        </p>
+
+                        <p className="mt-0.5 text-[10px] leading-tight text-slate-500">
+                          Play 2D Lottery
+                        </p>
+                      </div>
+                    </NavLink>
+
+                    {/* 3D */}
+
+                    <NavLink
+                      to="/player/play-3d"
+                      onClick={closeMobileMenu}
+                      className={({ isActive }) =>
+                        `group flex items-center gap-3 rounded-xl px-3 py-2.5 transition ${
+                          isActive
+                            ? "bg-violet-500/20 text-violet-300"
+                            : "text-slate-300 hover:bg-slate-700/60 hover:text-white"
+                        }`
+                      }
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400">
+                        <Boxes size={17} />
+                      </div>
+
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-semibold leading-tight">
+                          3D Play
+                        </p>
+
+                        <p className="mt-0.5 text-[10px] leading-tight text-slate-500">
+                          Play 3D Lottery
+                        </p>
+                      </div>
+                    </NavLink>
+                  </div>
                 )}
               </div>
 
@@ -790,15 +933,16 @@ export default function PlayerLayout() {
                 to="/player/tickets"
                 onClick={closeMobileMenu}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                  `flex min-h-10 items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition ${
                     isActive
                       ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
                       : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
                   }`
                 }
               >
-                <Ticket size={19} />
-                My Tickets
+                <Ticket size={17} />
+
+                <span>My Tickets</span>
               </NavLink>
 
               {/* =================================================
@@ -809,18 +953,18 @@ export default function PlayerLayout() {
                 to="/player/wallet"
                 onClick={closeMobileMenu}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                  `flex min-h-10 items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition ${
                     isActive
                       ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
                       : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
                   }`
                 }
               >
-                <WalletCards size={19} />
+                <WalletCards size={17} />
 
-                Wallet
+                <span>Wallet</span>
 
-                <span className="ml-auto text-xs font-bold text-emerald-400">
+                <span className="ml-auto text-[10px] font-bold text-emerald-400">
                   125,000 MMK
                 </span>
               </NavLink>
@@ -839,16 +983,16 @@ export default function PlayerLayout() {
                       to={item.path}
                       onClick={closeMobileMenu}
                       className={({ isActive }) =>
-                        `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                        `flex min-h-10 items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition ${
                           isActive
                             ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
                             : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
                         }`
                       }
                     >
-                      <Icon size={19} />
+                      <Icon size={17} />
 
-                      {item.name}
+                      <span>{item.name}</span>
                     </NavLink>
                   );
                 })}
@@ -857,7 +1001,7 @@ export default function PlayerLayout() {
                     NOTIFICATIONS
                 ================================================= */}
 
-                <div className="mt-1 flex items-center rounded-xl px-4 py-3">
+                <div className="flex min-h-10 items-center rounded-xl px-3 py-2.5">
                   <NotificationBell role="PLAYER" />
                 </div>
 
@@ -869,15 +1013,16 @@ export default function PlayerLayout() {
                   to="/player/profile"
                   onClick={closeMobileMenu}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                    `flex min-h-10 items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition ${
                       isActive
                         ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
                         : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
                     }`
                   }
                 >
-                  <User size={19} />
-                  Profile
+                  <User size={17} />
+
+                  <span>Profile</span>
                 </NavLink>
 
                 {/* =================================================
@@ -887,10 +1032,11 @@ export default function PlayerLayout() {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
+                  className="flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
                 >
-                  <LogOut size={19} />
-                  Logout
+                  <LogOut size={17} />
+
+                  <span>Logout</span>
                 </button>
               </div>
             </nav>
