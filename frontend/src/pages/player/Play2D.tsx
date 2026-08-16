@@ -1,7 +1,14 @@
 // src/pages/player/Play2D.tsx
 
 import { useMemo, useState } from "react";
-import { Check, Dice5, Lock, Pencil, Trash2, X } from "lucide-react";
+import {
+  Check,
+  Dice5,
+  Lock,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
 import type { Bet2D, Session2D } from "@/types/player";
 
 /* ============================================================
@@ -12,34 +19,15 @@ type NumberUsage = Record<string, number>;
 
 /* ============================================================
    ADMIN CONFIGURATION
-   Replace these values later with API/database settings.
 ============================================================ */
 
-// Maximum amount allowed for ONE number in each session.
 const MAX_BET_AMOUNT = 10_000;
 
-// Numbers blocked by admin.
-const BLOCKED_NUMBERS: string[] = [
-  // "13",
-  // "25",
-  // "66",
-];
+const BLOCKED_NUMBERS: string[] = [];
 
 /*
- * Already-used amount for each number.
- *
- * In the real application this should come from the backend.
- * Example:
- *
- * {
- *   AM: {
- *     "00": 2000,
- *     "01": 5000,
- *   },
- *   PM: {
- *     "00": 7000,
- *   }
- * }
+ * Mock usage data.
+ * Replace with API/database data later.
  */
 const INITIAL_USAGE: Record<Session2D, NumberUsage> = {
   AM: {
@@ -58,22 +46,21 @@ const INITIAL_USAGE: Record<Session2D, NumberUsage> = {
 };
 
 /* ============================================================
-   HELPERS
+   NUMBER LIST
 ============================================================ */
 
-const NUMBER_LIST = Array.from({ length: 100 }, (_, index) =>
-  index.toString().padStart(2, "0"),
+const NUMBER_LIST = Array.from(
+  { length: 100 },
+  (_, index) => index.toString().padStart(2, "0"),
 );
+
+/* ============================================================
+   COMPONENT
+============================================================ */
 
 export default function Play2D() {
   const [session, setSession] = useState<Session2D>("AM");
 
-  /*
-   * Multiple number selection.
-   *
-   * Example:
-   * ["00", "05", "23", "88"]
-   */
   const [selectedNumbers, setSelectedNumbers] = useState<string[]>([]);
 
   const [amount, setAmount] = useState("");
@@ -84,16 +71,12 @@ export default function Play2D() {
 
   const [editingAmount, setEditingAmount] = useState("");
 
-  /*
-   * Usage from backend/admin configuration.
-   *
-   * This is local mock data for now.
-   */
-  const [numberUsage] = useState<Record<Session2D, NumberUsage>>(INITIAL_USAGE);
+  const [numberUsage] =
+    useState<Record<Session2D, NumberUsage>>(INITIAL_USAGE);
 
-  /* ==========================================================
+  /* ============================================================
      CALCULATIONS
-  ========================================================== */
+  ============================================================ */
 
   const currentSessionUsage = numberUsage[session];
 
@@ -112,22 +95,28 @@ export default function Play2D() {
     return selectedNumbers.length * betAmount;
   }, [selectedNumbers, amount]);
 
-  /* ==========================================================
+  /* ============================================================
      NUMBER STATUS
-  ========================================================== */
+  ============================================================ */
 
   const getUsedAmount = (number: string) => {
     return currentSessionUsage[number] ?? 0;
   };
 
   const getRemainingAmount = (number: string) => {
-    return Math.max(MAX_BET_AMOUNT - getUsedAmount(number), 0);
+    return Math.max(
+      MAX_BET_AMOUNT - getUsedAmount(number),
+      0,
+    );
   };
 
   const getProgress = (number: string) => {
     const used = getUsedAmount(number);
 
-    return Math.min((used / MAX_BET_AMOUNT) * 100, 100);
+    return Math.min(
+      (used / MAX_BET_AMOUNT) * 100,
+      100,
+    );
   };
 
   const isBlocked = (number: string) => {
@@ -142,16 +131,12 @@ export default function Play2D() {
     return selectedNumbers.includes(number);
   };
 
-  /* ==========================================================
+  /* ============================================================
      NUMBER SELECTION
-  ========================================================== */
+  ============================================================ */
 
   const toggleNumber = (number: string) => {
-    if (isBlocked(number)) {
-      return;
-    }
-
-    if (isLimitReached(number)) {
+    if (isBlocked(number) || isLimitReached(number)) {
       return;
     }
 
@@ -160,31 +145,29 @@ export default function Play2D() {
         return current.filter((item) => item !== number);
       }
 
-      // No maximum selection limit.
       return [...current, number];
     });
   };
 
-  /* ==========================================================
-     SESSION CHANGE
-  ========================================================== */
+  /* ============================================================
+     SESSION
+  ============================================================ */
 
   const changeSession = (newSession: Session2D) => {
     setSession(newSession);
-
-    // Clear number selection when changing AM / PM.
     setSelectedNumbers([]);
-
     setAmount("");
   };
 
-  /* ==========================================================
+  /* ============================================================
      SELECT / CLEAR
-  ========================================================== */
+  ============================================================ */
 
   const selectAllAvailable = () => {
     const availableNumbers = NUMBER_LIST.filter(
-      (item) => !isBlocked(item) && !isLimitReached(item),
+      (item) =>
+        !isBlocked(item) &&
+        !isLimitReached(item),
     );
 
     setSelectedNumbers(availableNumbers);
@@ -194,25 +177,28 @@ export default function Play2D() {
     setSelectedNumbers([]);
   };
 
-  /* ==========================================================
-     ADD BETS
-  ========================================================== */
+  /* ============================================================
+     ADD BET
+  ============================================================ */
 
   const addBet = () => {
     const betAmount = Number(amount);
 
-    if (selectedNumbers.length === 0 || !betAmount || betAmount <= 0) {
+    if (
+      selectedNumbers.length === 0 ||
+      !betAmount ||
+      betAmount <= 0
+    ) {
       return;
     }
 
-    /*
-     * Validate every selected number against its
-     * remaining admin limit.
-     */
     const validNumbers = selectedNumbers.filter((item) => {
       const remaining = getRemainingAmount(item);
 
-      return !isBlocked(item) && remaining >= betAmount;
+      return (
+        !isBlocked(item) &&
+        remaining >= betAmount
+      );
     });
 
     if (validNumbers.length === 0) {
@@ -227,9 +213,6 @@ export default function Play2D() {
     }));
 
     setBets((current) => {
-      /*
-       * Prevent duplicate number/session combinations.
-       */
       const filtered = current.filter(
         (existing) =>
           !newBets.some(
@@ -247,8 +230,8 @@ export default function Play2D() {
   };
 
   /* ============================================================
-   EDIT BET AMOUNT
-============================================================ */
+     EDIT BET
+  ============================================================ */
 
   const startEditBet = (bet: Bet2D) => {
     setEditingBetId(bet.id);
@@ -267,15 +250,12 @@ export default function Play2D() {
       return;
     }
 
-    /*
-     * The current bet amount is already included in the
-     * backend/admin usage, so add it back when calculating
-     * how much this edited bet can use.
-     */
     const currentAmount = bet.amount;
     const usedAmount = getUsedAmount(bet.number);
 
-    const availableForEdit = MAX_BET_AMOUNT - (usedAmount - currentAmount);
+    const availableForEdit =
+      MAX_BET_AMOUNT -
+      (usedAmount - currentAmount);
 
     if (newAmount > availableForEdit) {
       return;
@@ -295,17 +275,19 @@ export default function Play2D() {
     cancelEditBet();
   };
 
-  /* ==========================================================
+  /* ============================================================
      REMOVE BET
-  ========================================================== */
+  ============================================================ */
 
   const removeBet = (id: string) => {
-    setBets((current) => current.filter((bet) => bet.id !== id));
+    setBets((current) =>
+      current.filter((bet) => bet.id !== id),
+    );
   };
 
-  /* ==========================================================
+  /* ============================================================
      SUBMIT
-  ========================================================== */
+  ============================================================ */
 
   const submitBets = () => {
     if (bets.length === 0) {
@@ -315,11 +297,12 @@ export default function Play2D() {
     console.log("2D Bets:", bets);
   };
 
-  /* ==========================================================
+  /* ============================================================
      FORMAT
-  ========================================================== */
+  ============================================================ */
 
-  const formatAmount = (value: number) => value.toLocaleString();
+  const formatAmount = (value: number) =>
+    value.toLocaleString();
 
   /* ============================================================
      UI
@@ -327,198 +310,281 @@ export default function Play2D() {
 
   return (
     <div className="space-y-6">
-      {/* =====================================================
+
+      {/* ======================================================
           PAGE HEADER
       ====================================================== */}
 
       <div>
         <div className="flex items-center gap-1 text-sm font-semibold">
-          <span className="text-gray-900">Lottery</span>
+          <span className="text-slate-500">
+            Lottery
+          </span>
 
-          <span className="text-indigo-600">Play</span>
+          <span className="text-violet-600">
+            /
+          </span>
+
+          <span className="text-violet-600">
+            Play
+          </span>
         </div>
 
-        <h1 className="mt-1 text-3xl font-bold tracking-tight text-gray-900">
+        <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
           2D Play
         </h1>
 
-        <p className="mt-2 text-sm text-gray-500">
-          Select multiple numbers and enter your bet amount.
+        <p className="mt-2 text-sm text-slate-500">
+          Select your lucky numbers and enter your bet amount.
         </p>
       </div>
 
-      {/* =====================================================
+      {/* ======================================================
           MAIN CONTENT
       ====================================================== */}
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_400px]">
-        {/* =================================================
-            LEFT - BET FORM
-        ================================================== */}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
 
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          {/* Header */}
+        {/* ====================================================
+            LEFT - BET FORM
+        ==================================================== */}
+
+        <div className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm sm:p-6">
+
+          {/* HEADER */}
 
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-sm shadow-violet-200">
               <Dice5 className="h-5 w-5" />
             </div>
 
             <div>
-              <h2 className="text-lg font-bold text-gray-900">Place 2D Bet</h2>
+              <h2 className="text-lg font-bold text-slate-900">
+                Place 2D Bet
+              </h2>
 
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-slate-400">
                 Choose one or more numbers
               </p>
             </div>
           </div>
 
-          {/* =================================================
+          {/* ==================================================
               SESSION
           ================================================== */}
 
-          <div className="mt-7">
-            <label className="mb-3 block text-sm font-semibold text-gray-700">
+          <div className="mt-6">
+            <label className="mb-3 block text-sm font-semibold text-slate-700">
               Session
             </label>
 
-            <div className="grid grid-cols-2 gap-3">
-              {(["AM", "PM"] as Session2D[]).map((item) => {
-                const active = session === item;
+            <div className="grid grid-cols-2 gap-2.5">
 
-                return (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => changeSession(item)}
-                    className={`rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-200 ${
-                      active
-                        ? "border-blue-200 bg-blue-100 text-blue-700 shadow-sm"
-                        : "border-gray-200 bg-white text-gray-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
-                    }`}
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      <span
-                        className={`h-2 w-2 rounded-full ${
-                          active ? "bg-blue-600" : "bg-gray-300"
-                        }`}
-                      />
-                      {item} Session
-                    </div>
-                  </button>
-                );
-              })}
+              {(["AM", "PM"] as Session2D[]).map(
+                (item) => {
+                  const active =
+                    session === item;
+
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() =>
+                        changeSession(item)
+                      }
+                      className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                        active
+                          ? item === "AM"
+                            ? "border-blue-400 bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md shadow-blue-100"
+                            : "border-violet-400 bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-md shadow-violet-100"
+                          : "border-slate-200 bg-slate-50 text-slate-500 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600"
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            active
+                              ? "bg-white"
+                              : "bg-slate-300"
+                          }`}
+                        />
+
+                        {item} Session
+                      </div>
+                    </button>
+                  );
+                },
+              )}
+
             </div>
           </div>
 
-          {/* =================================================
-              NUMBER SELECTION HEADER
+          {/* ==================================================
+              NUMBER SELECTION
           ================================================== */}
 
-          <div className="mt-7">
-            <div className="flex items-center justify-between">
+          <div className="mt-6">
+
+            {/* NUMBER HEADER */}
+
+            <div className="flex items-center justify-between gap-3">
+
               <div>
-                <label className="block text-sm font-semibold text-gray-700">
-                  2D Number
+                <label className="block text-sm font-semibold text-slate-700">
+                  Select Numbers
                 </label>
 
-                <p className="mt-1 text-xs text-gray-400">
-                  Select multiple numbers
+                <p className="mt-1 text-xs text-slate-400">
+                  Choose your 2D numbers
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-1.5">
+
+                {/* SELECT ALL */}
+
                 <button
                   type="button"
                   onClick={selectAllAvailable}
-                  className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-100"
+                  className="rounded-md border border-violet-200 bg-violet-100 px-2 py-1 text-[10px] font-bold text-violet-700 transition hover:border-violet-300 hover:bg-violet-200"
                 >
                   Select All
                 </button>
 
+                {/* CLEAR */}
+
                 <button
                   type="button"
                   onClick={clearSelection}
-                  disabled={selectedNumbers.length === 0}
-                  className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-500 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={
+                    selectedNumbers.length === 0
+                  }
+                  className="rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Clear
                 </button>
+
               </div>
             </div>
 
             {/* =================================================
                 NUMBER GRID
-            ================================================== */}
+            ================================================= */}
 
-            <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 p-3 sm:p-4">
-              <div className="grid grid-cols-5 gap-2 sm:grid-cols-10">
+            <div className="mt-3 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-100 via-indigo-50 to-blue-100 p-2.5 shadow-inner sm:p-3">
+
+              <div className="grid grid-cols-10 gap-1">
+
                 {NUMBER_LIST.map((item) => {
-                  const selected = isSelected(item);
 
-                  const blocked = isBlocked(item);
+                  const selected =
+                    isSelected(item);
 
-                  const limitReached = isLimitReached(item);
+                  const blocked =
+                    isBlocked(item);
 
-                  const used = getUsedAmount(item);
+                  const limitReached =
+                    isLimitReached(item);
 
-                  const progress = getProgress(item);
+                  const used =
+                    getUsedAmount(item);
 
-                  const unavailable = blocked || limitReached;
+                  const progress =
+                    getProgress(item);
+
+                  const unavailable =
+                    blocked || limitReached;
+
+                  const nearLimit =
+                    progress >= 80 &&
+                    progress < 100;
 
                   return (
                     <button
                       key={item}
                       type="button"
                       disabled={unavailable}
-                      onClick={() => toggleNumber(item)}
-                      className={`group relative overflow-hidden rounded-lg border px-1 py-2 text-center transition-all duration-150 ${
-                        blocked
-                          ? "cursor-not-allowed border-red-100 bg-red-50 text-red-300"
-                          : limitReached
-                            ? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-300"
-                            : selected
-                              ? "border-blue-500 bg-blue-600 text-white shadow-sm"
-                              : "border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
-                      }`}
+                      onClick={() =>
+                        toggleNumber(item)
+                      }
                       title={
                         blocked
                           ? `${item} is blocked`
                           : limitReached
-                            ? `${item} has reached the maximum limit`
+                            ? `${item} is full`
                             : `${formatAmount(
-                                getRemainingAmount(item),
+                                getRemainingAmount(
+                                  item,
+                                ),
                               )} MMK remaining`
                       }
+                      className={`
+                        relative flex
+                        h-8
+                        min-w-0
+                        flex-col
+                        items-center
+                        justify-center
+                        overflow-hidden
+                        rounded-md
+                        border
+                        px-0
+                        transition-all
+                        duration-150
+                        sm:h-9
+                        ${
+                          blocked
+                            ? "cursor-not-allowed border-red-200 bg-red-50 text-red-300"
+                            : limitReached
+                              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300"
+                              : selected
+                                ? "border-violet-600 bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 text-white shadow-sm shadow-violet-300 ring-1 ring-violet-400"
+                                : nearLimit
+                                  ? "border-orange-300 bg-gradient-to-br from-orange-100 to-amber-100 text-orange-700 hover:border-orange-400 hover:bg-orange-200"
+                                  : "border-violet-200 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-violet-400 hover:bg-violet-100 hover:text-violet-700 hover:shadow-sm"
+                        }
+                      `}
                     >
-                      {/* Number */}
 
-                      <div className="relative z-10 flex items-center justify-center gap-0.5">
-                        {blocked && <Lock className="h-2.5 w-2.5" />}
+                      {/* NUMBER */}
 
-                        {selected && <Check className="h-2.5 w-2.5" />}
+                      <div className="flex items-center justify-center gap-0.5">
 
-                        <span className="text-xs font-bold">{item}</span>
+                        {blocked && (
+                          <Lock className="h-2 w-2" />
+                        )}
+
+                        {selected && (
+                          <Check className="h-2 w-2" />
+                        )}
+
+                        <span className="text-[10px] font-bold leading-none sm:text-[11px]">
+                          {item}
+                        </span>
+
                       </div>
 
-                      {/* Progress */}
+                      {/* MINI PROGRESS */}
 
                       <div
-                        className={`mx-1.5 mt-1.5 h-1 overflow-hidden rounded-full ${
-                          selected ? "bg-blue-400" : "bg-gray-100"
+                        className={`mt-0.5 h-0.5 w-3/4 overflow-hidden rounded-full ${
+                          selected
+                            ? "bg-white/30"
+                            : "bg-slate-200"
                         }`}
                       >
                         <div
-                          className={`h-full rounded-full transition-all ${
+                          className={`h-full rounded-full ${
                             blocked
                               ? "bg-red-300"
                               : limitReached
-                                ? "bg-gray-400"
+                                ? "bg-slate-400"
                                 : selected
                                   ? "bg-white"
-                                  : progress >= 80
+                                  : nearLimit
                                     ? "bg-orange-400"
-                                    : "bg-blue-500"
+                                    : "bg-violet-400"
                           }`}
                           style={{
                             width: `${progress}%`,
@@ -526,36 +592,43 @@ export default function Play2D() {
                         />
                       </div>
 
-                      {/* Usage */}
+                      {/* USED */}
 
-                      <p
-                        className={`relative z-10 mt-1 truncate text-[8px] font-medium ${
+                      <span
+                        className={`mt-0.5 text-[6px] font-medium leading-none ${
                           selected
-                            ? "text-blue-100"
+                            ? "text-violet-100"
                             : blocked
                               ? "text-red-300"
                               : limitReached
-                                ? "text-gray-400"
-                                : "text-gray-400"
+                                ? "text-slate-400"
+                                : nearLimit
+                                  ? "text-orange-500"
+                                  : "text-slate-400"
                         }`}
                       >
                         {blocked
-                          ? "Blocked"
+                          ? "OFF"
                           : limitReached
-                            ? "Full"
-                            : `${formatAmount(used)}`}
-                      </p>
+                            ? "FULL"
+                            : formatAmount(used)}
+                      </span>
+
                     </button>
                   );
                 })}
+
               </div>
             </div>
 
-            {/* Legend */}
+            {/* =================================================
+                LEGEND
+            ================================================= */}
 
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-gray-400">
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] text-slate-400">
+
               <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                <span className="h-2 w-2 rounded-full bg-violet-500" />
                 Available
               </div>
 
@@ -565,94 +638,113 @@ export default function Play2D() {
               </div>
 
               <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-gray-400" />
-                Limit reached
+                <span className="h-2 w-2 rounded-full bg-slate-400" />
+                Full
               </div>
 
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-red-300" />
                 Blocked
               </div>
+
             </div>
           </div>
 
-          {/* =================================================
-              SELECTION SUMMARY
+          {/* ==================================================
+              SELECTED SUMMARY
           ================================================== */}
 
-          <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-4">
+          <div className="mt-5 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-100 via-indigo-50 to-blue-100 p-4">
+
             <div className="flex items-center justify-between">
+
               <div>
-                <p className="text-xs font-medium text-blue-500">
+                <p className="text-[11px] font-semibold text-violet-600">
                   Selected Numbers
                 </p>
 
-                <p className="mt-0.5 text-lg font-bold text-blue-700">
+                <p className="mt-0.5 text-lg font-bold text-violet-800">
                   {selectedNumbers.length}
                 </p>
               </div>
 
               <div className="text-right">
-                <p className="text-xs font-medium text-blue-500">
+                <p className="text-[11px] font-semibold text-indigo-600">
                   Selected Bet Total
                 </p>
 
-                <p className="mt-0.5 text-lg font-bold text-blue-700">
+                <p className="mt-0.5 text-lg font-bold text-indigo-800">
                   {formatAmount(selectedTotal)}{" "}
-                  <span className="text-xs">MMK</span>
+                  <span className="text-xs">
+                    MMK
+                  </span>
                 </p>
               </div>
+
             </div>
 
             {selectedNumbers.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {selectedNumbers.map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => toggleNumber(item)}
-                    className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-semibold text-blue-700 shadow-sm ring-1 ring-blue-100"
-                  >
-                    {item}
 
-                    <X className="h-3 w-3" />
-                  </button>
-                ))}
+                {selectedNumbers.map(
+                  (item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() =>
+                        toggleNumber(item)
+                      }
+                      className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[10px] font-bold text-violet-700 shadow-sm ring-1 ring-violet-200 transition hover:bg-violet-100"
+                    >
+                      {item}
+
+                      <X className="h-3 w-3" />
+                    </button>
+                  ),
+                )}
+
               </div>
             )}
+
           </div>
 
-          {/* =================================================
+          {/* ==================================================
               BET AMOUNT
           ================================================== */}
 
-          <div className="mt-6">
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
+          <div className="mt-5">
+
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
               Bet Amount Per Number
             </label>
 
             <div className="relative">
+
               <input
                 type="number"
                 value={amount}
-                onChange={(event) => setAmount(event.target.value)}
+                onChange={(event) =>
+                  setAmount(event.target.value)
+                }
                 placeholder="Enter amount"
                 min="100"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 pr-16 text-gray-900 outline-none transition-all placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                className="w-full rounded-xl border border-violet-200 bg-violet-50/50 px-4 py-3 pr-16 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100"
               />
 
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400">
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-violet-500">
                 MMK
               </span>
+
             </div>
 
-            <p className="mt-2 text-xs text-gray-400">
+            <p className="mt-2 text-xs text-slate-400">
               Minimum bet: 100 MMK per number.
             </p>
+
           </div>
 
-          {/* =================================================
-              ADD BET
+          {/* ==================================================
+              ADD BET BUTTON
           ================================================== */}
 
           <button
@@ -663,101 +755,131 @@ export default function Play2D() {
               !Number(amount) ||
               Number(amount) <= 0
             }
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 font-semibold text-white shadow-sm shadow-blue-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-700 hover:shadow-md disabled:cursor-not-allowed disabled:from-gray-300 disabled:to-gray-300 disabled:shadow-none"
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-5 py-3 font-semibold text-white shadow-md shadow-violet-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-violet-700 hover:via-indigo-700 hover:to-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
           >
             <Dice5 className="h-4 w-4" />
+
             Add{" "}
             {selectedNumbers.length > 0
               ? `${selectedNumbers.length} Numbers`
               : "Selected Bet"}
           </button>
+
         </div>
 
-        {/* =================================================
+        {/* ====================================================
             RIGHT - SELECTED BETS
-        ================================================== */}
+        ==================================================== */}
 
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          {/* Header */}
+        <div className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm sm:p-6">
+
+          {/* HEADER */}
 
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-gray-900">Selected Bets</h2>
 
-              <p className="mt-1 text-xs text-gray-400">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                Selected Bets
+              </h2>
+
+              <p className="mt-1 text-xs text-slate-400">
                 Review your selected numbers
               </p>
             </div>
 
-            <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-blue-100 px-2 text-xs font-bold text-blue-700">
+            <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 px-2 text-xs font-bold text-white shadow-sm">
               {bets.length}
             </span>
+
           </div>
 
-          {/* Bet List */}
+          {/* BET LIST */}
 
           <div className="mt-5 max-h-[520px] space-y-3 overflow-y-auto pr-1">
+
             {bets.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center">
-                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-500">
+
+              <div className="rounded-xl border border-dashed border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 p-8 text-center">
+
+                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-indigo-100 text-violet-600">
                   <Dice5 className="h-5 w-5" />
                 </div>
 
-                <p className="mt-3 text-sm font-semibold text-gray-600">
+                <p className="mt-3 text-sm font-semibold text-slate-600">
                   No bets selected
                 </p>
 
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-slate-400">
                   Select numbers and enter an amount.
                 </p>
+
               </div>
+
             ) : (
+
               bets.map((bet) => {
-                const isEditing = editingBetId === bet.id;
 
-                const usedAmount = getUsedAmount(bet.number);
+                const isEditing =
+                  editingBetId === bet.id;
 
-                /*
-                 * Since this bet already exists, its current amount
-                 * should be excluded from the used amount when editing.
-                 */
+                const usedAmount =
+                  getUsedAmount(bet.number);
+
                 const maxEditableAmount =
-                  MAX_BET_AMOUNT - (usedAmount - bet.amount);
+                  MAX_BET_AMOUNT -
+                  (usedAmount - bet.amount);
 
                 return (
                   <div
                     key={bet.id}
-                    className="rounded-xl border border-gray-100 bg-gray-50 p-4 transition-all hover:border-blue-100 hover:bg-blue-50/40"
+                    className="rounded-xl border border-slate-100 bg-slate-50 p-4 transition-all hover:border-violet-200 hover:bg-violet-50/50"
                   >
+
                     <div className="flex items-center justify-between gap-3">
-                      {/* Number */}
+
+                      {/* NUMBER */}
 
                       <div className="flex items-center gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-lg font-bold tracking-wider text-gray-900 shadow-sm ring-1 ring-gray-100">
+
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-lg font-bold tracking-wider text-white shadow-sm shadow-violet-200">
                           {bet.number}
                         </div>
 
                         <div>
+
                           <div className="flex items-center gap-2">
-                            <span className="rounded-md bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+
+                            <span
+                              className={`rounded-md px-2 py-0.5 text-[10px] font-bold text-white ${
+                                bet.session === "AM"
+                                  ? "bg-blue-500"
+                                  : "bg-violet-500"
+                              }`}
+                            >
                               {bet.session}
                             </span>
+
                           </div>
 
-                          <p className="mt-1 text-xs text-gray-400">
+                          <p className="mt-1 text-xs text-slate-400">
                             {bet.session} Session
                           </p>
+
                         </div>
+
                       </div>
 
-                      {/* Actions */}
+                      {/* ACTIONS */}
 
                       {!isEditing && (
                         <div className="flex items-center gap-1">
+
                           <button
                             type="button"
-                            onClick={() => startEditBet(bet)}
-                            className="rounded-lg p-2 text-gray-400 transition-all hover:bg-blue-50 hover:text-blue-600"
+                            onClick={() =>
+                              startEditBet(bet)
+                            }
+                            className="rounded-lg p-2 text-slate-400 transition-all hover:bg-violet-100 hover:text-violet-600"
                             title="Edit amount"
                           >
                             <Pencil className="h-4 w-4" />
@@ -765,115 +887,151 @@ export default function Play2D() {
 
                           <button
                             type="button"
-                            onClick={() => removeBet(bet.id)}
-                            className="rounded-lg p-2 text-gray-400 transition-all hover:bg-red-50 hover:text-red-500"
+                            onClick={() =>
+                              removeBet(bet.id)
+                            }
+                            className="rounded-lg p-2 text-slate-400 transition-all hover:bg-red-50 hover:text-red-500"
                             title="Delete bet"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
+
                         </div>
                       )}
+
                     </div>
 
-                    {/* Amount */}
+                    {/* AMOUNT */}
 
                     {isEditing ? (
+
                       <div className="mt-4">
-                        <label className="mb-2 block text-xs font-semibold text-gray-600">
+
+                        <label className="mb-2 block text-xs font-semibold text-slate-600">
                           Bet Amount
                         </label>
 
                         <div className="flex gap-2">
+
                           <div className="relative flex-1">
+
                             <input
                               type="number"
                               min="100"
                               max={maxEditableAmount}
                               value={editingAmount}
                               onChange={(event) =>
-                                setEditingAmount(event.target.value)
+                                setEditingAmount(
+                                  event.target.value,
+                                )
                               }
                               autoFocus
-                              className="w-full rounded-lg border border-blue-300 bg-white px-3 py-2 pr-12 text-sm font-semibold text-gray-900 outline-none focus:ring-4 focus:ring-blue-50"
+                              className="w-full rounded-lg border border-violet-300 bg-white px-3 py-2 pr-12 text-sm font-semibold text-slate-900 outline-none focus:ring-4 focus:ring-violet-50"
                             />
 
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-gray-400">
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-slate-400">
                               MMK
                             </span>
+
                           </div>
 
                           <button
                             type="button"
-                            onClick={() => saveEditBet(bet)}
-                            disabled={
-                              !Number(editingAmount) ||
-                              Number(editingAmount) < 100 ||
-                              Number(editingAmount) > maxEditableAmount
+                            onClick={() =>
+                              saveEditBet(bet)
                             }
-                            className="rounded-lg bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                            disabled={
+                              !Number(
+                                editingAmount,
+                              ) ||
+                              Number(
+                                editingAmount,
+                              ) < 100 ||
+                              Number(
+                                editingAmount,
+                              ) >
+                                maxEditableAmount
+                            }
+                            className="rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                           >
                             Save
                           </button>
 
                           <button
                             type="button"
-                            onClick={cancelEditBet}
-                            className="rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-500 transition hover:bg-gray-50"
+                            onClick={
+                              cancelEditBet
+                            }
+                            className="rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 transition hover:bg-slate-50"
                           >
                             Cancel
                           </button>
+
                         </div>
 
-                        <p className="mt-2 text-[11px] text-gray-400">
-                          Maximum allowed:{" "}
-                          <span className="font-semibold text-gray-600">
-                            {formatAmount(maxEditableAmount)} MMK
-                          </span>
-                        </p>
                       </div>
-                    ) : (
-                      <div className="mt-3 flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-gray-100">
-                        <span className="text-xs text-gray-400">Amount</span>
 
-                        <span className="text-sm font-bold text-gray-800">
-                          {formatAmount(bet.amount)} MMK
+                    ) : (
+
+                      <div className="mt-3 flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-slate-100">
+
+                        <span className="text-xs text-slate-400">
+                          Amount
                         </span>
+
+                        <span className="text-sm font-bold text-slate-800">
+                          {formatAmount(
+                            bet.amount,
+                          )}{" "}
+                          MMK
+                        </span>
+
                       </div>
+
                     )}
+
                   </div>
                 );
               })
+
             )}
+
           </div>
 
-          {/* =================================================
+          {/* ==================================================
               TOTAL
           ================================================== */}
 
-          <div className="mt-6 border-t border-gray-100 pt-5">
+          <div className="mt-6 border-t border-slate-100 pt-5">
+
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-500">
+
+              <span className="text-sm font-medium text-slate-500">
                 Total Bet Amount
               </span>
 
-              <span className="text-xl font-bold text-gray-900">
+              <span className="text-xl font-bold text-slate-900">
                 {formatAmount(totalAmount)}{" "}
-                <span className="text-sm font-semibold text-gray-400">MMK</span>
+                <span className="text-sm font-semibold text-slate-400">
+                  MMK
+                </span>
               </span>
-            </div>
 
-            {/* Place Bets */}
+            </div>
 
             <button
               type="button"
               onClick={submitBets}
               disabled={bets.length === 0}
-              className="mt-4 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 font-semibold text-white shadow-sm shadow-blue-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-700 hover:shadow-md disabled:cursor-not-allowed disabled:from-gray-300 disabled:to-gray-300 disabled:shadow-none"
+              className="mt-4 w-full rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-5 py-3 font-semibold text-white shadow-md shadow-violet-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-violet-700 hover:via-indigo-700 hover:to-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
             >
               Place 2D Bets
             </button>
+
           </div>
+
         </div>
+
       </div>
     </div>
   );

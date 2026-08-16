@@ -21,7 +21,7 @@ export default function LatestResults() {
   const latest3DResult = latest3DResults[0];
 
   return (
-    <section className="w-full bg-purple-50/40 py-8">
+    <section className="w-full bg-slate-50w-full bg-purple-50/40 py-8">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         {/* ==================================================
             HEADER
