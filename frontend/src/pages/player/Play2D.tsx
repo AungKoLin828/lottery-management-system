@@ -1,6 +1,6 @@
 // src/pages/player/Play2D.tsx
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Check,
   Dice5,
@@ -8,6 +8,7 @@ import {
   Pencil,
   Trash2,
   X,
+  ShoppingBasket,
 } from "lucide-react";
 import type { Bet2D, Session2D } from "@/types/player";
 
@@ -61,15 +62,24 @@ const NUMBER_LIST = Array.from(
 export default function Play2D() {
   const [session, setSession] = useState<Session2D>("AM");
 
-  const [selectedNumbers, setSelectedNumbers] = useState<string[]>([]);
+  const [selectedNumbers, setSelectedNumbers] = useState<string[]>(
+    [],
+  );
 
   const [amount, setAmount] = useState("");
 
   const [bets, setBets] = useState<Bet2D[]>([]);
 
-  const [editingBetId, setEditingBetId] = useState<string | null>(null);
+  const [editingBetId, setEditingBetId] = useState<string | null>(
+    null,
+  );
 
   const [editingAmount, setEditingAmount] = useState("");
+
+  /*
+   * Mobile selected bets modal.
+   */
+  const [mobileBetsOpen, setMobileBetsOpen] = useState(false);
 
   const [numberUsage] =
     useState<Record<Session2D, NumberUsage>>(INITIAL_USAGE);
@@ -227,6 +237,14 @@ export default function Play2D() {
 
     setSelectedNumbers([]);
     setAmount("");
+
+    /*
+     * On mobile, automatically open the selected bets modal
+     * after adding a bet.
+     */
+    if (window.innerWidth < 1024) {
+      setMobileBetsOpen(true);
+    }
   };
 
   /* ============================================================
@@ -283,6 +301,10 @@ export default function Play2D() {
     setBets((current) =>
       current.filter((bet) => bet.id !== id),
     );
+
+    if (editingBetId === id) {
+      cancelEditBet();
+    }
   };
 
   /* ============================================================
@@ -295,6 +317,11 @@ export default function Play2D() {
     }
 
     console.log("2D Bets:", bets);
+
+    /*
+     * Close mobile modal after submitting.
+     */
+    setMobileBetsOpen(false);
   };
 
   /* ============================================================
@@ -305,15 +332,185 @@ export default function Play2D() {
     value.toLocaleString();
 
   /* ============================================================
+     MOBILE MODAL
+  ============================================================ */
+
+  useEffect(() => {
+    if (!mobileBetsOpen) {
+      document.body.style.overflow = "";
+      return;
+    }
+
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileBetsOpen]);
+
+  /* ============================================================
+     BET CARD
+  ============================================================ */
+
+  const renderBetCard = (bet: Bet2D) => {
+    const isEditing = editingBetId === bet.id;
+
+    const usedAmount = getUsedAmount(bet.number);
+
+    const maxEditableAmount =
+      MAX_BET_AMOUNT -
+      (usedAmount - bet.amount);
+
+    return (
+      <div
+        key={bet.id}
+        className="rounded-xl border border-slate-100 bg-slate-50 p-4 transition-all hover:border-violet-200 hover:bg-violet-50/50"
+      >
+        {/* ====================================================
+            BET HEADER
+        ==================================================== */}
+
+        <div className="flex items-center justify-between gap-3">
+          {/* NUMBER */}
+
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-lg font-bold tracking-wider text-white shadow-sm shadow-violet-200">
+              {bet.number}
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`rounded-md px-2 py-0.5 text-[10px] font-bold text-white ${
+                    bet.session === "AM"
+                      ? "bg-blue-500"
+                      : "bg-violet-500"
+                  }`}
+                >
+                  {bet.session}
+                </span>
+              </div>
+
+              <p className="mt-1 text-xs text-slate-400">
+                {bet.session} Session
+              </p>
+            </div>
+          </div>
+
+          {/* ACTIONS */}
+
+          {!isEditing && (
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => startEditBet(bet)}
+                className="rounded-lg p-2 text-slate-400 transition-all hover:bg-violet-100 hover:text-violet-600"
+                title="Edit amount"
+                aria-label={`Edit bet ${bet.number}`}
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => removeBet(bet.id)}
+                className="rounded-lg p-2 text-slate-400 transition-all hover:bg-red-50 hover:text-red-500"
+                title="Delete bet"
+                aria-label={`Delete bet ${bet.number}`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ====================================================
+            EDIT
+        ==================================================== */}
+
+        {isEditing ? (
+          <div className="mt-4">
+            <label className="mb-2 block text-xs font-semibold text-slate-600">
+              Bet Amount
+            </label>
+
+            <div className="flex gap-2">
+              <div className="relative min-w-0 flex-1">
+                <input
+                  type="number"
+                  min="100"
+                  max={maxEditableAmount}
+                  value={editingAmount}
+                  onChange={(event) =>
+                    setEditingAmount(event.target.value)
+                  }
+                  autoFocus
+                  className="w-full rounded-lg border border-violet-300 bg-white px-3 py-2 pr-12 text-sm font-semibold text-slate-900 outline-none focus:ring-4 focus:ring-violet-50"
+                />
+
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-slate-400">
+                  MMK
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => saveEditBet(bet)}
+                disabled={
+                  !Number(editingAmount) ||
+                  Number(editingAmount) < 100 ||
+                  Number(editingAmount) >
+                    maxEditableAmount
+                }
+                className="rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                Save
+              </button>
+
+              <button
+                type="button"
+                onClick={cancelEditBet}
+                className="rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <p className="mt-2 text-[10px] text-slate-400">
+              Maximum: {formatAmount(maxEditableAmount)} MMK
+            </p>
+          </div>
+        ) : (
+          /* ==================================================
+             AMOUNT
+          ================================================== */
+
+          <div className="mt-3 flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-slate-100">
+            <span className="text-xs text-slate-400">
+              Amount
+            </span>
+
+            <span className="text-sm font-bold text-slate-800">
+              {formatAmount(bet.amount)}{" "}
+              <span className="text-xs font-semibold text-slate-400">
+                MMK
+              </span>
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /* ============================================================
      UI
   ============================================================ */
 
   return (
-    <div className="space-y-6">
-
+    <div className="space-y-6 pb-24 lg:pb-0">
       {/* ======================================================
           PAGE HEADER
-      ====================================================== */}
+      ======================================================= */}
 
       <div>
         <div className="flex items-center gap-1 text-sm font-semibold">
@@ -341,16 +538,14 @@ export default function Play2D() {
 
       {/* ======================================================
           MAIN CONTENT
-      ====================================================== */}
+      ======================================================= */}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-
         {/* ====================================================
             LEFT - BET FORM
         ==================================================== */}
 
         <div className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm sm:p-6">
-
           {/* HEADER */}
 
           <div className="flex items-center gap-3">
@@ -379,11 +574,9 @@ export default function Play2D() {
             </label>
 
             <div className="grid grid-cols-2 gap-2.5">
-
               {(["AM", "PM"] as Session2D[]).map(
                 (item) => {
-                  const active =
-                    session === item;
+                  const active = session === item;
 
                   return (
                     <button
@@ -401,7 +594,6 @@ export default function Play2D() {
                       }`}
                     >
                       <div className="flex items-center justify-center gap-2">
-
                         <span
                           className={`h-2 w-2 rounded-full ${
                             active
@@ -416,7 +608,6 @@ export default function Play2D() {
                   );
                 },
               )}
-
             </div>
           </div>
 
@@ -425,11 +616,9 @@ export default function Play2D() {
           ================================================== */}
 
           <div className="mt-6">
-
             {/* NUMBER HEADER */}
 
             <div className="flex items-center justify-between gap-3">
-
               <div>
                 <label className="block text-sm font-semibold text-slate-700">
                   Select Numbers
@@ -441,9 +630,6 @@ export default function Play2D() {
               </div>
 
               <div className="flex shrink-0 items-center gap-1.5">
-
-                {/* SELECT ALL */}
-
                 <button
                   type="button"
                   onClick={selectAllAvailable}
@@ -451,8 +637,6 @@ export default function Play2D() {
                 >
                   Select All
                 </button>
-
-                {/* CLEAR */}
 
                 <button
                   type="button"
@@ -464,7 +648,6 @@ export default function Play2D() {
                 >
                   Clear
                 </button>
-
               </div>
             </div>
 
@@ -473,25 +656,18 @@ export default function Play2D() {
             ================================================= */}
 
             <div className="mt-3 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-100 via-indigo-50 to-blue-100 p-2.5 shadow-inner sm:p-3">
-
               <div className="grid grid-cols-10 gap-1">
-
                 {NUMBER_LIST.map((item) => {
+                  const selected = isSelected(item);
 
-                  const selected =
-                    isSelected(item);
-
-                  const blocked =
-                    isBlocked(item);
+                  const blocked = isBlocked(item);
 
                   const limitReached =
                     isLimitReached(item);
 
-                  const used =
-                    getUsedAmount(item);
+                  const used = getUsedAmount(item);
 
-                  const progress =
-                    getProgress(item);
+                  const progress = getProgress(item);
 
                   const unavailable =
                     blocked || limitReached;
@@ -546,11 +722,9 @@ export default function Play2D() {
                         }
                       `}
                     >
-
                       {/* NUMBER */}
 
                       <div className="flex items-center justify-center gap-0.5">
-
                         {blocked && (
                           <Lock className="h-2 w-2" />
                         )}
@@ -562,7 +736,6 @@ export default function Play2D() {
                         <span className="text-[10px] font-bold leading-none sm:text-[11px]">
                           {item}
                         </span>
-
                       </div>
 
                       {/* MINI PROGRESS */}
@@ -613,20 +786,15 @@ export default function Play2D() {
                             ? "FULL"
                             : formatAmount(used)}
                       </span>
-
                     </button>
                   );
                 })}
-
               </div>
             </div>
 
-            {/* =================================================
-                LEGEND
-            ================================================= */}
+            {/* LEGEND */}
 
             <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] text-slate-400">
-
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-violet-500" />
                 Available
@@ -646,7 +814,6 @@ export default function Play2D() {
                 <span className="h-2 w-2 rounded-full bg-red-300" />
                 Blocked
               </div>
-
             </div>
           </div>
 
@@ -655,9 +822,7 @@ export default function Play2D() {
           ================================================== */}
 
           <div className="mt-5 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-100 via-indigo-50 to-blue-100 p-4">
-
             <div className="flex items-center justify-between">
-
               <div>
                 <p className="text-[11px] font-semibold text-violet-600">
                   Selected Numbers
@@ -680,32 +845,26 @@ export default function Play2D() {
                   </span>
                 </p>
               </div>
-
             </div>
 
             {selectedNumbers.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
+                {selectedNumbers.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() =>
+                      toggleNumber(item)
+                    }
+                    className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[10px] font-bold text-violet-700 shadow-sm ring-1 ring-violet-200 transition hover:bg-violet-100"
+                  >
+                    {item}
 
-                {selectedNumbers.map(
-                  (item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() =>
-                        toggleNumber(item)
-                      }
-                      className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[10px] font-bold text-violet-700 shadow-sm ring-1 ring-violet-200 transition hover:bg-violet-100"
-                    >
-                      {item}
-
-                      <X className="h-3 w-3" />
-                    </button>
-                  ),
-                )}
-
+                    <X className="h-3 w-3" />
+                  </button>
+                ))}
               </div>
             )}
-
           </div>
 
           {/* ==================================================
@@ -713,13 +872,11 @@ export default function Play2D() {
           ================================================== */}
 
           <div className="mt-5">
-
             <label className="mb-2 block text-sm font-semibold text-slate-700">
               Bet Amount Per Number
             </label>
 
             <div className="relative">
-
               <input
                 type="number"
                 value={amount}
@@ -734,13 +891,11 @@ export default function Play2D() {
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-violet-500">
                 MMK
               </span>
-
             </div>
 
             <p className="mt-2 text-xs text-slate-400">
               Minimum bet: 100 MMK per number.
             </p>
-
           </div>
 
           {/* ==================================================
@@ -764,19 +919,17 @@ export default function Play2D() {
               ? `${selectedNumbers.length} Numbers`
               : "Selected Bet"}
           </button>
-
         </div>
 
         {/* ====================================================
-            RIGHT - SELECTED BETS
+            DESKTOP - SELECTED BETS
+            Hidden on mobile/tablet.
         ==================================================== */}
 
-        <div className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm sm:p-6">
-
+        <div className="hidden rounded-2xl border border-violet-100 bg-white p-5 shadow-sm sm:p-6 xl:block">
           {/* HEADER */}
 
           <div className="flex items-center justify-between">
-
             <div>
               <h2 className="text-lg font-bold text-slate-900">
                 Selected Bets
@@ -790,17 +943,13 @@ export default function Play2D() {
             <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 px-2 text-xs font-bold text-white shadow-sm">
               {bets.length}
             </span>
-
           </div>
 
           {/* BET LIST */}
 
           <div className="mt-5 max-h-[520px] space-y-3 overflow-y-auto pr-1">
-
             {bets.length === 0 ? (
-
               <div className="rounded-xl border border-dashed border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 p-8 text-center">
-
                 <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-indigo-100 text-violet-600">
                   <Dice5 className="h-5 w-5" />
                 </div>
@@ -812,200 +961,16 @@ export default function Play2D() {
                 <p className="mt-1 text-xs text-slate-400">
                   Select numbers and enter an amount.
                 </p>
-
               </div>
-
             ) : (
-
-              bets.map((bet) => {
-
-                const isEditing =
-                  editingBetId === bet.id;
-
-                const usedAmount =
-                  getUsedAmount(bet.number);
-
-                const maxEditableAmount =
-                  MAX_BET_AMOUNT -
-                  (usedAmount - bet.amount);
-
-                return (
-                  <div
-                    key={bet.id}
-                    className="rounded-xl border border-slate-100 bg-slate-50 p-4 transition-all hover:border-violet-200 hover:bg-violet-50/50"
-                  >
-
-                    <div className="flex items-center justify-between gap-3">
-
-                      {/* NUMBER */}
-
-                      <div className="flex items-center gap-3">
-
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-lg font-bold tracking-wider text-white shadow-sm shadow-violet-200">
-                          {bet.number}
-                        </div>
-
-                        <div>
-
-                          <div className="flex items-center gap-2">
-
-                            <span
-                              className={`rounded-md px-2 py-0.5 text-[10px] font-bold text-white ${
-                                bet.session === "AM"
-                                  ? "bg-blue-500"
-                                  : "bg-violet-500"
-                              }`}
-                            >
-                              {bet.session}
-                            </span>
-
-                          </div>
-
-                          <p className="mt-1 text-xs text-slate-400">
-                            {bet.session} Session
-                          </p>
-
-                        </div>
-
-                      </div>
-
-                      {/* ACTIONS */}
-
-                      {!isEditing && (
-                        <div className="flex items-center gap-1">
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              startEditBet(bet)
-                            }
-                            className="rounded-lg p-2 text-slate-400 transition-all hover:bg-violet-100 hover:text-violet-600"
-                            title="Edit amount"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              removeBet(bet.id)
-                            }
-                            className="rounded-lg p-2 text-slate-400 transition-all hover:bg-red-50 hover:text-red-500"
-                            title="Delete bet"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-
-                        </div>
-                      )}
-
-                    </div>
-
-                    {/* AMOUNT */}
-
-                    {isEditing ? (
-
-                      <div className="mt-4">
-
-                        <label className="mb-2 block text-xs font-semibold text-slate-600">
-                          Bet Amount
-                        </label>
-
-                        <div className="flex gap-2">
-
-                          <div className="relative flex-1">
-
-                            <input
-                              type="number"
-                              min="100"
-                              max={maxEditableAmount}
-                              value={editingAmount}
-                              onChange={(event) =>
-                                setEditingAmount(
-                                  event.target.value,
-                                )
-                              }
-                              autoFocus
-                              className="w-full rounded-lg border border-violet-300 bg-white px-3 py-2 pr-12 text-sm font-semibold text-slate-900 outline-none focus:ring-4 focus:ring-violet-50"
-                            />
-
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-slate-400">
-                              MMK
-                            </span>
-
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              saveEditBet(bet)
-                            }
-                            disabled={
-                              !Number(
-                                editingAmount,
-                              ) ||
-                              Number(
-                                editingAmount,
-                              ) < 100 ||
-                              Number(
-                                editingAmount,
-                              ) >
-                                maxEditableAmount
-                            }
-                            className="rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                          >
-                            Save
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={
-                              cancelEditBet
-                            }
-                            className="rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 transition hover:bg-slate-50"
-                          >
-                            Cancel
-                          </button>
-
-                        </div>
-
-                      </div>
-
-                    ) : (
-
-                      <div className="mt-3 flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-slate-100">
-
-                        <span className="text-xs text-slate-400">
-                          Amount
-                        </span>
-
-                        <span className="text-sm font-bold text-slate-800">
-                          {formatAmount(
-                            bet.amount,
-                          )}{" "}
-                          MMK
-                        </span>
-
-                      </div>
-
-                    )}
-
-                  </div>
-                );
-              })
-
+              bets.map(renderBetCard)
             )}
-
           </div>
 
-          {/* ==================================================
-              TOTAL
-          ================================================== */}
+          {/* TOTAL */}
 
           <div className="mt-6 border-t border-slate-100 pt-5">
-
             <div className="flex items-center justify-between">
-
               <span className="text-sm font-medium text-slate-500">
                 Total Bet Amount
               </span>
@@ -1016,7 +981,6 @@ export default function Play2D() {
                   MMK
                 </span>
               </span>
-
             </div>
 
             <button
@@ -1027,12 +991,218 @@ export default function Play2D() {
             >
               Place 2D Bets
             </button>
+          </div>
+        </div>
+      </div>
 
+      {/* ======================================================
+          MOBILE FIXED SELECTED BETS BAR
+      ======================================================= */}
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-violet-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 shadow-[0_-8px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileBetsOpen(true)}
+          className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-4 py-3 text-left text-white shadow-lg shadow-violet-200 transition active:scale-[0.99]"
+        >
+          {/* LEFT */}
+
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">
+              <ShoppingBasket className="h-5 w-5" />
+
+              {bets.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-extrabold text-slate-900 ring-2 ring-violet-600">
+                  {bets.length}
+                </span>
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-violet-100">
+                Selected Bets
+              </p>
+
+              <p className="truncate text-sm font-bold">
+                {bets.length === 0
+                  ? "No bets selected"
+                  : `${bets.length} ${
+                      bets.length === 1
+                        ? "bet"
+                        : "bets"
+                    } selected`}
+              </p>
+            </div>
           </div>
 
-        </div>
+          {/* RIGHT */}
 
+          <div className="flex shrink-0 items-center gap-3">
+            <div className="text-right">
+              <p className="text-[10px] font-medium text-violet-100">
+                Total
+              </p>
+
+              <p className="text-sm font-extrabold">
+                {formatAmount(totalAmount)} MMK
+              </p>
+            </div>
+
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
+              <span className="text-lg">↑</span>
+            </div>
+          </div>
+        </button>
       </div>
+
+      {/* ======================================================
+          MOBILE SELECTED BETS MODAL
+      ======================================================= */}
+
+      {mobileBetsOpen && (
+        <div
+          className="fixed inset-0 z-[100] lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Selected Bets"
+        >
+          {/* BACKDROP */}
+
+          <button
+            type="button"
+            aria-label="Close selected bets"
+            onClick={() => setMobileBetsOpen(false)}
+            className="absolute inset-0 h-full w-full bg-slate-950/60 backdrop-blur-[2px]"
+          />
+
+          {/* ==================================================
+              BOTTOM SHEET
+          ================================================== */}
+
+          <div className="absolute inset-x-0 bottom-0 flex max-h-[92vh] flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl">
+            {/* HANDLE */}
+
+            <div className="flex shrink-0 justify-center pt-3">
+              <div className="h-1.5 w-12 rounded-full bg-slate-200" />
+            </div>
+
+            {/* HEADER */}
+
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-sm">
+                  <ShoppingBasket className="h-5 w-5" />
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold text-slate-900">
+                      Selected Bets
+                    </h2>
+
+                    <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-violet-100 px-1.5 text-[10px] font-bold text-violet-700">
+                      {bets.length}
+                    </span>
+                  </div>
+
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    Review and edit your bets
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setMobileBetsOpen(false)
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+                aria-label="Close selected bets"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* ==================================================
+                BET LIST
+            ================================================== */}
+
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
+              {bets.length === 0 ? (
+                <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 p-8 text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-indigo-100 text-violet-600">
+                    <Dice5 className="h-6 w-6" />
+                  </div>
+
+                  <p className="mt-4 text-sm font-bold text-slate-700">
+                    No bets selected
+                  </p>
+
+                  <p className="mt-1 max-w-xs text-xs leading-5 text-slate-400">
+                    Select numbers from the 2D grid, enter
+                    your amount, then add the bet.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMobileBetsOpen(false)
+                    }
+                    className="mt-5 rounded-xl bg-violet-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-violet-700"
+                  >
+                    Choose Numbers
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {bets.map(renderBetCard)}
+                </div>
+              )}
+            </div>
+
+            {/* ==================================================
+                MOBILE TOTAL / SUBMIT
+            ================================================== */}
+
+            <div className="shrink-0 border-t border-slate-100 bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] sm:px-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-400">
+                    Total Bet Amount
+                  </p>
+
+                  <p className="mt-0.5 text-xl font-extrabold text-slate-900">
+                    {formatAmount(totalAmount)}{" "}
+                    <span className="text-sm font-bold text-slate-400">
+                      MMK
+                    </span>
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <p className="text-xs font-medium text-slate-400">
+                    Numbers
+                  </p>
+
+                  <p className="mt-0.5 text-lg font-extrabold text-violet-600">
+                    {bets.length}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={submitBets}
+                disabled={bets.length === 0}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-5 py-3.5 text-sm font-bold text-white shadow-md shadow-violet-200 transition-all hover:from-violet-700 hover:via-indigo-700 hover:to-blue-700 disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
+              >
+                <Check className="h-4 w-4" />
+                Place 2D Bets
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
