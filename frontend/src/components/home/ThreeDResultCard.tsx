@@ -10,25 +10,29 @@ export default function ThreeDResultCard({
   result,
 }: ThreeDResultCardProps) {
   return (
-    <div className="overflow-hidden rounded-lg border border-fuchsia-200 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
+    <div className="overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg">
       {/* Header */}
-      <div className="border-b border-fuchsia-100 bg-fuchsia-50 px-4 py-3">
+      <div className="border-b border-amber-100 bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-3">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <span className="inline-flex rounded-md bg-fuchsia-100 px-2 py-0.5 text-[10px] font-bold text-fuchsia-700">
+            {/* 3D Badge */}
+            <span className="inline-flex rounded-md bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
               3D
             </span>
 
-            <h3 className="mt-1.5 text-sm font-bold text-gray-800">
+            {/* Day */}
+            <h3 className="mt-1.5 text-sm font-bold text-slate-800">
               {day}
             </h3>
 
-            <p className="mt-0.5 text-xs text-gray-400">
+            {/* Date */}
+            <p className="mt-0.5 text-xs text-slate-400">
               {date}
             </p>
           </div>
 
-          <span className="rounded-md bg-fuchsia-100 px-2 py-0.5 text-[10px] font-semibold text-fuchsia-700">
+          {/* Draw Badge */}
+          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-700">
             3D DRAW
           </span>
         </div>
@@ -36,15 +40,19 @@ export default function ThreeDResultCard({
 
       {/* Result */}
       <div className="p-4 text-center">
-        <p className="text-[11px] font-medium text-gray-400">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
           3D Winning Number
         </p>
 
-        <p className="mt-1 text-4xl font-bold tracking-widest text-fuchsia-600">
-          {result}
-        </p>
+        {/* Number */}
+        <div className="mx-auto mt-2 flex h-16 w-20 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-md ring-4 ring-amber-100">
+          <p className="text-3xl font-extrabold tracking-widest text-white">
+            {result}
+          </p>
+        </div>
 
-        <p className="mt-2 text-[10px] text-gray-400">
+        {/* Description */}
+        <p className="mt-3 text-[10px] text-slate-400">
           One result per scheduled 3D draw
         </p>
       </div>

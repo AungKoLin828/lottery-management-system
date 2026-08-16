@@ -19,29 +19,35 @@ export default function Weekly2DResults() {
   });
 
   return (
-    <section className="bg-slate-50 py-8">
-      <div className="mx-auto max-w-6xl px-4">
-        {/* Header */}
+    <section className="w-full bg-purple-50/40 py-8">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        {/* ==================================================
+            HEADER
+        ================================================== */}
+
         <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">
+            <h2 className="text-xl font-bold text-slate-900">
               2D Weekly Results
             </h2>
 
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-slate-500">
               Monday to Friday — AM and PM
             </p>
           </div>
 
           <Link
             to="/results-history"
-            className="text-sm font-medium text-purple-600 transition hover:text-purple-700 hover:underline"
+            className="inline-flex w-fit items-center rounded-lg px-2 py-1 text-sm font-semibold text-purple-700 transition hover:bg-purple-50 hover:text-purple-800 hover:underline"
           >
             View Full History
           </Link>
         </div>
 
-        {/* Weekly Results */}
+        {/* ==================================================
+            WEEKLY RESULTS
+        ================================================== */}
+
         <div className="space-y-3">
           {weekly2DResults.map((day) => {
             const holidayName = twoDOffDays[day.date];
@@ -54,42 +60,81 @@ export default function Weekly2DResults() {
             return (
               <div
                 key={day.date}
-                className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition duration-200 hover:shadow-md"
+                className={`overflow-hidden rounded-xl border bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+                  isOffDay
+                    ? "border-rose-100 hover:shadow-rose-100/60"
+                    : "border-purple-100 hover:shadow-purple-100/70"
+                }`}
               >
-                {/* Date Header */}
-                <div className="border-b border-slate-100 px-4 py-3">
+                {/* ==================================================
+                    DATE HEADER
+                ================================================== */}
+
+                <div
+                  className={`border-b px-4 py-3 ${
+                    isOffDay
+                      ? "border-rose-100 bg-rose-50/60"
+                      : "border-purple-100 bg-gradient-to-r from-purple-50/80 via-violet-50/60 to-purple-50/40"
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-3">
+                    {/* Day Information */}
+
                     <div className="flex items-center gap-3">
+                      {/* Day Indicator */}
+
+                      <div
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white shadow-sm ${
+                          isOffDay
+                            ? "bg-gradient-to-br from-rose-500 to-rose-600"
+                            : "bg-gradient-to-br from-purple-700 to-violet-600"
+                        }`}
+                      >
+                        {day.day.slice(0, 2)}
+                      </div>
+
+                      {/* Date */}
+
                       <div>
-                        <h3 className="text-sm font-bold text-gray-800">
+                        <h3 className="text-sm font-bold text-slate-800">
                           {day.day}
                         </h3>
 
-                        <p className="mt-0.5 text-xs text-gray-400">
+                        <p className="mt-0.5 text-xs text-slate-400">
                           {day.date}
                         </p>
                       </div>
                     </div>
 
+                    {/* ==================================================
+                        STATUS BADGE
+                    ================================================== */}
+
                     {isOffDay ? (
-                      <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600">
+                      <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-bold text-rose-600">
                         OFF DAY
                       </span>
                     ) : (
-                      <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-600">
+                      <span className="rounded-full bg-purple-100 px-2.5 py-1 text-[10px] font-bold text-purple-700">
                         2D
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* Content */}
+                {/* ==================================================
+                    CONTENT
+                ================================================== */}
+
                 <div className="p-3">
                   {isOffDay ? (
                     <TwoDOffDayCard holidayName={holidayName} />
                   ) : (
                     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                      {/* AM */}
+                      {/* ==================================================
+                          AM RESULT
+                      ================================================== */}
+
                       {day.morning ? (
                         <TwoDResultCard
                           title="Morning"
@@ -97,14 +142,17 @@ export default function Weekly2DResults() {
                           result={day.morning.result}
                         />
                       ) : (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                          <p className="text-xs text-gray-400">
+                        <div className="rounded-lg border border-purple-100 bg-purple-50/40 px-4 py-3">
+                          <p className="text-xs text-slate-400">
                             No AM result
                           </p>
                         </div>
                       )}
 
-                      {/* PM */}
+                      {/* ==================================================
+                          PM RESULT
+                      ================================================== */}
+
                       {day.evening ? (
                         <TwoDResultCard
                           title="Evening"
@@ -112,8 +160,8 @@ export default function Weekly2DResults() {
                           result={day.evening.result}
                         />
                       ) : (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                          <p className="text-xs text-gray-400">
+                        <div className="rounded-lg border border-purple-100 bg-purple-50/40 px-4 py-3">
+                          <p className="text-xs text-slate-400">
                             No PM result
                           </p>
                         </div>

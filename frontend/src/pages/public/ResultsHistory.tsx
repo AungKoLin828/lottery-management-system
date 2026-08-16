@@ -358,47 +358,92 @@ export default function ResultsHistory() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* ======================================================
-          PAGE HEADER
+          PAGE HERO
       ======================================================= */}
 
-      <section className="bg-blue-600 text-white">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            {/* HEADER TEXT */}
+      <section className="w-full bg-indigo-50/40 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="relative mx-auto max-w-6xl overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-600 px-5 py-7 text-white shadow-lg shadow-indigo-200/60 sm:px-8 sm:py-9">
+          {/* ==================================================
+              DECORATIVE BACKGROUND
+          ================================================== */}
 
-            <div>
-              <p className="mb-1 text-sm font-medium text-blue-100">
-                Lottery Results
-              </p>
+          <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-white/10" />
 
-              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+          <div className="absolute -bottom-24 right-24 h-56 w-56 rounded-full bg-violet-300/10" />
+
+          <div className="absolute -left-16 bottom-0 h-36 w-36 rounded-full bg-indigo-300/10" />
+
+          <div className="absolute right-20 top-10 h-20 w-20 rounded-full bg-amber-300/5" />
+
+          {/* ==================================================
+              CONTENT
+          ================================================== */}
+
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            {/* Hero Text */}
+
+            <div className="max-w-2xl">
+              {/* Badge */}
+
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-sm">
+                <Trophy className="h-3.5 w-3.5 text-amber-300" />
+                <span>Lottery Results</span>
+              </div>
+
+              {/* Heading */}
+
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
                 Results History
               </h1>
 
-              <p className="mt-1.5 text-sm text-blue-100 sm:text-base">
-                View previous 2D and 3D lottery results.
+              {/* Description */}
+
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-indigo-100 sm:text-base">
+                Browse previous 2D and 3D lottery results, search winning
+                numbers, and filter results by date or session.
               </p>
+
+              {/* Quick Info */}
+
+              <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-indigo-100">
+                <span className="flex items-center gap-1">
+                  <span className="text-amber-300">✓</span>
+                  2D Results
+                </span>
+
+                <span className="flex items-center gap-1">
+                  <span className="text-amber-300">✓</span>
+                  3D Results
+                </span>
+
+                <span className="flex items-center gap-1">
+                  <span className="text-amber-300">✓</span>
+                  Date Search
+                </span>
+              </div>
             </div>
 
             {/* ==================================================
                 RESULT TYPE SWITCHER
-            =================================================== */}
+            ================================================== */}
 
-            <div className="flex w-full rounded-xl bg-blue-700/50 p-1 lg:w-auto">
+            <div className="relative flex w-full rounded-xl bg-indigo-950/25 p-1.5 ring-1 ring-white/10 backdrop-blur-sm lg:w-auto">
+              {/* 2D */}
+
               <button
                 type="button"
                 onClick={() => handleTabChange("2D")}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all lg:min-w-[120px] ${
+                className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all lg:min-w-[125px] ${
                   activeTab === "2D"
-                    ? "bg-white text-blue-600 shadow-sm"
-                    : "text-blue-100 hover:bg-white/10 hover:text-white"
+                    ? "bg-white text-indigo-700 shadow-md"
+                    : "text-indigo-100 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <span
                   className={`flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ${
                     activeTab === "2D"
-                      ? "bg-blue-50 text-blue-600"
-                      : "bg-blue-600 text-blue-100"
+                      ? "bg-indigo-100 text-indigo-700"
+                      : "bg-white/10 text-white"
                   }`}
                 >
                   2D
@@ -407,20 +452,22 @@ export default function ResultsHistory() {
                 <span>Results</span>
               </button>
 
+              {/* 3D */}
+
               <button
                 type="button"
                 onClick={() => handleTabChange("3D")}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all lg:min-w-[120px] ${
+                className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all lg:min-w-[125px] ${
                   activeTab === "3D"
-                    ? "bg-white text-blue-600 shadow-sm"
-                    : "text-blue-100 hover:bg-white/10 hover:text-white"
+                    ? "bg-white text-violet-700 shadow-md"
+                    : "text-indigo-100 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <span
                   className={`flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ${
                     activeTab === "3D"
-                      ? "bg-blue-50 text-blue-600"
-                      : "bg-blue-600 text-blue-100"
+                      ? "bg-violet-100 text-violet-700"
+                      : "bg-white/10 text-white"
                   }`}
                 >
                   3D
@@ -437,7 +484,7 @@ export default function ResultsHistory() {
           MAIN
       ======================================================= */}
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
         {/* ====================================================
             CURRENT RESULT TYPE
         ===================================================== */}
@@ -447,8 +494,8 @@ export default function ResultsHistory() {
             <div
               className={`flex h-10 w-10 items-center justify-center rounded-xl ${
                 activeTab === "2D"
-                  ? "bg-blue-50 text-blue-600"
-                  : "bg-emerald-50 text-emerald-600"
+                  ? "bg-indigo-100 text-indigo-700"
+                  : "bg-violet-100 text-violet-700"
               }`}
             >
               {activeTab === "2D" ? (
@@ -474,8 +521,8 @@ export default function ResultsHistory() {
           <div
             className={`hidden rounded-full px-3 py-1.5 text-[11px] font-semibold sm:block ${
               activeTab === "2D"
-                ? "bg-blue-50 text-blue-600"
-                : "bg-emerald-50 text-emerald-600"
+                ? "bg-indigo-100 text-indigo-700"
+                : "bg-violet-100 text-violet-700"
             }`}
           >
             {activeResults.length} result
@@ -487,8 +534,10 @@ export default function ResultsHistory() {
             FILTER CARD
         ===================================================== */}
 
-        <div className="mb-5 rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 px-5 py-4">
+        <div className="mb-5 overflow-hidden rounded-xl border border-indigo-100 bg-white shadow-sm">
+          {/* Filter Header */}
+
+          <div className="border-b border-indigo-100 bg-gradient-to-r from-indigo-50 to-violet-50 px-5 py-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-sm font-bold text-slate-800">
@@ -503,13 +552,15 @@ export default function ResultsHistory() {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-800"
+                className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-50"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 Clear Filters
               </button>
             </div>
           </div>
+
+          {/* Filters */}
 
           <div className="p-5">
             <div
@@ -528,7 +579,7 @@ export default function ResultsHistory() {
                 </label>
 
                 <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-400" />
 
                   <input
                     id="result-search"
@@ -536,7 +587,7 @@ export default function ResultsHistory() {
                     value={search}
                     onChange={(e) => handleSearchChange(e.target.value)}
                     placeholder="Number or date"
-                    className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                   />
                 </div>
               </div>
@@ -553,7 +604,7 @@ export default function ResultsHistory() {
                   </label>
 
                   <div className="relative">
-                    <Clock3 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Clock3 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-400" />
 
                     <select
                       id="session"
@@ -563,7 +614,7 @@ export default function ResultsHistory() {
                           e.target.value as "All" | DrawSession,
                         )
                       }
-                      className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                      className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                     >
                       <option value="All">All Sessions</option>
                       <option value="Morning">Morning</option>
@@ -584,14 +635,14 @@ export default function ResultsHistory() {
                 </label>
 
                 <div className="relative">
-                  <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-400" />
 
                   <input
                     id="from-date"
                     type="date"
                     value={fromDate}
                     onChange={(e) => handleFromDateChange(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                   />
                 </div>
               </div>
@@ -607,14 +658,14 @@ export default function ResultsHistory() {
                 </label>
 
                 <div className="relative">
-                  <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-400" />
 
                   <input
                     id="to-date"
                     type="date"
                     value={toDate}
                     onChange={(e) => handleToDateChange(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                   />
                 </div>
               </div>
@@ -636,7 +687,7 @@ export default function ResultsHistory() {
             {activeResults.length !== 1 ? "s" : ""}
           </p>
 
-          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+          <div className="flex items-center gap-1.5 text-xs text-indigo-500">
             <Trophy className="h-3.5 w-3.5" />
             Latest results
           </div>
@@ -647,36 +698,36 @@ export default function ResultsHistory() {
         ===================================================== */}
 
         {activeTab === "2D" && (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-indigo-100 bg-white shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px]">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50">
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-indigo-100 bg-gradient-to-r from-indigo-50 to-violet-50">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-indigo-700">
                       #
                     </th>
 
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-indigo-700">
                       Date
                     </th>
 
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-indigo-700">
                       Session
                     </th>
 
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
                       Winning Number
                     </th>
 
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
                       Set
                     </th>
 
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
                       Value
                     </th>
 
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
                       Status
                     </th>
                   </tr>
@@ -692,7 +743,7 @@ export default function ResultsHistory() {
                       return (
                         <tr
                           key={result.id}
-                          className="border-b border-slate-100 last:border-b-0 transition-colors hover:bg-slate-50/70"
+                          className="border-b border-slate-100 last:border-b-0 transition-colors hover:bg-indigo-50/40"
                         >
                           <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-400">
                             {startIndex + index + 1}
@@ -707,7 +758,7 @@ export default function ResultsHistory() {
                               className={`inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold ${
                                 isMorning
                                   ? "bg-amber-50 text-amber-600"
-                                  : "bg-indigo-50 text-indigo-600"
+                                  : "bg-indigo-50 text-indigo-700"
                               }`}
                             >
                               {result.session}
@@ -718,8 +769,8 @@ export default function ResultsHistory() {
                             <span
                               className={`inline-flex h-10 w-10 items-center justify-center rounded-lg text-base font-bold ${
                                 isMorning
-                                  ? "bg-amber-50 text-amber-600"
-                                  : "bg-indigo-50 text-indigo-600"
+                                  ? "bg-amber-50 text-amber-600 ring-1 ring-amber-100"
+                                  : "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100"
                               }`}
                             >
                               {result.result}
@@ -760,24 +811,24 @@ export default function ResultsHistory() {
         ===================================================== */}
 
         {activeTab === "3D" && (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-violet-100 bg-white shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[600px]">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50">
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-violet-100 bg-gradient-to-r from-violet-50 to-indigo-50">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-violet-700">
                       #
                     </th>
 
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-violet-700">
                       Draw Date
                     </th>
 
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-violet-700">
                       3D Winning Number
                     </th>
 
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-violet-700">
                       Status
                     </th>
                   </tr>
@@ -791,7 +842,7 @@ export default function ResultsHistory() {
                       return (
                         <tr
                           key={result.id}
-                          className="border-b border-slate-100 last:border-b-0 transition-colors hover:bg-slate-50/70"
+                          className="border-b border-slate-100 last:border-b-0 transition-colors hover:bg-violet-50/40"
                         >
                           <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-400">
                             {startIndex + index + 1}
@@ -802,7 +853,7 @@ export default function ResultsHistory() {
                           </td>
 
                           <td className="px-4 py-3 text-center">
-                            <span className="inline-flex h-10 min-w-[76px] items-center justify-center rounded-lg bg-emerald-50 px-3 text-lg font-bold tracking-widest text-emerald-600">
+                            <span className="inline-flex h-10 min-w-[76px] items-center justify-center rounded-lg bg-violet-50 px-3 text-lg font-bold tracking-widest text-violet-700 ring-1 ring-violet-100">
                               {result.result}
                             </span>
                           </td>
@@ -834,15 +885,19 @@ export default function ResultsHistory() {
 
         {totalPages > 1 && (
           <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5">
+            {/* Previous */}
+
             <button
               type="button"
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
               Previous
             </button>
+
+            {/* Pages */}
 
             {Array.from({ length: totalPages }, (_, index) => index + 1).map(
               (page) => (
@@ -853,9 +908,9 @@ export default function ResultsHistory() {
                   className={`min-w-9 rounded-lg px-3 py-2 text-xs font-semibold transition ${
                     currentPage === page
                       ? activeTab === "2D"
-                        ? "bg-blue-600 text-white shadow-sm"
-                        : "bg-emerald-600 text-white shadow-sm"
-                      : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : "bg-violet-600 text-white shadow-sm"
+                      : "border border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
                   }`}
                 >
                   {page}
@@ -863,13 +918,15 @@ export default function ResultsHistory() {
               ),
             )}
 
+            {/* Next */}
+
             <button
               type="button"
               disabled={currentPage === totalPages}
               onClick={() =>
                 setCurrentPage((page) => Math.min(page + 1, totalPages))
               }
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Next
               <ChevronRight className="h-3.5 w-3.5" />
@@ -888,11 +945,13 @@ export default function ResultsHistory() {
 function EmptyResults() {
   return (
     <div className="flex flex-col items-center justify-center text-center">
-      <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-full bg-slate-100">
-        <Search className="h-5 w-5 text-slate-400" />
+      <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-full bg-indigo-50">
+        <Search className="h-5 w-5 text-indigo-400" />
       </div>
 
-      <p className="text-sm font-semibold text-slate-600">No results found</p>
+      <p className="text-sm font-semibold text-slate-600">
+        No results found
+      </p>
 
       <p className="mt-1 text-xs text-slate-400">
         Try changing your search or filters.
