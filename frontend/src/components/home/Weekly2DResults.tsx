@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 
 import { dayNames, twoDResults, weekDates } from "@/data/home/lotteryData";
-
 import { twoDOffDays } from "@/data/home/publicHolidays";
 
 import TwoDOffDayCard from "./TwoDOffDayCard";
@@ -20,26 +19,30 @@ export default function Weekly2DResults() {
   });
 
   return (
-    <section className="bg-gray-50 py-12">
-      <div className="mx-auto max-w-7xl px-4">
-        <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <section className="bg-slate-50 py-8">
+      <div className="mx-auto max-w-6xl px-4">
+        {/* Header */}
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">
+            <h2 className="text-xl font-bold text-gray-900">
               2D Weekly Results
             </h2>
 
-            <p className="mt-1 text-gray-500">Monday to Friday — AM and PM</p>
+            <p className="mt-1 text-sm text-gray-500">
+              Monday to Friday — AM and PM
+            </p>
           </div>
 
           <Link
             to="/results-history"
-            className="font-medium text-blue-600 hover:underline"
+            className="text-sm font-medium text-purple-600 transition hover:text-purple-700 hover:underline"
           >
             View Full History
           </Link>
         </div>
 
-        <div className="space-y-5">
+        {/* Weekly Results */}
+        <div className="space-y-3">
           {weekly2DResults.map((day) => {
             const holidayName = twoDOffDays[day.date];
 
@@ -51,23 +54,29 @@ export default function Weekly2DResults() {
             return (
               <div
                 key={day.date}
-                className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
+                className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition duration-200 hover:shadow-md"
               >
                 {/* Date Header */}
-                <div className="border-b border-gray-200 px-5 py-4">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h3 className="font-bold text-gray-800">{day.day}</h3>
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <h3 className="text-sm font-bold text-gray-800">
+                          {day.day}
+                        </h3>
 
-                      <p className="text-sm text-gray-500">{day.date}</p>
+                        <p className="mt-0.5 text-xs text-gray-400">
+                          {day.date}
+                        </p>
+                      </div>
                     </div>
 
                     {isOffDay ? (
-                      <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+                      <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600">
                         OFF DAY
                       </span>
                     ) : (
-                      <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                      <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-600">
                         2D
                       </span>
                     )}
@@ -75,11 +84,11 @@ export default function Weekly2DResults() {
                 </div>
 
                 {/* Content */}
-                <div className="p-5">
+                <div className="p-3">
                   {isOffDay ? (
                     <TwoDOffDayCard holidayName={holidayName} />
                   ) : (
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                       {/* AM */}
                       {day.morning ? (
                         <TwoDResultCard
@@ -88,8 +97,10 @@ export default function Weekly2DResults() {
                           result={day.morning.result}
                         />
                       ) : (
-                        <div className="rounded-xl border border-gray-200 bg-gray-50 p-6">
-                          <p className="text-sm text-gray-500">No AM result</p>
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                          <p className="text-xs text-gray-400">
+                            No AM result
+                          </p>
                         </div>
                       )}
 
@@ -101,8 +112,10 @@ export default function Weekly2DResults() {
                           result={day.evening.result}
                         />
                       ) : (
-                        <div className="rounded-xl border border-gray-200 bg-gray-50 p-6">
-                          <p className="text-sm text-gray-500">No PM result</p>
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                          <p className="text-xs text-gray-400">
+                            No PM result
+                          </p>
                         </div>
                       )}
                     </div>

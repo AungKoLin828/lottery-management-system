@@ -19,26 +19,30 @@ export default function ThreeDResults() {
   }));
 
   return (
-    <section className="bg-gray-50 py-12">
-      <div className="mx-auto max-w-7xl px-4">
-        <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <section className="bg-slate-50 py-8">
+      <div className="mx-auto max-w-6xl px-4">
+        {/* Header */}
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">3D Results</h2>
+            <h2 className="text-xl font-bold text-gray-900">
+              3D Results
+            </h2>
 
-            <p className="mt-1 text-gray-500">
+            <p className="mt-1 text-sm text-gray-500">
               Scheduled 3D lottery draws with one winning number per draw
             </p>
           </div>
 
           <Link
             to="/results-history"
-            className="font-medium text-blue-600 hover:underline"
+            className="text-sm font-medium text-fuchsia-600 transition hover:text-fuchsia-700 hover:underline"
           >
             View Full History
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+        {/* 3D Results */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {weekly3DResults.map((draw) =>
             draw.result ? (
               <ThreeDResultCard
@@ -48,7 +52,11 @@ export default function ThreeDResults() {
                 result={draw.result}
               />
             ) : (
-              <NoThreeDDraw key={draw.date} date={draw.date} day={draw.day} />
+              <NoThreeDDraw
+                key={draw.date}
+                date={draw.date}
+                day={draw.day}
+              />
             ),
           )}
         </div>

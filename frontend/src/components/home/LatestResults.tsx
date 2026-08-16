@@ -21,103 +21,137 @@ export default function LatestResults() {
   const latest3DResult = latest3DResults[0];
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-12">
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Latest Results</h2>
+    <section className="w-full bg-slate-50 py-8">
+      <div className="mx-auto max-w-6xl px-4">
+        {/* Header */}
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">
+              Latest Results
+            </h2>
 
-          <p className="mt-1 text-gray-500">
-            Latest published 2D and 3D lottery results
-          </p>
+            <p className="mt-1 text-sm text-gray-500">
+              Latest published 2D and 3D lottery results
+            </p>
+          </div>
+
+          <Link
+            to="/results-history"
+            className="text-sm font-medium text-purple-600 transition hover:text-purple-700 hover:underline"
+          >
+            View All
+          </Link>
         </div>
 
-        <Link
-          to="/results-history"
-          className="font-medium text-blue-600 hover:underline"
-        >
-          View All
-        </Link>
-      </div>
+        {/* Results Grid */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* 2D Results */}
+          {sortedLatest2DResults.map((item) => {
+            const isMorning = item.session === "AM";
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {sortedLatest2DResults.map((item) => (
-          <div
-            key={`2d-${item.id}`}
-            className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
-          >
-            <div className="flex justify-between gap-3">
-              <div>
-                <span
-                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
-                    item.session === "AM"
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-indigo-100 text-indigo-700"
+            return (
+              <div
+                key={`2d-${item.id}`}
+                className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md"
+              >
+                {/* Card Header */}
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    {/* Session Badge */}
+                    <span
+                      className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-bold ${
+                        isMorning
+                          ? "bg-amber-50 text-amber-600"
+                          : "bg-purple-50 text-purple-600"
+                      }`}
+                    >
+                      2D {item.session}
+                    </span>
+
+                    {/* Date */}
+                    <p className="mt-1.5 text-xs text-gray-400">
+                      {item.date}
+                    </p>
+
+                    {/* Draw Name */}
+                    <h3 className="mt-0.5 text-sm font-semibold text-gray-800">
+                      {isMorning ? "Morning Draw" : "Evening Draw"}
+                    </h3>
+                  </div>
+
+                  {/* Published Badge */}
+                  <span className="rounded-md bg-cyan-50 px-2 py-0.5 text-[10px] font-medium text-cyan-600">
+                    Published
+                  </span>
+                </div>
+
+                {/* Winning Number */}
+                <div
+                  className={`mt-4 rounded-md py-3 text-center ${
+                    isMorning ? "bg-amber-50" : "bg-purple-50"
                   }`}
                 >
-                  2D {item.session}
-                </span>
+                  <p className="text-[11px] font-medium text-gray-400">
+                    Winning Number
+                  </p>
 
-                <p className="mt-2 text-sm text-gray-500">{item.date}</p>
-
-                <h3 className="mt-1 font-semibold">
-                  {item.session === "AM" ? "Morning Draw" : "Evening Draw"}
-                </h3>
+                  <p
+                    className={`mt-1 text-4xl font-bold tracking-wider ${
+                      isMorning ? "text-amber-500" : "text-purple-600"
+                    }`}
+                  >
+                    {item.result}
+                  </p>
+                </div>
               </div>
+            );
+          })}
 
-              <span className="h-fit rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
-                Published
-              </span>
-            </div>
-
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-500">Winning Number</p>
-
-              <p
-                className={`mt-2 text-6xl font-bold tracking-wider ${
-                  item.session === "AM" ? "text-yellow-600" : "text-indigo-600"
-                }`}
-              >
-                {item.result}
-              </p>
-            </div>
-          </div>
-        ))}
-
-        {latest3DResult && (
-          <div className="overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm">
-            <div className="border-b border-emerald-100 bg-emerald-50 px-6 py-5">
-              <div className="flex justify-between gap-3">
+          {/* 3D Result */}
+          {latest3DResult && (
+            <div className="rounded-lg border border-fuchsia-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
+              {/* Card Header */}
+              <div className="flex items-start justify-between gap-2">
                 <div>
-                  <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                  {/* 3D Badge */}
+                  <span className="inline-flex rounded-md bg-fuchsia-50 px-2 py-0.5 text-[11px] font-bold text-fuchsia-600">
                     3D
                   </span>
 
-                  <p className="mt-2 text-sm text-gray-500">
+                  {/* Date */}
+                  <p className="mt-1.5 text-xs text-gray-400">
                     {latest3DResult.date}
                   </p>
 
-                  <h3 className="mt-1 font-semibold text-gray-800">3D Draw</h3>
+                  {/* Draw Name */}
+                  <h3 className="mt-0.5 text-sm font-semibold text-gray-800">
+                    3D Draw
+                  </h3>
                 </div>
 
-                <span className="h-fit rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
+                {/* Published Badge */}
+                <span className="rounded-md bg-cyan-50 px-2 py-0.5 text-[10px] font-medium text-cyan-600">
                   Published
                 </span>
               </div>
+
+              {/* Winning Number */}
+              <div className="mt-4 rounded-md bg-fuchsia-50 py-3 text-center">
+                <p className="text-[11px] font-medium text-gray-400">
+                  Winning Number
+                </p>
+
+                <p className="mt-1 text-4xl font-bold tracking-widest text-fuchsia-600">
+                  {latest3DResult.result}
+                </p>
+
+                <p className="mt-2 text-[10px] text-gray-400">
+                  One winning number per 3D draw
+                </p>
+              </div>
             </div>
-
-            <div className="p-8 text-center">
-              <p className="text-sm text-gray-500">Latest 3D Winning Number</p>
-
-              <p className="mt-3 text-6xl font-bold tracking-widest text-emerald-600 md:text-7xl">
-                {latest3DResult.result}
-              </p>
-
-              <p className="mt-5 text-xs text-gray-400">
-                One winning number per 3D draw
-              </p>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </section>
   );

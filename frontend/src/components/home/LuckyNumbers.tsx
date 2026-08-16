@@ -13,21 +13,21 @@ export default function LuckyNumbers() {
   );
 
   return (
-    <section className="bg-gray-50 py-12">
-      <div className="mx-auto max-w-7xl px-4">
+    <section className="bg-slate-50 py-8">
+      <div className="mx-auto max-w-6xl px-4">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-100 text-xl text-purple-700">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-fuchsia-50 text-lg">
               🍀
             </div>
 
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">
+              <h2 className="text-xl font-bold text-gray-900">
                 Today's Lucky Numbers
               </h2>
 
-              <p className="mt-1 text-gray-500">
+              <p className="mt-1 text-sm text-gray-500">
                 Random lucky-number suggestions for today
               </p>
             </div>
@@ -35,59 +35,63 @@ export default function LuckyNumbers() {
         </div>
 
         {/* Disclaimer */}
-        <div className="mb-6 rounded-xl border border-purple-100 bg-purple-50 p-4">
-          <div className="flex items-start gap-3">
-            <span className="text-lg">💡</span>
+        <div className="mb-4 rounded-lg border border-cyan-100 bg-cyan-50 px-4 py-3">
+          <div className="flex items-start gap-2.5">
+            <span className="text-base">💡</span>
 
             <div>
-              <p className="text-sm font-semibold text-purple-800">
+              <p className="text-xs font-semibold text-cyan-800">
                 Lucky Number Suggestions
               </p>
 
-              <p className="mt-1 text-xs text-purple-700">
-                These numbers are randomly generated for entertainment purposes
-                only. They are not official lottery results and do not guarantee
-                any outcome.
+              <p className="mt-1 text-[11px] leading-relaxed text-cyan-700">
+                These numbers are randomly generated for entertainment
+                purposes only. They are not official lottery results and do
+                not guarantee any outcome.
               </p>
             </div>
           </div>
         </div>
 
         {/* Cards */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {/* 2D AM */}
-          <div className="overflow-hidden rounded-2xl border border-yellow-200 bg-white shadow-sm">
-            <div className="border-b border-yellow-100 bg-yellow-50 px-6 py-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-yellow-100 font-bold text-yellow-700">
+          <div className="overflow-hidden rounded-lg border border-amber-200 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
+            {/* Header */}
+            <div className="border-b border-amber-100 bg-amber-50 px-4 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-xs font-bold text-amber-700">
                     AM
                   </div>
 
                   <div>
-                    <p className="text-xs text-gray-500">2D</p>
+                    <p className="text-[10px] text-gray-400">2D</p>
 
-                    <h3 className="font-bold text-gray-800">
+                    <h3 className="text-sm font-bold text-gray-800">
                       Morning Lucky Number
                     </h3>
                   </div>
                 </div>
 
-                <span className="rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-semibold text-yellow-700">
+                <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
                   2D AM
                 </span>
               </div>
             </div>
 
-            <div className="p-8 text-center">
-              <p className="text-sm text-gray-500">Today's Lucky Number</p>
+            {/* Number */}
+            <div className="p-4 text-center">
+              <p className="text-[11px] text-gray-400">
+                Today's Lucky Number
+              </p>
 
-              <p className="mt-3 text-6xl font-bold tracking-widest text-yellow-600">
+              <p className="mt-1 text-4xl font-bold tracking-widest text-amber-500">
                 {todayLuckyNumbers.twoDAM}
               </p>
 
-              <div className="mt-5">
-                <span className="inline-flex rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-500">
+              <div className="mt-3">
+                <span className="inline-flex rounded-md bg-slate-50 px-2.5 py-1 text-[10px] font-medium text-gray-400">
                   Random Suggestion
                 </span>
               </div>
@@ -95,38 +99,42 @@ export default function LuckyNumbers() {
           </div>
 
           {/* 2D PM */}
-          <div className="overflow-hidden rounded-2xl border border-indigo-200 bg-white shadow-sm">
-            <div className="border-b border-indigo-100 bg-indigo-50 px-6 py-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 font-bold text-indigo-700">
+          <div className="overflow-hidden rounded-lg border border-purple-200 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
+            {/* Header */}
+            <div className="border-b border-purple-100 bg-purple-50 px-4 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100 text-xs font-bold text-purple-700">
                     PM
                   </div>
 
                   <div>
-                    <p className="text-xs text-gray-500">2D</p>
+                    <p className="text-[10px] text-gray-400">2D</p>
 
-                    <h3 className="font-bold text-gray-800">
+                    <h3 className="text-sm font-bold text-gray-800">
                       Evening Lucky Number
                     </h3>
                   </div>
                 </div>
 
-                <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                <span className="rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
                   2D PM
                 </span>
               </div>
             </div>
 
-            <div className="p-8 text-center">
-              <p className="text-sm text-gray-500">Today's Lucky Number</p>
+            {/* Number */}
+            <div className="p-4 text-center">
+              <p className="text-[11px] text-gray-400">
+                Today's Lucky Number
+              </p>
 
-              <p className="mt-3 text-6xl font-bold tracking-widest text-indigo-600">
+              <p className="mt-1 text-4xl font-bold tracking-widest text-purple-600">
                 {todayLuckyNumbers.twoDPM}
               </p>
 
-              <div className="mt-5">
-                <span className="inline-flex rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-500">
+              <div className="mt-3">
+                <span className="inline-flex rounded-md bg-slate-50 px-2.5 py-1 text-[10px] font-medium text-gray-400">
                   Random Suggestion
                 </span>
               </div>
@@ -134,36 +142,42 @@ export default function LuckyNumbers() {
           </div>
 
           {/* 3D */}
-          <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm">
-            <div className="border-b border-emerald-100 bg-emerald-50 px-6 py-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 font-bold text-emerald-700">
+          <div className="overflow-hidden rounded-lg border border-fuchsia-200 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
+            {/* Header */}
+            <div className="border-b border-fuchsia-100 bg-fuchsia-50 px-4 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-fuchsia-100 text-xs font-bold text-fuchsia-700">
                     3D
                   </div>
 
                   <div>
-                    <p className="text-xs text-gray-500">3D</p>
+                    <p className="text-[10px] text-gray-400">3D</p>
 
-                    <h3 className="font-bold text-gray-800">3D Lucky Number</h3>
+                    <h3 className="text-sm font-bold text-gray-800">
+                      3D Lucky Number
+                    </h3>
                   </div>
                 </div>
 
-                <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                <span className="rounded-md bg-fuchsia-100 px-2 py-0.5 text-[10px] font-semibold text-fuchsia-700">
                   3D
                 </span>
               </div>
             </div>
 
-            <div className="p-8 text-center">
-              <p className="text-sm text-gray-500">Today's Lucky Number</p>
+            {/* Number */}
+            <div className="p-4 text-center">
+              <p className="text-[11px] text-gray-400">
+                Today's Lucky Number
+              </p>
 
-              <p className="mt-3 text-6xl font-bold tracking-widest text-emerald-600">
+              <p className="mt-1 text-4xl font-bold tracking-widest text-fuchsia-600">
                 {todayLuckyNumbers.threeD}
               </p>
 
-              <div className="mt-5">
-                <span className="inline-flex rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-500">
+              <div className="mt-3">
+                <span className="inline-flex rounded-md bg-slate-50 px-2.5 py-1 text-[10px] font-medium text-gray-400">
                   Random Suggestion
                 </span>
               </div>
@@ -172,10 +186,10 @@ export default function LuckyNumbers() {
         </div>
 
         {/* Bottom Disclaimer */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-400">
-            🍀 Lucky numbers are randomly generated and are not official lottery
-            results.
+        <div className="mt-4 text-center">
+          <p className="text-[10px] text-gray-400">
+            🍀 Lucky numbers are randomly generated and are not official
+            lottery results.
           </p>
         </div>
       </div>
