@@ -1,189 +1,279 @@
 // src/pages/player/Play3D.tsx
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Boxes,
-  ChevronLeft,
-  ChevronRight,
   Check,
+  Dice5,
+  Lock,
   Pencil,
   Trash2,
   X,
+  ShoppingBasket,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import type { Bet3D } from "@/types/player";
 
 /* ============================================================
-   CONFIGURATION
+   TYPES
 ============================================================ */
 
-const MAX_BET_PER_NUMBER = 50_000;
+type Bet3D = {
+  id: string;
+  number: string;
+  amount: number;
+};
 
+type NumberUsage = Record<string, number>;
+
+/* ============================================================
+   ADMIN CONFIGURATION
+============================================================ */
+
+const MAX_BET_AMOUNT = 10_000;
+
+/*
+ * Numbers that cannot be selected.
+ *
+ * Example:
+ * const BLOCKED_NUMBERS = ["123", "456"];
+ */
+const BLOCKED_NUMBERS: string[] = [];
+
+/*
+ * Mock usage data.
+ *
+ * Since AM / PM session has been removed,
+ * usage is now stored in one single object.
+ *
+ * Replace this with API/database data later.
+ */
+const INITIAL_USAGE: NumberUsage = {
+  "000": 2_000,
+  "001": 5_000,
+  "003": 3_000,
+  "012": 7_500,
+  "018": 6_000,
+  "055": 8_500,
+  "088": 10_000,
+  "125": 10_000,
+  "222": 8_000,
+  "333": 7_500,
+  "555": 9_000,
+  "888": 9_500,
+};
+
+/* ============================================================
+   NUMBER LIST
+============================================================ */
+
+/*
+ * 000 - 999
+ */
+const NUMBER_LIST = Array.from(
+  { length: 1000 },
+  (_, index) => index.toString().padStart(3, "0"),
+);
+
+/*
+ * 100 numbers per page
+ *
+ * Page 1  = 000 - 099
+ * Page 2  = 100 - 199
+ * Page 3  = 200 - 299
+ * ...
+ * Page 10 = 900 - 999
+ */
 const NUMBERS_PER_PAGE = 100;
 
-const MIN_BET_AMOUNT = 100;
-
-const BLOCKED_NUMBERS = new Set([
-  "007",
-  "013",
-  "088",
-  "111",
-  "222",
-  "333",
-  "444",
-  "555",
-  "666",
-  "777",
-  "888",
-  "999",
-]);
-
-/* ============================================================
-   HELPERS
-============================================================ */
-
-const formatNumber = (value: number) => {
-  return value.toString().padStart(3, "0");
-};
+const TOTAL_PAGES = Math.ceil(
+  NUMBER_LIST.length / NUMBERS_PER_PAGE,
+);
 
 /* ============================================================
    COMPONENT
 ============================================================ */
 
 export default function Play3D() {
-  const [number, setNumber] = useState("");
+  /* ============================================================
+     STATE
+  ============================================================ */
+
+  const [selectedNumbers, setSelectedNumbers] = useState<string[]>(
+    [],
+  );
 
   const [amount, setAmount] = useState("");
 
-  const [selectedNumbers, setSelectedNumbers] = useState<string[]>([]);
-
   const [bets, setBets] = useState<Bet3D[]>([]);
 
-  const [editingBetId, setEditingBetId] = useState<string | null>(null);
+  const [editingBetId, setEditingBetId] = useState<string | null>(
+    null,
+  );
 
   const [editingAmount, setEditingAmount] = useState("");
 
+  /*
+   * Mobile selected bets bottom sheet.
+   */
+  const [mobileBetsOpen, setMobileBetsOpen] = useState(false);
+
+  /*
+   * Number usage.
+   */
+  const [numberUsage] =
+    useState<NumberUsage>(INITIAL_USAGE);
+
+  /*
+   * Pagination.
+   */
   const [currentPage, setCurrentPage] = useState(1);
 
-  const totalPages = Math.ceil(1000 / NUMBERS_PER_PAGE);
-
   /* ============================================================
-     TOTAL AMOUNT
+     PAGINATION CALCULATIONS
   ============================================================ */
 
-  const totalAmount = useMemo(
-    () => bets.reduce((sum, bet) => sum + bet.amount, 0),
-    [bets],
-  );
+  const currentPageNumbers = useMemo(() => {
+    const startIndex =
+      (currentPage - 1) * NUMBERS_PER_PAGE;
 
-  /* ============================================================
-     CURRENT PAGE NUMBERS
-  ============================================================ */
+    const endIndex =
+      startIndex + NUMBERS_PER_PAGE;
 
-  const pageNumbers = useMemo(() => {
-    const start = (currentPage - 1) * NUMBERS_PER_PAGE;
-
-    const end = Math.min(
-      start + NUMBERS_PER_PAGE,
-      1000,
-    );
-
-    return Array.from(
-      { length: end - start },
-      (_, index) => formatNumber(start + index),
+    return NUMBER_LIST.slice(
+      startIndex,
+      endIndex,
     );
   }, [currentPage]);
 
+  const pageStartNumber =
+    (currentPage - 1) * NUMBERS_PER_PAGE;
+
+  const pageEndNumber = Math.min(
+    pageStartNumber + NUMBERS_PER_PAGE - 1,
+    NUMBER_LIST.length - 1,
+  );
+
   /* ============================================================
-     GET BET AMOUNT FOR NUMBER
+     CALCULATIONS
   ============================================================ */
 
-  const getNumberBetAmount = (value: string) => {
-    return bets
-      .filter((bet) => bet.number === value)
-      .reduce(
+  const totalAmount = useMemo(
+    () =>
+      bets.reduce(
         (sum, bet) => sum + bet.amount,
         0,
-      );
-  };
+      ),
+    [bets],
+  );
+
+  const selectedTotal = useMemo(() => {
+    const betAmount = Number(amount);
+
+    if (!betAmount || betAmount <= 0) {
+      return 0;
+    }
+
+    return selectedNumbers.length * betAmount;
+  }, [selectedNumbers, amount]);
 
   /* ============================================================
-     PROGRESS
+     NUMBER STATUS
   ============================================================ */
 
-  const getNumberProgress = (value: string) => {
-    const currentAmount =
-      getNumberBetAmount(value);
+  const getUsedAmount = (number: string) => {
+    return numberUsage[number] ?? 0;
+  };
+
+  const getRemainingAmount = (number: string) => {
+    return Math.max(
+      MAX_BET_AMOUNT - getUsedAmount(number),
+      0,
+    );
+  };
+
+  const getProgress = (number: string) => {
+    const used = getUsedAmount(number);
 
     return Math.min(
-      (currentAmount /
-        MAX_BET_PER_NUMBER) *
-        100,
+      (used / MAX_BET_AMOUNT) * 100,
       100,
     );
   };
 
-  /* ============================================================
-     BLOCKED
-  ============================================================ */
+  const isBlocked = (number: string) => {
+    return BLOCKED_NUMBERS.includes(number);
+  };
 
-  const isBlocked = (value: string) => {
-    return BLOCKED_NUMBERS.has(value);
+  const isLimitReached = (number: string) => {
+    return getRemainingAmount(number) <= 0;
+  };
+
+  const isSelected = (number: string) => {
+    return selectedNumbers.includes(number);
   };
 
   /* ============================================================
-     LIMIT REACHED
+     NUMBER SELECTION
   ============================================================ */
 
-  const isLimitReached = (value: string) => {
-    return (
-      getNumberBetAmount(value) >=
-      MAX_BET_PER_NUMBER
-    );
-  };
-
-  /* ============================================================
-     SELECTED
-  ============================================================ */
-
-  const isSelected = (value: string) => {
-    return selectedNumbers.includes(value);
-  };
-
-  /* ============================================================
-     SELECT / DESELECT NUMBER
-  ============================================================ */
-
-  const toggleNumber = (value: string) => {
+  const toggleNumber = (number: string) => {
     if (
-      isBlocked(value) ||
-      isLimitReached(value)
+      isBlocked(number) ||
+      isLimitReached(number)
     ) {
       return;
     }
 
     setSelectedNumbers((current) => {
-      if (current.includes(value)) {
+      if (current.includes(number)) {
         return current.filter(
-          (item) => item !== value,
+          (item) => item !== number,
         );
       }
 
-      return [...current, value];
+      return [...current, number];
     });
-
-    setNumber(value);
   };
 
   /* ============================================================
-     SELECT ALL AVAILABLE ON PAGE
+     PAGINATION
   ============================================================ */
 
-  const selectAvailableOnPage = () => {
+  const goToPage = (page: number) => {
+    const safePage = Math.max(
+      1,
+      Math.min(page, TOTAL_PAGES),
+    );
+
+    setCurrentPage(safePage);
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(
+        (page) => page - 1,
+      );
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < TOTAL_PAGES) {
+      setCurrentPage(
+        (page) => page + 1,
+      );
+    }
+  };
+
+  /* ============================================================
+     SELECT ALL / CLEAR
+  ============================================================ */
+
+  const selectAllAvailable = () => {
     const availableNumbers =
-      pageNumbers.filter(
-        (value) =>
-          !isBlocked(value) &&
-          !isLimitReached(value),
+      currentPageNumbers.filter(
+        (item) =>
+          !isBlocked(item) &&
+          !isLimitReached(item),
       );
 
     setSelectedNumbers((current) => {
@@ -196,42 +286,8 @@ export default function Play3D() {
     });
   };
 
-  /* ============================================================
-     CLEAR
-  ============================================================ */
-
-  const clearSelectedNumbers = () => {
+  const clearSelection = () => {
     setSelectedNumbers([]);
-    setNumber("");
-  };
-
-  /* ============================================================
-     MANUAL NUMBER INPUT
-  ============================================================ */
-
-  const handleNumberInput = (
-    value: string,
-  ) => {
-    const cleaned = value
-      .replace(/\D/g, "")
-      .slice(0, 3);
-
-    setNumber(cleaned);
-
-    if (cleaned.length === 3) {
-      if (
-        !isBlocked(cleaned) &&
-        !isLimitReached(cleaned)
-      ) {
-        setSelectedNumbers((current) => {
-          if (current.includes(cleaned)) {
-            return current;
-          }
-
-          return [...current, cleaned];
-        });
-      }
-    }
   };
 
   /* ============================================================
@@ -242,67 +298,62 @@ export default function Play3D() {
     const betAmount = Number(amount);
 
     if (
+      selectedNumbers.length === 0 ||
       !betAmount ||
-      betAmount < MIN_BET_AMOUNT
+      betAmount < 100
     ) {
       return;
     }
 
-    if (selectedNumbers.length === 0) {
+    const validNumbers =
+      selectedNumbers.filter((item) => {
+        const remaining =
+          getRemainingAmount(item);
+
+        return (
+          !isBlocked(item) &&
+          remaining >= betAmount
+        );
+      });
+
+    if (validNumbers.length === 0) {
       return;
     }
 
+    const newBets: Bet3D[] =
+      validNumbers.map((item) => ({
+        id: crypto.randomUUID(),
+        number: item,
+        amount: betAmount,
+      }));
+
     setBets((current) => {
-      const updated = [...current];
-
-      selectedNumbers.forEach(
-        (selectedNumber) => {
-          if (isBlocked(selectedNumber)) {
-            return;
-          }
-
-          const existingIndex =
-            updated.findIndex(
-              (bet) =>
-                bet.number === selectedNumber,
-            );
-
-          const currentAmount =
-            existingIndex >= 0
-              ? updated[existingIndex].amount
-              : 0;
-
-          const newAmount =
-            currentAmount + betAmount;
-
-          if (
-            newAmount >
-            MAX_BET_PER_NUMBER
-          ) {
-            return;
-          }
-
-          if (existingIndex >= 0) {
-            updated[existingIndex] = {
-              ...updated[existingIndex],
-              amount: newAmount,
-            };
-          } else {
-            updated.push({
-              id: crypto.randomUUID(),
-              number: selectedNumber,
-              amount: betAmount,
-            });
-          }
-        },
+      /*
+       * If the same number already exists,
+       * replace the previous bet.
+       */
+      const filtered = current.filter(
+        (existing) =>
+          !newBets.some(
+            (newBet) =>
+              newBet.number ===
+              existing.number,
+          ),
       );
 
-      return updated;
+      return [...filtered, ...newBets];
     });
 
     setSelectedNumbers([]);
-    setNumber("");
     setAmount("");
+
+    /*
+     * Automatically open selected bets
+     * on mobile.
+     */
+    if (window.innerWidth < 1024) {
+      setMobileBetsOpen(true);
+    }
   };
 
   /* ============================================================
@@ -327,22 +378,24 @@ export default function Play3D() {
 
     if (
       !newAmount ||
-      newAmount < MIN_BET_AMOUNT
+      newAmount < 100
     ) {
       return;
     }
 
-    const currentNumberAmount =
-      getNumberBetAmount(bet.number);
+    const currentAmount =
+      bet.amount;
 
-    const maxEditableAmount =
-      MAX_BET_PER_NUMBER -
-      (currentNumberAmount -
-        bet.amount);
+    const usedAmount =
+      getUsedAmount(bet.number);
+
+    const availableForEdit =
+      MAX_BET_AMOUNT -
+      (usedAmount - currentAmount);
 
     if (
       newAmount >
-      maxEditableAmount
+      availableForEdit
     ) {
       return;
     }
@@ -371,40 +424,10 @@ export default function Play3D() {
         (bet) => bet.id !== id,
       ),
     );
-  };
 
-  /* ============================================================
-     REMOVE SELECTED NUMBER
-  ============================================================ */
-
-  const removeSelectedNumber = (
-    value: string,
-  ) => {
-    setSelectedNumbers((current) =>
-      current.filter(
-        (item) => item !== value,
-      ),
-    );
-
-    if (number === value) {
-      setNumber("");
+    if (editingBetId === id) {
+      cancelEditBet();
     }
-  };
-
-  /* ============================================================
-     PAGE NAVIGATION
-  ============================================================ */
-
-  const goToPage = (page: number) => {
-    if (
-      page < 1 ||
-      page > totalPages
-    ) {
-      return;
-    }
-
-    setCurrentPage(page);
-    setNumber("");
   };
 
   /* ============================================================
@@ -417,1350 +440,1061 @@ export default function Play3D() {
     }
 
     console.log("3D Bets:", bets);
+
+    /*
+     * Replace this with your API request.
+     *
+     * Example:
+     *
+     * await api.post("/bets/3d", {
+     *   bets,
+     * });
+     */
+
+    setMobileBetsOpen(false);
   };
 
   /* ============================================================
-     RENDER
+     FORMAT
+  ============================================================ */
+
+  const formatAmount = (value: number) => {
+    return value.toLocaleString();
+  };
+
+  /* ============================================================
+     MOBILE BODY LOCK
+  ============================================================ */
+
+  useEffect(() => {
+    if (!mobileBetsOpen) {
+      document.body.style.overflow = "";
+      return;
+    }
+
+    document.body.style.overflow =
+      "hidden";
+
+    return () => {
+      document.body.style.overflow =
+        "";
+    };
+  }, [mobileBetsOpen]);
+
+  /* ============================================================
+     BET CARD
+  ============================================================ */
+
+  const renderBetCard = (bet: Bet3D) => {
+    const isEditing =
+      editingBetId === bet.id;
+
+    const usedAmount =
+      getUsedAmount(bet.number);
+
+    const maxEditableAmount =
+      MAX_BET_AMOUNT -
+      (usedAmount - bet.amount);
+
+    return (
+      <div
+        key={bet.id}
+        className="rounded-xl border border-slate-100 bg-slate-50 p-4 transition-all hover:border-violet-200 hover:bg-violet-50/50"
+      >
+        {/* HEADER */}
+
+        <div className="flex items-center justify-between gap-3">
+          {/* NUMBER */}
+
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-12 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-base font-extrabold tracking-widest text-white shadow-sm shadow-violet-200">
+              {bet.number}
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-slate-500">
+                3D Number
+              </p>
+
+              <p className="mt-1 text-xs text-slate-400">
+                Selected bet
+              </p>
+            </div>
+          </div>
+
+          {/* ACTIONS */}
+
+          {!isEditing && (
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() =>
+                  startEditBet(bet)
+                }
+                className="rounded-lg p-2 text-slate-400 transition-all hover:bg-violet-100 hover:text-violet-600"
+                title="Edit amount"
+                aria-label={`Edit bet ${bet.number}`}
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  removeBet(bet.id)
+                }
+                className="rounded-lg p-2 text-slate-400 transition-all hover:bg-red-50 hover:text-red-500"
+                title="Delete bet"
+                aria-label={`Delete bet ${bet.number}`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* EDIT */}
+
+        {isEditing ? (
+          <div className="mt-4">
+            <label className="mb-2 block text-xs font-semibold text-slate-600">
+              Bet Amount
+            </label>
+
+            <div className="flex gap-2">
+              <div className="relative min-w-0 flex-1">
+                <input
+                  type="number"
+                  min="100"
+                  max={
+                    maxEditableAmount
+                  }
+                  value={
+                    editingAmount
+                  }
+                  onChange={(event) =>
+                    setEditingAmount(
+                      event.target.value,
+                    )
+                  }
+                  autoFocus
+                  className="w-full rounded-lg border border-violet-300 bg-white px-3 py-2 pr-12 text-sm font-semibold text-slate-900 outline-none focus:ring-4 focus:ring-violet-50"
+                />
+
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-slate-400">
+                  MMK
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  saveEditBet(bet)
+                }
+                disabled={
+                  !Number(
+                    editingAmount,
+                  ) ||
+                  Number(
+                    editingAmount,
+                  ) < 100 ||
+                  Number(
+                    editingAmount,
+                  ) >
+                    maxEditableAmount
+                }
+                className="rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                Save
+              </button>
+
+              <button
+                type="button"
+                onClick={
+                  cancelEditBet
+                }
+                className="rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <p className="mt-2 text-[10px] text-slate-400">
+              Maximum:{" "}
+              {formatAmount(
+                maxEditableAmount,
+              )}{" "}
+              MMK
+            </p>
+          </div>
+        ) : (
+          /* AMOUNT */
+
+          <div className="mt-3 flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-slate-100">
+            <span className="text-xs text-slate-400">
+              Amount
+            </span>
+
+            <span className="text-sm font-bold text-slate-800">
+              {formatAmount(
+                bet.amount,
+              )}{" "}
+              <span className="text-xs font-semibold text-slate-400">
+                MMK
+              </span>
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /* ============================================================
+     UI
   ============================================================ */
 
   return (
-    <div className="min-w-0 space-y-5 sm:space-y-6">
-
+    <div className="w-full max-w-full space-y-6 overflow-x-hidden pb-24 lg:pb-0">
       {/* ======================================================
           PAGE HEADER
-      ====================================================== */}
+      ======================================================= */}
 
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-1 text-xs font-semibold sm:text-sm">
+      <div>
+        <div className="flex items-center gap-1 text-sm font-semibold">
           <span className="text-slate-500">
             Lottery
           </span>
 
-          <span className="text-blue-500">
+          <span className="text-violet-600">
             /
           </span>
 
-          <span className="text-blue-600">
-            3D Play
+          <span className="text-violet-600">
+            Play
           </span>
         </div>
 
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+        <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900 sm:text-3xl">
           3D Play
         </h1>
 
-        <p className="mt-1.5 text-xs text-slate-500 sm:mt-2 sm:text-sm">
-          Select your numbers and enter your
-          betting amount.
+        <p className="mt-2 text-sm text-slate-500">
+          Select your lucky 3D numbers and
+          enter your bet amount.
         </p>
       </div>
 
       {/* ======================================================
-          MAIN
-      ====================================================== */}
+          MAIN CONTENT
+      ======================================================= */}
 
-      <div
-        className="
-          grid
-          min-w-0
-          grid-cols-1
-          gap-5
-          xl:grid-cols-[minmax(0,1fr)_380px]
-          xl:gap-6
-        "
-      >
-
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         {/* ====================================================
-            LEFT
+            LEFT - BET FORM
         ==================================================== */}
 
-        <div className="min-w-0 space-y-5 sm:space-y-6">
+        <div className="min-w-0 rounded-2xl border border-violet-100 bg-white p-3 shadow-sm sm:p-6">
+          {/* HEADER */}
+
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-sm shadow-violet-200">
+              <Dice5 className="h-5 w-5" />
+            </div>
+
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold text-slate-900">
+                Place 3D Bet
+              </h2>
+
+              <p className="text-xs text-slate-400">
+                Choose one or more 3-digit
+                numbers
+              </p>
+            </div>
+          </div>
 
           {/* ==================================================
-              NUMBER SELECTOR
+              NUMBER SELECTION
           ================================================== */}
 
-          <div
-            className="
-              min-w-0
-              overflow-hidden
-              rounded-2xl
-              border
-              border-slate-200
-              bg-white
-              p-4
-              shadow-sm
-              sm:p-6
-            "
-          >
+          <div className="mt-6 min-w-0">
+            {/* NUMBER HEADER */}
 
-            {/* HEADER */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <label className="block text-sm font-semibold text-slate-700">
+                  Select Numbers
+                </label>
 
-            <div
-              className="
-                flex
-                min-w-0
-                flex-col
-                gap-3
-                sm:flex-row
-                sm:items-center
-                sm:justify-between
-              "
-            >
-
-              <div className="flex min-w-0 items-center gap-3">
-
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 sm:h-10 sm:w-10 sm:rounded-xl">
-                  <Boxes className="h-4 w-4 sm:h-5 sm:w-5" />
-                </div>
-
-                <div className="min-w-0">
-                  <h2 className="truncate text-base font-bold text-slate-900 sm:text-lg">
-                    Select 3D Numbers
-                  </h2>
-
-                  <p className="text-[10px] text-slate-400 sm:text-xs">
-                    100 numbers per page
-                  </p>
-                </div>
-
+                <p className="mt-1 text-xs text-slate-400">
+                  Choose your 3D numbers from
+                  000 to 999
+                </p>
               </div>
 
-              {/* ACTION BUTTONS */}
-
-              <div className="flex w-full min-w-0 gap-1.5 sm:w-auto">
-
+              <div className="flex shrink-0 items-center gap-1.5 self-start">
                 <button
                   type="button"
                   onClick={
-                    selectAvailableOnPage
+                    selectAllAvailable
                   }
-                  className="
-                    min-w-0
-                    flex-1
-                    rounded-md
-                    border
-                    border-blue-200
-                    bg-blue-50
-                    px-2
-                    py-1.5
-                    text-[9px]
-                    font-bold
-                    text-blue-600
-                    transition
-                    hover:border-blue-300
-                    hover:bg-blue-100
-                    sm:flex-none
-                    sm:px-2.5
-                    sm:text-[10px]
-                  "
+                  className="rounded-md border border-violet-200 bg-violet-100 px-2.5 py-1.5 text-[10px] font-bold text-violet-700 transition hover:border-violet-300 hover:bg-violet-200"
                 >
-                  Select Available
+                  Select All
                 </button>
 
                 <button
                   type="button"
                   onClick={
-                    clearSelectedNumbers
+                    clearSelection
                   }
                   disabled={
                     selectedNumbers.length ===
                     0
                   }
-                  className="
-                    flex-1
-                    rounded-md
-                    border
-                    border-slate-200
-                    bg-white
-                    px-2
-                    py-1.5
-                    text-[9px]
-                    font-bold
-                    text-slate-500
-                    transition
-                    hover:bg-slate-50
-                    disabled:cursor-not-allowed
-                    disabled:opacity-40
-                    sm:flex-none
-                    sm:px-2.5
-                    sm:text-[10px]
-                  "
+                  className="rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-[10px] font-bold text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Clear
                 </button>
-
               </div>
-
             </div>
 
-            {/* ==================================================
-                SELECTED COUNT
-            ================================================== */}
+            {/* =================================================
+                CURRENT PAGE RANGE
+            ================================================= */}
 
-            <div
-              className="
-                mt-4
-                flex
-                items-center
-                justify-between
-                gap-3
-                rounded-xl
-                border
-                border-blue-100
-                bg-gradient-to-r
-                from-blue-50
-                to-indigo-50
-                px-3
-                py-2.5
-                sm:mt-5
-                sm:px-4
-                sm:py-3
-              "
-            >
+            <div className="mt-3 flex min-w-0 items-center justify-between gap-2 rounded-lg border border-violet-100 bg-violet-50 px-3 py-2">
+              <span className="truncate text-[10px] font-semibold text-violet-600 sm:text-xs">
+                Numbers{" "}
+                {pageStartNumber
+                  .toString()
+                  .padStart(3, "0")}{" "}
+                -{" "}
+                {pageEndNumber
+                  .toString()
+                  .padStart(3, "0")}
+              </span>
 
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold text-blue-500 sm:text-[11px]">
-                  Selected Numbers
-                </p>
-
-                <p className="mt-0.5 text-base font-bold text-blue-700 sm:text-lg">
-                  {selectedNumbers.length}
-                </p>
-              </div>
-
-              <div className="shrink-0 rounded-md bg-white px-2 py-1 text-[9px] font-bold text-blue-600 shadow-sm sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-[10px]">
+              <span className="shrink-0 text-[10px] font-medium text-slate-400 sm:text-xs">
                 Page {currentPage} /{" "}
-                {totalPages}
-              </div>
-
+                {TOTAL_PAGES}
+              </span>
             </div>
 
-            {/* ==================================================
-                NUMBER GRID
-            ================================================== */}
+            {/* =================================================
+                3D NUMBER GRID
+            ================================================= */}
 
-            <div
-              className="
-                mt-3
-                min-w-0
-                overflow-hidden
-                rounded-xl
-                border
-                border-blue-100
-                bg-gradient-to-br
-                from-blue-50
-                via-indigo-50/60
-                to-slate-50
-                p-1.5
-                sm:mt-4
-                sm:p-2.5
-              "
-            >
-
-              {/*
-                MOBILE  = 5 columns
-                SMALL   = 8 columns
-                MEDIUM  = 10 columns
-
-                This prevents the buttons from becoming
-                too narrow on phones.
-              */}
-
+            <div className="mt-3 w-full min-w-0 overflow-hidden rounded-xl border border-violet-200 bg-gradient-to-br from-violet-100 via-indigo-50 to-blue-100 p-1.5 shadow-inner xs:p-2 sm:p-3">
               <div
                 className="
                   grid
                   w-full
-                  min-w-0
                   grid-cols-5
                   gap-1
-                  sm:grid-cols-8
-                  md:grid-cols-10
-                  sm:gap-1
+                  min-[360px]:grid-cols-6
+                  min-[420px]:grid-cols-7
+                  sm:grid-cols-10
+                  md:grid-cols-12
+                  lg:grid-cols-15
                 "
               >
+                {currentPageNumbers.map(
+                  (item) => {
+                    const selected =
+                      isSelected(item);
 
-                {pageNumbers.map((value) => {
+                    const blocked =
+                      isBlocked(item);
 
-                  const selected =
-                    isSelected(value);
+                    const limitReached =
+                      isLimitReached(
+                        item,
+                      );
 
-                  const blocked =
-                    isBlocked(value);
+                    const used =
+                      getUsedAmount(
+                        item,
+                      );
 
-                  const currentAmount =
-                    getNumberBetAmount(value);
+                    const progress =
+                      getProgress(
+                        item,
+                      );
 
-                  const progress =
-                    getNumberProgress(value);
+                    const unavailable =
+                      blocked ||
+                      limitReached;
 
-                  const limitReached =
-                    isLimitReached(value);
+                    const nearLimit =
+                      progress >= 80 &&
+                      progress < 100;
 
-                  const nearLimit =
-                    progress >= 80 &&
-                    progress < 100;
-
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      disabled={
-                        blocked ||
-                        limitReached
-                      }
-                      onClick={() =>
-                        toggleNumber(value)
-                      }
-                      title={
-                        blocked
-                          ? "This number is blocked"
-                          : limitReached
-                            ? "Maximum betting limit reached"
-                            : `${currentAmount.toLocaleString()} / ${MAX_BET_PER_NUMBER.toLocaleString()} MMK`
-                      }
-                      className={`
-                        relative
-                        flex
-                        h-7
-                        min-w-0
-                        w-full
-                        items-center
-                        justify-center
-                        overflow-hidden
-                        rounded-[5px]
-                        border
-                        px-0
-                        text-[9px]
-                        font-bold
-                        leading-none
-                        transition-all
-                        duration-150
-
-                        sm:h-7
-                        sm:text-[10px]
-
-                        md:h-8
-                        md:text-[11px]
-
-                        ${
-                          blocked
-                            ? "cursor-not-allowed border-slate-300 bg-slate-200 text-slate-400"
-                            : limitReached
-                              ? "cursor-not-allowed border-red-200 bg-red-100 text-red-400"
-                              : selected
-                                ? "border-blue-600 bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-sm shadow-blue-200 ring-1 ring-blue-300"
-                                : nearLimit
-                                  ? "border-orange-200 bg-orange-50 text-orange-700 hover:border-orange-300 hover:bg-orange-100"
-                                  : "border-blue-100 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-100 hover:text-blue-700"
+                    return (
+                      <button
+                        key={item}
+                        type="button"
+                        disabled={
+                          unavailable
                         }
-                      `}
-                    >
+                        onClick={() =>
+                          toggleNumber(
+                            item,
+                          )
+                        }
+                        title={
+                          blocked
+                            ? `${item} is blocked`
+                            : limitReached
+                              ? `${item} is full`
+                              : `${formatAmount(
+                                  getRemainingAmount(
+                                    item,
+                                  ),
+                                )} MMK remaining`
+                        }
+                        className={`
+                          relative
+                          flex
+                          h-9
+                          min-w-0
+                          flex-col
+                          items-center
+                          justify-center
+                          overflow-hidden
+                          rounded-md
+                          border
+                          px-0
+                          transition-all
+                          duration-150
+                          min-[420px]:h-9
+                          sm:h-10
 
-                      {/* NUMBER */}
+                          ${
+                            blocked
+                              ? "cursor-not-allowed border-red-200 bg-red-50 text-red-300"
+                              : limitReached
+                                ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300"
+                                : selected
+                                  ? "border-violet-600 bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 text-white shadow-sm shadow-violet-300 ring-1 ring-violet-400"
+                                  : nearLimit
+                                    ? "border-orange-300 bg-gradient-to-br from-orange-100 to-amber-100 text-orange-700 hover:border-orange-400 hover:bg-orange-200"
+                                    : "border-violet-200 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-violet-400 hover:bg-violet-100 hover:text-violet-700 hover:shadow-sm"
+                          }
+                        `}
+                      >
+                        {/* NUMBER */}
 
-                      <span className="relative z-10 flex items-center gap-0.5">
-                        {selected && (
-                          <Check className="h-2 w-2 sm:h-2.5 sm:w-2.5" />
-                        )}
+                        <div className="flex items-center justify-center gap-0.5">
+                          {blocked && (
+                            <Lock className="h-2 w-2" />
+                          )}
 
-                        {value}
-                      </span>
+                          {selected && (
+                            <Check className="h-2 w-2" />
+                          )}
 
-                      {/* PROGRESS */}
+                          <span className="text-[8px] font-bold leading-none min-[360px]:text-[8px] min-[420px]:text-[9px] sm:text-[10px]">
+                            {item}
+                          </span>
+                        </div>
 
-                      {!blocked && (
-                        <span
-                          className={`
-                            absolute
-                            bottom-0
-                            left-0
-                            h-0.5
-                            w-full
-                            ${
-                              selected
-                                ? "bg-white/30"
-                                : "bg-slate-100"
-                            }
-                          `}
+                        {/* MINI PROGRESS */}
+
+                        <div
+                          className={`mt-0.5 h-0.5 w-3/4 overflow-hidden rounded-full ${
+                            selected
+                              ? "bg-white/30"
+                              : "bg-slate-200"
+                          }`}
                         >
-                          <span
-                            className={`
-                              block
-                              h-full
-                              ${
-                                selected
-                                  ? "bg-white"
-                                  : limitReached
-                                    ? "bg-red-400"
+                          <div
+                            className={`h-full rounded-full ${
+                              blocked
+                                ? "bg-red-300"
+                                : limitReached
+                                  ? "bg-slate-400"
+                                  : selected
+                                    ? "bg-white"
                                     : nearLimit
                                       ? "bg-orange-400"
-                                      : "bg-blue-400"
-                              }
-                            `}
+                                      : "bg-violet-400"
+                            }`}
                             style={{
                               width: `${progress}%`,
                             }}
                           />
+                        </div>
+
+                        {/* USED */}
+
+                        <span
+                          className={`mt-0.5 max-w-full truncate px-0.5 text-[4px] font-medium leading-none min-[360px]:text-[4px] min-[420px]:text-[5px] sm:text-[6px] ${
+                            selected
+                              ? "text-violet-100"
+                              : blocked
+                                ? "text-red-300"
+                                : limitReached
+                                  ? "text-slate-400"
+                                  : nearLimit
+                                    ? "text-orange-500"
+                                    : "text-slate-400"
+                          }`}
+                        >
+                          {blocked
+                            ? "OFF"
+                            : limitReached
+                              ? "FULL"
+                              : formatAmount(
+                                  used,
+                                )}
                         </span>
-                      )}
-
-                    </button>
-                  );
-                })}
-
+                      </button>
+                    );
+                  },
+                )}
               </div>
-
             </div>
 
-            {/* ==================================================
-                LEGEND
-            ================================================== */}
+            {/* =================================================
+                SMALL RESPONSIVE PAGINATION
+            ================================================= */}
 
-            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[9px] text-slate-400 sm:gap-x-4 sm:text-[10px]">
+            <div className="mt-3 flex min-w-0 items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2 py-2 shadow-sm">
+              {/* PREVIOUS */}
 
-              <div className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-sm bg-white ring-1 ring-blue-200" />
+              <button
+                type="button"
+                onClick={
+                  goToPreviousPage
+                }
+                disabled={
+                  currentPage === 1
+                }
+                aria-label="Previous page"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-600 disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <ChevronLeft className="h-3 w-3" />
+              </button>
+
+              {/* PAGE NUMBERS */}
+
+              <div className="flex min-w-0 flex-1 items-center justify-center gap-0.5 overflow-hidden">
+                {Array.from(
+                  {
+                    length: TOTAL_PAGES,
+                  },
+                  (_, index) =>
+                    index + 1,
+                ).map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() =>
+                      goToPage(page)
+                    }
+                    aria-label={`Go to page ${page}`}
+                    aria-current={
+                      currentPage === page
+                        ? "page"
+                        : undefined
+                    }
+                    className={`flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1 text-[9px] font-bold transition sm:h-7 sm:min-w-7 sm:text-[10px] ${
+                      currentPage ===
+                      page
+                        ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm"
+                        : "border border-slate-200 bg-white text-slate-500 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-600"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+
+              {/* NEXT */}
+
+              <button
+                type="button"
+                onClick={
+                  goToNextPage
+                }
+                disabled={
+                  currentPage ===
+                  TOTAL_PAGES
+                }
+                aria-label="Next page"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-600 disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <ChevronRight className="h-3 w-3" />
+              </button>
+            </div>
+
+            {/* PAGE INFO */}
+
+            <div className="mt-1.5 text-center text-[9px] text-slate-400">
+              Showing{" "}
+              <span className="font-bold text-slate-600">
+                {pageStartNumber
+                  .toString()
+                  .padStart(3, "0")}
+              </span>{" "}
+              -{" "}
+              <span className="font-bold text-slate-600">
+                {pageEndNumber
+                  .toString()
+                  .padStart(3, "0")}
+              </span>
+            </div>
+
+            {/* LEGEND */}
+
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] text-slate-400">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-violet-500" />
                 Available
               </div>
 
-              <div className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-sm bg-blue-600" />
-                Selected
-              </div>
-
-              <div className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-sm bg-orange-400" />
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-orange-400" />
                 Near limit
               </div>
 
-              <div className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-sm bg-red-400" />
-                Limit
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-slate-400" />
+                Full
               </div>
 
-              <div className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-sm bg-slate-300" />
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-red-300" />
                 Blocked
               </div>
-
             </div>
+          </div>
 
-            {/* ==================================================
-                PAGINATION
-            ================================================== */}
+          {/* ==================================================
+              SELECTED SUMMARY
+          ================================================== */}
 
-            <div
-              className="
-                mt-4
-                flex
-                min-w-0
-                flex-col
-                gap-3
-                border-t
-                border-slate-100
-                pt-4
-                sm:flex-row
-                sm:items-center
-                sm:justify-between
-              "
-            >
+          <div className="mt-5 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-100 via-indigo-50 to-blue-100 p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-semibold text-violet-600">
+                  Selected Numbers
+                </p>
 
-              {/* SHOWING */}
-
-              <p className="shrink-0 text-[9px] text-slate-400 sm:text-[10px]">
-                Showing{" "}
-                <span className="font-semibold text-slate-600">
-                  {formatNumber(
-                    (currentPage - 1) *
-                      NUMBERS_PER_PAGE,
-                  )}
-                </span>
-
-                {" - "}
-
-                <span className="font-semibold text-slate-600">
-                  {formatNumber(
-                    Math.min(
-                      currentPage *
-                        NUMBERS_PER_PAGE -
-                        1,
-                      999,
-                    ),
-                  )}
-                </span>
-
-                {" "}of 1,000
-              </p>
-
-              {/* PAGINATION CONTROLS */}
-
-              <div
-                className="
-                  flex
-                  min-w-0
-                  max-w-full
-                  items-center
-                  gap-1
-                "
-              >
-
-                {/* PREVIOUS */}
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    goToPage(
-                      currentPage - 1,
-                    )
-                  }
-                  disabled={
-                    currentPage === 1
-                  }
-                  className="
-                    flex
-                    h-7
-                    shrink-0
-                    items-center
-                    gap-0.5
-                    rounded-md
-                    border
-                    border-slate-200
-                    bg-white
-                    px-1.5
-                    text-[9px]
-                    font-semibold
-                    text-slate-500
-                    transition
-                    hover:border-blue-200
-                    hover:bg-blue-50
-                    hover:text-blue-600
-                    disabled:cursor-not-allowed
-                    disabled:opacity-40
-                    sm:px-2
-                    sm:text-[10px]
-                  "
-                >
-                  <ChevronLeft className="h-3 w-3" />
-
-                  <span className="hidden xs:inline">
-                    Prev
-                  </span>
-
-                  <span className="xs:hidden">
-                    Prev
-                  </span>
-                </button>
-
-                {/* PAGE NUMBERS */}
-
-                <div
-                  className="
-                    flex
-                    min-w-0
-                    flex-1
-                    items-center
-                    gap-0.5
-                    overflow-x-auto
-                    scrollbar-none
-                  "
-                >
-
-                  {Array.from(
-                    {
-                      length: totalPages,
-                    },
-                    (_, index) =>
-                      index + 1,
-                  ).map((page) => (
-                    <button
-                      key={page}
-                      type="button"
-                      onClick={() =>
-                        goToPage(page)
-                      }
-                      className={`
-                        flex
-                        h-7
-                        w-7
-                        shrink-0
-                        items-center
-                        justify-center
-                        rounded-md
-                        text-[9px]
-                        font-bold
-                        transition
-                        sm:text-[10px]
-                        ${
-                          currentPage ===
-                          page
-                            ? "bg-blue-600 text-white shadow-sm"
-                            : "text-slate-500 hover:bg-blue-50 hover:text-blue-600"
-                        }
-                      `}
-                    >
-                      {page}
-                    </button>
-                  ))}
-
-                </div>
-
-                {/* NEXT */}
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    goToPage(
-                      currentPage + 1,
-                    )
-                  }
-                  disabled={
-                    currentPage ===
-                    totalPages
-                  }
-                  className="
-                    flex
-                    h-7
-                    shrink-0
-                    items-center
-                    gap-0.5
-                    rounded-md
-                    border
-                    border-slate-200
-                    bg-white
-                    px-1.5
-                    text-[9px]
-                    font-semibold
-                    text-slate-500
-                    transition
-                    hover:border-blue-200
-                    hover:bg-blue-50
-                    hover:text-blue-600
-                    disabled:cursor-not-allowed
-                    disabled:opacity-40
-                    sm:px-2
-                    sm:text-[10px]
-                  "
-                >
-                  <span>Next</span>
-
-                  <ChevronRight className="h-3 w-3" />
-                </button>
-
+                <p className="mt-0.5 text-lg font-bold text-violet-800">
+                  {selectedNumbers.length}
+                </p>
               </div>
 
+              <div className="text-right">
+                <p className="text-[11px] font-semibold text-indigo-600">
+                  Selected Bet Total
+                </p>
+
+                <p className="mt-0.5 text-lg font-bold text-indigo-800">
+                  {formatAmount(
+                    selectedTotal,
+                  )}{" "}
+                  <span className="text-xs">
+                    MMK
+                  </span>
+                </p>
+              </div>
             </div>
 
+            {/* SELECTED NUMBERS */}
+
+            {selectedNumbers.length >
+              0 && (
+              <div className="mt-3 flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
+                {selectedNumbers.map(
+                  (item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() =>
+                        toggleNumber(
+                          item,
+                        )
+                      }
+                      className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[10px] font-bold tracking-wide text-violet-700 shadow-sm ring-1 ring-violet-200 transition hover:bg-violet-100"
+                    >
+                      {item}
+
+                      <X className="h-3 w-3" />
+                    </button>
+                  ),
+                )}
+              </div>
+            )}
           </div>
 
           {/* ==================================================
               BET AMOUNT
           ================================================== */}
 
-          <div
-            className="
-              min-w-0
-              overflow-hidden
-              rounded-2xl
-              border
-              border-slate-200
-              bg-white
-              p-4
-              shadow-sm
-              sm:p-6
-            "
-          >
+          <div className="mt-5">
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Bet Amount Per Number
+            </label>
 
-            <div className="flex min-w-0 items-center gap-3">
-
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 sm:h-10 sm:w-10 sm:rounded-xl">
-                <Boxes className="h-4 w-4 sm:h-5 sm:w-5" />
-              </div>
-
-              <div className="min-w-0">
-                <h2 className="text-base font-bold text-slate-900 sm:text-lg">
-                  Betting Amount
-                </h2>
-
-                <p className="truncate text-[10px] text-slate-400 sm:text-xs">
-                  Apply this amount to all selected numbers
-                </p>
-              </div>
-
-            </div>
-
-            {/* ==================================================
-                SELECTED NUMBER CHIPS
-            ================================================== */}
-
-            {selectedNumbers.length > 0 && (
-              <div className="mt-4 sm:mt-5">
-
-                <div className="mb-2 flex items-center justify-between gap-2">
-
-                  <label className="text-xs font-semibold text-slate-700 sm:text-sm">
-                    Selected Numbers
-                  </label>
-
-                  <span className="shrink-0 text-[9px] font-semibold text-blue-500 sm:text-[10px]">
-                    {selectedNumbers.length} selected
-                  </span>
-
-                </div>
-
-                <div
-                  className="
-                    flex
-                    max-h-28
-                    min-w-0
-                    flex-wrap
-                    gap-1.5
-                    overflow-y-auto
-                    rounded-xl
-                    border
-                    border-blue-100
-                    bg-blue-50/60
-                    p-2
-                    sm:p-2.5
-                  "
-                >
-
-                  {selectedNumbers.map(
-                    (selectedNumber) => (
-                      <button
-                        key={selectedNumber}
-                        type="button"
-                        onClick={() =>
-                          removeSelectedNumber(
-                            selectedNumber,
-                          )
-                        }
-                        className="
-                          inline-flex
-                          shrink-0
-                          items-center
-                          gap-1
-                          rounded-md
-                          bg-blue-600
-                          px-1.5
-                          py-1
-                          text-[9px]
-                          font-bold
-                          text-white
-                          shadow-sm
-                          transition
-                          hover:bg-red-500
-                          sm:px-2
-                          sm:text-[10px]
-                        "
-                      >
-                        {selectedNumber}
-
-                        <X className="h-2.5 w-2.5" />
-                      </button>
-                    ),
-                  )}
-
-                </div>
-
-              </div>
-            )}
-
-            {/* ==================================================
-                MANUAL NUMBER
-            ================================================== */}
-
-            <div className="mt-4 sm:mt-5">
-
-              <label className="mb-2 block text-xs font-semibold text-slate-700 sm:text-sm">
-                3D Number
-              </label>
-
+            <div className="relative">
               <input
-                value={number}
+                type="number"
+                value={amount}
                 onChange={(event) =>
-                  handleNumberInput(
+                  setAmount(
                     event.target.value,
                   )
                 }
-                placeholder="000 - 999"
-                inputMode="numeric"
-                maxLength={3}
-                className="
-                  w-full
-                  min-w-0
-                  rounded-xl
-                  border
-                  border-slate-200
-                  bg-slate-50
-                  px-3
-                  py-3
-                  text-center
-                  text-xl
-                  font-bold
-                  tracking-[0.3em]
-                  text-slate-900
-                  outline-none
-                  transition-all
-                  placeholder:tracking-normal
-                  placeholder:text-slate-400
-                  focus:border-blue-500
-                  focus:bg-white
-                  focus:ring-4
-                  focus:ring-blue-50
-                  sm:px-4
-                  sm:tracking-[0.35em]
-                "
+                placeholder="Enter amount"
+                min="100"
+                className="w-full rounded-xl border border-violet-200 bg-violet-50/50 px-4 py-3 pr-16 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100"
               />
 
-              <p className="mt-2 text-[10px] text-slate-400 sm:text-xs">
-                You can also enter a number manually.
-              </p>
-
-            </div>
-
-            {/* ==================================================
-                AMOUNT
-            ================================================== */}
-
-            <div className="mt-4 sm:mt-5">
-
-              <label className="mb-2 block text-xs font-semibold text-slate-700 sm:text-sm">
-                Bet Amount
-              </label>
-
-              <div className="relative min-w-0">
-
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={(event) =>
-                    setAmount(
-                      event.target.value,
-                    )
-                  }
-                  placeholder="Enter amount"
-                  min={MIN_BET_AMOUNT}
-                  className="
-                    w-full
-                    min-w-0
-                    rounded-xl
-                    border
-                    border-slate-200
-                    bg-slate-50
-                    px-3
-                    py-3
-                    pr-14
-                    text-sm
-                    text-slate-900
-                    outline-none
-                    transition-all
-                    placeholder:text-slate-400
-                    focus:border-blue-500
-                    focus:bg-white
-                    focus:ring-4
-                    focus:ring-blue-50
-                    sm:px-4
-                  "
-                />
-
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-slate-400 sm:right-4 sm:text-xs">
-                  MMK
-                </span>
-
-              </div>
-
-              <p className="mt-2 text-[10px] text-slate-400 sm:text-xs">
-                Minimum bet:{" "}
-                {MIN_BET_AMOUNT.toLocaleString()} MMK
-              </p>
-
-            </div>
-
-            {/* ==================================================
-                ADD BET
-            ================================================== */}
-
-            <button
-              type="button"
-              onClick={addBet}
-              disabled={
-                selectedNumbers.length ===
-                  0 ||
-                Number(amount) <
-                  MIN_BET_AMOUNT
-              }
-              className="
-                mt-4
-                flex
-                w-full
-                items-center
-                justify-center
-                gap-2
-                rounded-xl
-                bg-gradient-to-r
-                from-blue-600
-                to-indigo-600
-                px-4
-                py-3
-                text-sm
-                font-semibold
-                text-white
-                shadow-md
-                shadow-blue-200
-                transition-all
-                duration-200
-                hover:-translate-y-0.5
-                hover:from-blue-700
-                hover:to-indigo-700
-                hover:shadow-lg
-                disabled:cursor-not-allowed
-                disabled:from-slate-300
-                disabled:to-slate-300
-                disabled:shadow-none
-                sm:mt-5
-              "
-            >
-              <Boxes className="h-4 w-4 shrink-0" />
-
-              <span className="truncate">
-                Add{" "}
-                {selectedNumbers.length > 0
-                  ? `${selectedNumbers.length} Numbers`
-                  : "Selected Bet"}
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-violet-500">
+                MMK
               </span>
-            </button>
+            </div>
 
+            <p className="mt-2 text-xs text-slate-400">
+              Minimum bet: 100 MMK per
+              number.
+            </p>
           </div>
 
+          {/* ==================================================
+              ADD BET
+          ================================================== */}
+
+          <button
+            type="button"
+            onClick={addBet}
+            disabled={
+              selectedNumbers.length ===
+                0 ||
+              !Number(amount) ||
+              Number(amount) < 100
+            }
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-5 py-3 font-semibold text-white shadow-md shadow-violet-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-violet-700 hover:via-indigo-700 hover:to-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
+          >
+            <Dice5 className="h-4 w-4" />
+
+            Add{" "}
+            {selectedNumbers.length >
+            0
+              ? `${selectedNumbers.length} Numbers`
+              : "Selected Bet"}
+          </button>
         </div>
 
         {/* ====================================================
-            RIGHT - SELECTED BETS
+            DESKTOP - SELECTED BETS
         ==================================================== */}
 
-        <div
-          className="
-            min-w-0
-            overflow-hidden
-            rounded-2xl
-            border
-            border-slate-200
-            bg-white
-            p-4
-            shadow-sm
-            sm:p-6
-          "
-        >
-
+        <div className="hidden min-w-0 rounded-2xl border border-violet-100 bg-white p-5 shadow-sm sm:p-6 xl:block">
           {/* HEADER */}
 
-          <div className="flex min-w-0 items-center justify-between gap-3">
-
-            <div className="min-w-0">
-              <h2 className="truncate text-base font-bold text-slate-900 sm:text-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
                 Selected Bets
               </h2>
 
-              <p className="mt-1 truncate text-[10px] text-slate-400 sm:text-xs">
-                Review your selected numbers
+              <p className="mt-1 text-xs text-slate-400">
+                Review your selected 3D
+                numbers
               </p>
             </div>
 
-            <span className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 px-2 text-[10px] font-bold text-blue-700 sm:h-8 sm:min-w-8 sm:text-xs">
+            <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 px-2 text-xs font-bold text-white shadow-sm">
               {bets.length}
             </span>
-
           </div>
 
           {/* BET LIST */}
 
-          <div className="mt-4 max-h-[560px] min-w-0 space-y-3 overflow-y-auto pr-0.5 sm:mt-5 sm:pr-1">
-
+          <div className="mt-5 max-h-[520px] space-y-3 overflow-y-auto pr-1">
             {bets.length === 0 ? (
-
-              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center sm:p-8">
-
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-500 sm:h-11 sm:w-11">
-                  <Boxes className="h-5 w-5" />
+              <div className="rounded-xl border border-dashed border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 p-8 text-center">
+                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-indigo-100 text-violet-600">
+                  <Dice5 className="h-5 w-5" />
                 </div>
 
-                <p className="mt-3 text-xs font-semibold text-slate-600 sm:text-sm">
+                <p className="mt-3 text-sm font-semibold text-slate-600">
                   No bets selected
                 </p>
 
-                <p className="mt-1 text-[10px] text-slate-400 sm:text-xs">
-                  Select numbers and add your bet.
+                <p className="mt-1 text-xs text-slate-400">
+                  Select 3D numbers and
+                  enter an amount.
                 </p>
-
               </div>
-
             ) : (
-
-              bets.map((bet) => {
-
-                const progress =
-                  getNumberProgress(
-                    bet.number,
-                  );
-
-                const isEditing =
-                  editingBetId ===
-                  bet.id;
-
-                const currentNumberAmount =
-                  getNumberBetAmount(
-                    bet.number,
-                  );
-
-                const maxEditableAmount =
-                  MAX_BET_PER_NUMBER -
-                  (
-                    currentNumberAmount -
-                    bet.amount
-                  );
-
-                return (
-                  <div
-                    key={bet.id}
-                    className="
-                      min-w-0
-                      rounded-xl
-                      border
-                      border-slate-100
-                      bg-slate-50
-                      p-3
-                      transition-all
-                      hover:border-blue-100
-                      hover:bg-blue-50/40
-                      sm:p-4
-                    "
-                  >
-
-                    {/* BET HEADER */}
-
-                    <div className="flex min-w-0 items-center justify-between gap-2">
-
-                      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-
-                        <div className="flex h-9 w-12 shrink-0 items-center justify-center rounded-lg bg-white text-sm font-bold tracking-widest text-slate-900 shadow-sm ring-1 ring-slate-100 sm:h-10 sm:w-14 sm:text-base">
-                          {bet.number}
-                        </div>
-
-                        <div className="min-w-0">
-
-                          <p className="truncate text-xs font-semibold text-slate-800 sm:text-sm">
-                            {bet.amount.toLocaleString()} MMK
-                          </p>
-
-                          <p className="mt-1 truncate text-[9px] text-slate-400 sm:text-[10px]">
-                            Current number usage
-                          </p>
-
-                        </div>
-
-                      </div>
-
-                      {/* ACTIONS */}
-
-                      {!isEditing && (
-                        <div className="flex shrink-0 items-center gap-0.5">
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              startEditBet(
-                                bet,
-                              )
-                            }
-                            className="
-                              rounded-lg
-                              p-1.5
-                              text-slate-400
-                              transition-all
-                              hover:bg-blue-50
-                              hover:text-blue-600
-                              sm:p-2
-                            "
-                            title="Edit amount"
-                          >
-                            <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              removeBet(
-                                bet.id,
-                              )
-                            }
-                            className="
-                              rounded-lg
-                              p-1.5
-                              text-slate-400
-                              transition-all
-                              hover:bg-red-50
-                              hover:text-red-500
-                              sm:p-2
-                            "
-                            title="Delete bet"
-                          >
-                            <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                          </button>
-
-                        </div>
-                      )}
-
-                    </div>
-
-                    {/* EDIT */}
-
-                    {isEditing && (
-                      <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/50 p-2.5 sm:mt-4 sm:p-3">
-
-                        <label className="mb-2 block text-[10px] font-semibold text-slate-600 sm:text-xs">
-                          Edit Bet Amount
-                        </label>
-
-                        <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
-
-                          <div className="relative min-w-0 flex-1">
-
-                            <input
-                              type="number"
-                              min={
-                                MIN_BET_AMOUNT
-                              }
-                              max={
-                                maxEditableAmount
-                              }
-                              value={
-                                editingAmount
-                              }
-                              onChange={(
-                                event,
-                              ) =>
-                                setEditingAmount(
-                                  event
-                                    .target
-                                    .value,
-                                )
-                              }
-                              autoFocus
-                              className="
-                                w-full
-                                min-w-0
-                                rounded-lg
-                                border
-                                border-blue-200
-                                bg-white
-                                px-3
-                                py-2
-                                pr-12
-                                text-sm
-                                font-semibold
-                                text-slate-900
-                                outline-none
-                                transition
-                                focus:border-blue-500
-                                focus:ring-4
-                                focus:ring-blue-50
-                              "
-                            />
-
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-semibold text-slate-400">
-                              MMK
-                            </span>
-
-                          </div>
-
-                          <div className="flex shrink-0 gap-2">
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                saveEditBet(
-                                  bet,
-                                )
-                              }
-                              disabled={
-                                !Number(
-                                  editingAmount,
-                                ) ||
-                                Number(
-                                  editingAmount,
-                                ) <
-                                  MIN_BET_AMOUNT ||
-                                Number(
-                                  editingAmount,
-                                ) >
-                                  maxEditableAmount
-                              }
-                              className="
-                                flex-1
-                                rounded-lg
-                                bg-blue-600
-                                px-3
-                                py-2
-                                text-[10px]
-                                font-semibold
-                                text-white
-                                transition
-                                hover:bg-blue-700
-                                disabled:cursor-not-allowed
-                                disabled:bg-slate-300
-                                sm:flex-none
-                              "
-                            >
-                              Save
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={
-                                cancelEditBet
-                              }
-                              className="
-                                flex-1
-                                rounded-lg
-                                border
-                                border-slate-200
-                                bg-white
-                                px-3
-                                py-2
-                                text-[10px]
-                                font-semibold
-                                text-slate-500
-                                transition
-                                hover:bg-slate-50
-                                sm:flex-none
-                              "
-                            >
-                              Cancel
-                            </button>
-
-                          </div>
-
-                        </div>
-
-                      </div>
-                    )}
-
-                    {/* PROGRESS */}
-
-                    <div className="mt-3">
-
-                      <div className="mb-1 flex items-center justify-between text-[9px] sm:text-[10px]">
-
-                        <span className="text-slate-400">
-                          Number usage
-                        </span>
-
-                        <span className="font-semibold text-blue-600">
-                          {Math.round(
-                            progress,
-                          )}
-                          %
-                        </span>
-
-                      </div>
-
-                      <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
-
-                        <div
-                          className={`
-                            h-full
-                            rounded-full
-                            transition-all
-                            ${
-                              progress >=
-                              100
-                                ? "bg-red-500"
-                                : progress >=
-                                    80
-                                  ? "bg-orange-400"
-                                  : "bg-gradient-to-r from-blue-500 to-indigo-500"
-                            }
-                          `}
-                          style={{
-                            width: `${progress}%`,
-                          }}
-                        />
-
-                      </div>
-
-                    </div>
-
-                  </div>
-                );
-              })
-
+              bets.map(renderBetCard)
             )}
-
           </div>
 
-          {/* ==================================================
-              TOTAL
-          ================================================== */}
+          {/* TOTAL */}
 
-          <div className="mt-5 border-t border-slate-100 pt-4 sm:mt-6 sm:pt-5">
-
-            <div className="flex items-center justify-between gap-3">
-
-              <span className="text-xs font-medium text-slate-500 sm:text-sm">
+          <div className="mt-6 border-t border-slate-100 pt-5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-slate-500">
                 Total Bet Amount
               </span>
 
-              <span className="shrink-0 text-lg font-bold text-slate-900 sm:text-xl">
-                {totalAmount.toLocaleString()}{" "}
-                <span className="text-xs font-semibold text-slate-400 sm:text-sm">
+              <span className="text-xl font-bold text-slate-900">
+                {formatAmount(
+                  totalAmount,
+                )}{" "}
+                <span className="text-sm font-semibold text-slate-400">
                   MMK
                 </span>
               </span>
-
             </div>
-
-            {/* PLACE BETS */}
 
             <button
               type="button"
               onClick={submitBets}
-              disabled={bets.length === 0}
-              className="
-                mt-3
-                w-full
-                rounded-xl
-                bg-gradient-to-r
-                from-blue-600
-                to-indigo-600
-                px-4
-                py-3
-                text-sm
-                font-semibold
-                text-white
-                shadow-md
-                shadow-blue-200
-                transition-all
-                duration-200
-                hover:-translate-y-0.5
-                hover:from-blue-700
-                hover:to-indigo-700
-                hover:shadow-lg
-                disabled:cursor-not-allowed
-                disabled:from-slate-300
-                disabled:to-slate-300
-                disabled:shadow-none
-                sm:mt-4
-              "
+              disabled={
+                bets.length === 0
+              }
+              className="mt-4 w-full rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-5 py-3 font-semibold text-white shadow-md shadow-violet-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-violet-700 hover:via-indigo-700 hover:to-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
             >
               Place 3D Bets
             </button>
+          </div>
+        </div>
+      </div>
 
+      {/* ======================================================
+          MOBILE FIXED SELECTED BETS BAR
+      ======================================================= */}
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-violet-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 shadow-[0_-8px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:hidden">
+        <button
+          type="button"
+          onClick={() =>
+            setMobileBetsOpen(true)
+          }
+          className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-4 py-3 text-left text-white shadow-lg shadow-violet-200 transition active:scale-[0.99]"
+        >
+          {/* LEFT */}
+
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">
+              <ShoppingBasket className="h-5 w-5" />
+
+              {bets.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-extrabold text-slate-900 ring-2 ring-violet-600">
+                  {bets.length}
+                </span>
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-violet-100">
+                Selected Bets
+              </p>
+
+              <p className="truncate text-sm font-bold">
+                {bets.length === 0
+                  ? "No bets selected"
+                  : `${bets.length} ${
+                      bets.length ===
+                      1
+                        ? "bet"
+                        : "bets"
+                    } selected`}
+              </p>
+            </div>
           </div>
 
-        </div>
+          {/* RIGHT */}
 
+          <div className="flex shrink-0 items-center gap-3">
+            <div className="text-right">
+              <p className="text-[10px] font-medium text-violet-100">
+                Total
+              </p>
+
+              <p className="text-sm font-extrabold">
+                {formatAmount(
+                  totalAmount,
+                )}{" "}
+                MMK
+              </p>
+            </div>
+
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
+              <span className="text-lg">
+                ↑
+              </span>
+            </div>
+          </div>
+        </button>
       </div>
+
+      {/* ======================================================
+          MOBILE SELECTED BETS MODAL
+      ======================================================= */}
+
+      {mobileBetsOpen && (
+        <div
+          className="fixed inset-0 z-[100] lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Selected 3D Bets"
+        >
+          {/* BACKDROP */}
+
+          <button
+            type="button"
+            aria-label="Close selected bets"
+            onClick={() =>
+              setMobileBetsOpen(false)
+            }
+            className="absolute inset-0 h-full w-full bg-slate-950/60 backdrop-blur-[2px]"
+          />
+
+          {/* BOTTOM SHEET */}
+
+          <div className="absolute inset-x-0 bottom-0 flex max-h-[92vh] flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl">
+            {/* HANDLE */}
+
+            <div className="flex shrink-0 justify-center pt-3">
+              <div className="h-1.5 w-12 rounded-full bg-slate-200" />
+            </div>
+
+            {/* HEADER */}
+
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-sm">
+                  <ShoppingBasket className="h-5 w-5" />
+                </div>
+
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2 className="truncate text-base font-bold text-slate-900">
+                      Selected 3D Bets
+                    </h2>
+
+                    <span className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 px-1.5 text-[10px] font-bold text-violet-700">
+                      {bets.length}
+                    </span>
+                  </div>
+
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    Review and edit your 3D
+                    bets
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setMobileBetsOpen(
+                    false,
+                  )
+                }
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+                aria-label="Close selected bets"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* BET LIST */}
+
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
+              {bets.length === 0 ? (
+                <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 p-8 text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-indigo-100 text-violet-600">
+                    <Dice5 className="h-6 w-6" />
+                  </div>
+
+                  <p className="mt-4 text-sm font-bold text-slate-700">
+                    No bets selected
+                  </p>
+
+                  <p className="mt-1 max-w-xs text-xs leading-5 text-slate-400">
+                    Select 3D numbers from
+                    the grid, enter your
+                    amount, then add the bet.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMobileBetsOpen(
+                        false,
+                      )
+                    }
+                    className="mt-5 rounded-xl bg-violet-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-violet-700"
+                  >
+                    Choose Numbers
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {bets.map(
+                    renderBetCard,
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* MOBILE TOTAL / SUBMIT */}
+
+            <div className="shrink-0 border-t border-slate-100 bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] sm:px-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-400">
+                    Total Bet Amount
+                  </p>
+
+                  <p className="mt-0.5 text-xl font-extrabold text-slate-900">
+                    {formatAmount(
+                      totalAmount,
+                    )}{" "}
+                    <span className="text-sm font-bold text-slate-400">
+                      MMK
+                    </span>
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <p className="text-xs font-medium text-slate-400">
+                    Numbers
+                  </p>
+
+                  <p className="mt-0.5 text-lg font-extrabold text-violet-600">
+                    {bets.length}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={
+                  submitBets
+                }
+                disabled={
+                  bets.length === 0
+                }
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-5 py-3.5 text-sm font-bold text-white shadow-md shadow-violet-200 transition-all hover:from-violet-700 hover:via-indigo-700 hover:to-blue-700 disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
+              >
+                <Check className="h-4 w-4" />
+
+                Place 3D Bets
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
