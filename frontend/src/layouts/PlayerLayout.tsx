@@ -20,6 +20,7 @@ import {
   ChevronDown,
   Sparkles,
   ArrowLeft,
+  Bell,
 } from "lucide-react";
 
 import {
@@ -160,10 +161,6 @@ export default function PlayerLayout() {
   /* ============================================================
      ACTIVE ROUTES
   ============================================================ */
-
-  const isDashboard =
-    location.pathname === "/player" ||
-    location.pathname === "/player/";
 
   const isPlayActive =
     location.pathname.startsWith(
@@ -340,9 +337,6 @@ export default function PlayerLayout() {
 
   /* ============================================================
      MOBILE BACK BUTTON VISIBILITY
-     
-     Hidden at top.
-     Appears after 120px.
   ============================================================ */
 
   useEffect(() => {
@@ -506,7 +500,7 @@ export default function PlayerLayout() {
     closeAllMenus();
 
     /*
-      Replace this with your actual logout logic.
+      Replace this with your real logout logic.
 
       Example:
 
@@ -611,9 +605,7 @@ export default function PlayerLayout() {
               Dashboard
             </NavLink>
 
-            {/* =================================================
-                PLAY DROPDOWN
-            ================================================= */}
+            {/* PLAY */}
 
             <div
               ref={playMenuRef}
@@ -740,9 +732,7 @@ export default function PlayerLayout() {
               Wallet
             </NavLink>
 
-            {/* =================================================
-                MORE
-            ================================================= */}
+            {/* MORE */}
 
             <div
               ref={moreMenuRef}
@@ -837,7 +827,9 @@ export default function PlayerLayout() {
               </div>
             </NavLink>
 
-            {/* NOTIFICATIONS */}
+            {/* ==================================================
+                DESKTOP NOTIFICATIONS
+            =================================================== */}
 
             <div className="hidden rounded-xl sm:block">
               <NotificationBell role="PLAYER" />
@@ -974,25 +966,32 @@ export default function PlayerLayout() {
 
             <nav className="mx-auto max-w-7xl space-y-1 px-3 py-3 sm:px-5">
 
-              {/* DASHBOARD */}
+              {/* =================================================
+                  DASHBOARD
+              ================================================= */}
 
               <NavLink
                 to="/player"
                 end
                 onClick={handleMobileNavigation}
                 className={({ isActive }) =>
-                  `flex min-h-10 items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition ${
+                  `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
                     isActive
-                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm"
+                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-950/30"
                       : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
                   }`
                 }
               >
-                <LayoutDashboard size={17} />
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                  <LayoutDashboard size={17} />
+                </span>
+
                 <span>Dashboard</span>
               </NavLink>
 
-              {/* MOBILE PLAY */}
+              {/* =================================================
+                  MOBILE PLAY
+              ================================================= */}
 
               <div
                 className={`rounded-xl border p-1 transition-colors ${
@@ -1115,48 +1114,61 @@ export default function PlayerLayout() {
                 )}
               </div>
 
-              {/* MY TICKETS */}
+              {/* =================================================
+                  MY TICKETS
+              ================================================= */}
 
               <NavLink
                 to="/player/tickets"
                 onClick={handleMobileNavigation}
                 className={({ isActive }) =>
-                  `flex min-h-10 items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition ${
+                  `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
                     isActive
-                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-950/30"
                       : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
                   }`
                 }
               >
-                <Ticket size={17} />
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                  <Ticket size={17} />
+                </span>
+
                 <span>My Tickets</span>
               </NavLink>
 
-              {/* WALLET */}
+              {/* =================================================
+                  WALLET
+              ================================================= */}
 
               <NavLink
                 to="/player/wallet"
                 onClick={handleMobileNavigation}
                 className={({ isActive }) =>
-                  `flex min-h-10 items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition ${
+                  `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
                     isActive
-                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-950/30"
                       : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
                   }`
                 }
               >
-                <WalletCards size={17} />
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-emerald-400">
+                  <WalletCards size={17} />
+                </span>
 
                 <span>Wallet</span>
 
-                <span className="ml-auto text-[10px] font-bold text-emerald-400">
+                <span className="ml-auto rounded-md bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-400">
                   125,000 MMK
                 </span>
               </NavLink>
 
-              {/* MORE */}
+              {/* =================================================
+                  MORE SECTION
+              ================================================= */}
 
               <div className="mt-2 border-t border-slate-700 pt-2">
+
+                {/* RESULTS + CONTACT */}
 
                 {moreNavigation.map((item) => {
                   const Icon = item.icon;
@@ -1167,52 +1179,168 @@ export default function PlayerLayout() {
                       to={item.path}
                       onClick={handleMobileNavigation}
                       className={({ isActive }) =>
-                        `flex min-h-10 items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition ${
+                        `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
                           isActive
-                            ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                            ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-950/30"
                             : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
                         }`
                       }
                     >
-                      <Icon size={17} />
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                        <Icon size={17} />
+                      </span>
 
                       <span>{item.name}</span>
                     </NavLink>
                   );
                 })}
 
-                {/* NOTIFICATIONS */}
+                {/* =================================================
+                    MOBILE NOTIFICATIONS
+                ================================================= */}
 
-                <div className="flex min-h-10 items-center rounded-xl px-3 py-2.5">
-                  <NotificationBell role="PLAYER" />
+                <div className="relative mt-1">
+
+                  {/* Notification row background */}
+
+                  <div
+                    className="
+                      flex
+                      min-h-11
+                      w-full
+                      items-center
+                      gap-3
+                      rounded-xl
+                      border
+                      border-slate-700
+                      bg-slate-800/80
+                      px-3
+                      py-2
+                      text-slate-300
+                      transition-all
+                      duration-200
+                      hover:border-indigo-500/40
+                      hover:bg-indigo-500/10
+                      hover:text-white
+                    "
+                  >
+
+                    {/* CUSTOM MOBILE ICON */}
+
+                    <span
+                      className="
+                        flex
+                        h-8
+                        w-8
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-lg
+                        bg-gradient-to-br
+                        from-indigo-600
+                        to-violet-600
+                        text-white
+                        shadow-md
+                        shadow-indigo-950/30
+                      "
+                    >
+                      <Bell
+                        className="h-4 w-4"
+                        strokeWidth={2.5}
+                      />
+                    </span>
+
+                    {/* LABEL */}
+
+                    <span className="text-[13px] font-semibold">
+                      Notifications
+                    </span>
+
+                    {/* ACTUAL NOTIFICATION COMPONENT */}
+
+                    <div
+                      className="
+                        ml-auto
+                        flex
+                        shrink-0
+                        items-center
+                        justify-center
+                        [&>button]:!flex
+                        [&>button]:!h-9
+                        [&>button]:!w-9
+                        [&>button]:!items-center
+                        [&>button]:!justify-center
+                        [&>button]:!rounded-lg
+                        [&>button]:!border
+                        [&>button]:!border-indigo-500/30
+                        [&>button]:!bg-indigo-500/10
+                        [&>button]:!text-indigo-300
+                        [&>button]:hover:!border-indigo-400/50
+                        [&>button]:hover:!bg-indigo-500/20
+                        [&>button]:hover:!text-white
+                        [&_svg]:!h-[18px]
+                        [&_svg]:!w-[18px]
+                      "
+                    >
+                      <NotificationBell role="PLAYER" />
+                    </div>
+
+                  </div>
+
                 </div>
 
-                {/* PROFILE */}
+                {/* =================================================
+                    PROFILE
+                ================================================= */}
 
                 <NavLink
                   to="/player/profile"
                   onClick={handleMobileNavigation}
                   className={({ isActive }) =>
-                    `flex min-h-10 items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition ${
+                    `mt-1 flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
                       isActive
-                        ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                        ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-950/30"
                         : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
                     }`
                   }
                 >
-                  <User size={17} />
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                    <User size={17} />
+                  </span>
 
                   <span>Profile</span>
                 </NavLink>
 
-                {/* LOGOUT */}
+                {/* =================================================
+                    LOGOUT
+                ================================================= */}
 
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
+                  className="
+                    mt-1
+                    flex
+                    min-h-11
+                    w-full
+                    items-center
+                    gap-3
+                    rounded-xl
+                    px-3
+                    py-2.5
+                    text-left
+                    text-[13px]
+                    font-semibold
+                    text-red-400
+                    transition-all
+                    duration-200
+                    hover:bg-red-500/10
+                    hover:text-red-300
+                  "
                 >
-                  <LogOut size={17} />
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-500/10">
+                    <LogOut size={17} />
+                  </span>
 
                   <span>Logout</span>
                 </button>
@@ -1225,19 +1353,6 @@ export default function PlayerLayout() {
 
       {/* ======================================================
           MOBILE FLOATING BACK BUTTON
-
-          UPDATED DESIGN
-
-          - Mobile only
-          - Hidden at top
-          - Appears after 120px
-          - Indigo / violet primary color
-          - Matches PlayerLayout navigation
-          - Colored icon section
-          - Soft glow
-          - No dark standalone pill
-          - Never uses navigate(-1)
-          - Never leaves /player/*
       ======================================================= */}
 
       <div
@@ -1289,11 +1404,6 @@ export default function PlayerLayout() {
             focus:ring-offset-slate-50
           "
         >
-
-          {/* ==================================================
-              ARROW ICON
-          =================================================== */}
-
           <span
             className="
               flex
@@ -1321,14 +1431,9 @@ export default function PlayerLayout() {
             />
           </span>
 
-          {/* ==================================================
-              LABEL
-          =================================================== */}
-
           <span className="pr-1 tracking-wide">
             Back
           </span>
-
         </button>
       </div>
 
