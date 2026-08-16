@@ -31,19 +31,10 @@ type NumberUsage = Record<string, number>;
 
 const MAX_BET_AMOUNT = 10_000;
 
-/*
- * Numbers that cannot be selected.
- *
- * Example:
- * const BLOCKED_NUMBERS = ["123", "456"];
- */
 const BLOCKED_NUMBERS: string[] = [];
 
 /*
  * Mock usage data.
- *
- * Since AM / PM session has been removed,
- * usage is now stored in one single object.
  *
  * Replace this with API/database data later.
  */
@@ -66,23 +57,11 @@ const INITIAL_USAGE: NumberUsage = {
    NUMBER LIST
 ============================================================ */
 
-/*
- * 000 - 999
- */
 const NUMBER_LIST = Array.from(
   { length: 1000 },
   (_, index) => index.toString().padStart(3, "0"),
 );
 
-/*
- * 100 numbers per page
- *
- * Page 1  = 000 - 099
- * Page 2  = 100 - 199
- * Page 3  = 200 - 299
- * ...
- * Page 10 = 900 - 999
- */
 const NUMBERS_PER_PAGE = 100;
 
 const TOTAL_PAGES = Math.ceil(
@@ -112,20 +91,11 @@ export default function Play3D() {
 
   const [editingAmount, setEditingAmount] = useState("");
 
-  /*
-   * Mobile selected bets bottom sheet.
-   */
   const [mobileBetsOpen, setMobileBetsOpen] = useState(false);
 
-  /*
-   * Number usage.
-   */
   const [numberUsage] =
     useState<NumberUsage>(INITIAL_USAGE);
 
-  /*
-   * Pagination.
-   */
   const [currentPage, setCurrentPage] = useState(1);
 
   /* ============================================================
@@ -328,10 +298,6 @@ export default function Play3D() {
       }));
 
     setBets((current) => {
-      /*
-       * If the same number already exists,
-       * replace the previous bet.
-       */
       const filtered = current.filter(
         (existing) =>
           !newBets.some(
@@ -347,10 +313,6 @@ export default function Play3D() {
     setSelectedNumbers([]);
     setAmount("");
 
-    /*
-     * Automatically open selected bets
-     * on mobile.
-     */
     if (window.innerWidth < 1024) {
       setMobileBetsOpen(true);
     }
@@ -441,16 +403,6 @@ export default function Play3D() {
 
     console.log("3D Bets:", bets);
 
-    /*
-     * Replace this with your API request.
-     *
-     * Example:
-     *
-     * await api.post("/bets/3d", {
-     *   bets,
-     * });
-     */
-
     setMobileBetsOpen(false);
   };
 
@@ -472,17 +424,17 @@ export default function Play3D() {
       return;
     }
 
-    document.body.style.overflow =
-      "hidden";
+    document.body.style.overflow = "hidden";
 
     return () => {
-      document.body.style.overflow =
-        "";
+      document.body.style.overflow = "";
     };
   }, [mobileBetsOpen]);
 
   /* ============================================================
-     BET CARD
+     COMPACT BET CARD
+     
+     This is intentionally smaller than the previous card.
   ============================================================ */
 
   const renderBetCard = (bet: Bet3D) => {
@@ -499,43 +451,95 @@ export default function Play3D() {
     return (
       <div
         key={bet.id}
-        className="rounded-xl border border-slate-100 bg-slate-50 p-4 transition-all hover:border-violet-200 hover:bg-violet-50/50"
+        className="
+          rounded-lg
+          border
+          border-slate-100
+          bg-slate-50
+          p-2.5
+          transition-all
+          hover:border-emerald-200
+          hover:bg-emerald-50/50
+        "
       >
-        {/* HEADER */}
+        {/* COMPACT BET ROW */}
 
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+
           {/* NUMBER */}
 
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-12 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-base font-extrabold tracking-widest text-white shadow-sm shadow-violet-200">
-              {bet.number}
-            </div>
+          <div
+            className="
+              flex
+              h-9
+              w-11
+              shrink-0
+              items-center
+              justify-center
+              rounded-lg
+              bg-gradient-to-br
+              from-emerald-500
+              to-teal-600
+              text-[11px]
+              font-extrabold
+              tracking-wider
+              text-white
+              shadow-sm
+              shadow-emerald-200
+            "
+          >
+            {bet.number}
+          </div>
 
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-500">
-                3D Number
-              </p>
+          {/* BET INFO */}
 
-              <p className="mt-1 text-xs text-slate-400">
-                Selected bet
+          <div className="min-w-0 flex-1">
+
+            <p className="truncate text-[9px] font-medium text-slate-400">
+              3D Number
+            </p>
+
+            {!isEditing ? (
+              <p className="mt-0.5 truncate text-xs font-bold text-slate-800">
+                {formatAmount(bet.amount)}
+                <span className="ml-1 text-[9px] font-semibold text-slate-400">
+                  MMK
+                </span>
               </p>
-            </div>
+            ) : (
+              <p className="mt-0.5 text-[9px] text-slate-400">
+                Edit amount
+              </p>
+            )}
+
           </div>
 
           {/* ACTIONS */}
 
           {!isEditing && (
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="flex shrink-0 items-center gap-0.5">
+
               <button
                 type="button"
                 onClick={() =>
                   startEditBet(bet)
                 }
-                className="rounded-lg p-2 text-slate-400 transition-all hover:bg-violet-100 hover:text-violet-600"
+                className="
+                  flex
+                  h-7
+                  w-7
+                  items-center
+                  justify-center
+                  rounded-md
+                  text-slate-400
+                  transition
+                  hover:bg-emerald-100
+                  hover:text-emerald-600
+                "
                 title="Edit amount"
                 aria-label={`Edit bet ${bet.number}`}
               >
-                <Pencil className="h-4 w-4" />
+                <Pencil className="h-3.5 w-3.5" />
               </button>
 
               <button
@@ -543,47 +547,72 @@ export default function Play3D() {
                 onClick={() =>
                   removeBet(bet.id)
                 }
-                className="rounded-lg p-2 text-slate-400 transition-all hover:bg-red-50 hover:text-red-500"
+                className="
+                  flex
+                  h-7
+                  w-7
+                  items-center
+                  justify-center
+                  rounded-md
+                  text-slate-400
+                  transition
+                  hover:bg-red-50
+                  hover:text-red-500
+                "
                 title="Delete bet"
                 aria-label={`Delete bet ${bet.number}`}
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-3.5 w-3.5" />
               </button>
+
             </div>
           )}
+
         </div>
 
-        {/* EDIT */}
+        {/* EDIT AREA */}
 
-        {isEditing ? (
-          <div className="mt-4">
-            <label className="mb-2 block text-xs font-semibold text-slate-600">
-              Bet Amount
-            </label>
+        {isEditing && (
+          <div className="mt-2.5 border-t border-slate-200 pt-2.5">
 
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
+
               <div className="relative min-w-0 flex-1">
+
                 <input
                   type="number"
                   min="100"
-                  max={
-                    maxEditableAmount
-                  }
-                  value={
-                    editingAmount
-                  }
+                  max={maxEditableAmount}
+                  value={editingAmount}
                   onChange={(event) =>
                     setEditingAmount(
                       event.target.value,
                     )
                   }
                   autoFocus
-                  className="w-full rounded-lg border border-violet-300 bg-white px-3 py-2 pr-12 text-sm font-semibold text-slate-900 outline-none focus:ring-4 focus:ring-violet-50"
+                  className="
+                    h-8
+                    w-full
+                    rounded-md
+                    border
+                    border-emerald-300
+                    bg-white
+                    px-2
+                    py-1
+                    pr-10
+                    text-xs
+                    font-semibold
+                    text-slate-900
+                    outline-none
+                    focus:ring-2
+                    focus:ring-emerald-50
+                  "
                 />
 
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-slate-400">
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-semibold text-slate-400">
                   MMK
                 </span>
+
               </div>
 
               <button
@@ -592,57 +621,58 @@ export default function Play3D() {
                   saveEditBet(bet)
                 }
                 disabled={
-                  !Number(
-                    editingAmount,
-                  ) ||
-                  Number(
-                    editingAmount,
-                  ) < 100 ||
-                  Number(
-                    editingAmount,
-                  ) >
+                  !Number(editingAmount) ||
+                  Number(editingAmount) < 100 ||
+                  Number(editingAmount) >
                     maxEditableAmount
                 }
-                className="rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="
+                  h-8
+                  rounded-md
+                  bg-emerald-600
+                  px-2.5
+                  text-[9px]
+                  font-bold
+                  text-white
+                  transition
+                  hover:bg-emerald-700
+                  disabled:cursor-not-allowed
+                  disabled:bg-slate-300
+                "
               >
                 Save
               </button>
 
               <button
                 type="button"
-                onClick={
-                  cancelEditBet
-                }
-                className="rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 transition hover:bg-slate-50"
+                onClick={cancelEditBet}
+                className="
+                  h-8
+                  rounded-md
+                  border
+                  border-slate-200
+                  bg-white
+                  px-2
+                  text-[9px]
+                  font-semibold
+                  text-slate-500
+                  transition
+                  hover:bg-slate-50
+                "
               >
                 Cancel
               </button>
+
             </div>
 
-            <p className="mt-2 text-[10px] text-slate-400">
+            <p className="mt-1.5 text-[8px] text-slate-400">
               Maximum:{" "}
               {formatAmount(
                 maxEditableAmount,
               )}{" "}
               MMK
             </p>
-          </div>
-        ) : (
-          /* AMOUNT */
 
-          <div className="mt-3 flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-slate-100">
-            <span className="text-xs text-slate-400">
-              Amount
-            </span>
-
-            <span className="text-sm font-bold text-slate-800">
-              {formatAmount(
-                bet.amount,
-              )}{" "}
-              <span className="text-xs font-semibold text-slate-400">
-                MMK
-              </span>
-            </span>
           </div>
         )}
       </div>
@@ -655,9 +685,8 @@ export default function Play3D() {
 
   return (
     <div className="w-full max-w-full space-y-6 overflow-x-hidden pb-24 lg:pb-0">
-      {/* ======================================================
-          PAGE HEADER
-      ======================================================= */}
+
+      {/* PAGE HEADER */}
 
       <div>
         <div className="flex items-center gap-1 text-sm font-semibold">
@@ -665,11 +694,11 @@ export default function Play3D() {
             Lottery
           </span>
 
-          <span className="text-violet-600">
+          <span className="text-emerald-600">
             /
           </span>
 
-          <span className="text-violet-600">
+          <span className="text-emerald-600">
             Play
           </span>
         </div>
@@ -684,24 +713,24 @@ export default function Play3D() {
         </p>
       </div>
 
-      {/* ======================================================
-          MAIN CONTENT
-      ======================================================= */}
+      {/* MAIN CONTENT */}
 
       <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-        {/* ====================================================
-            LEFT - BET FORM
-        ==================================================== */}
 
-        <div className="min-w-0 rounded-2xl border border-violet-100 bg-white p-3 shadow-sm sm:p-6">
+        {/* LEFT */}
+
+        <div className="min-w-0 rounded-2xl border border-emerald-100 bg-white p-3 shadow-sm sm:p-6">
+
           {/* HEADER */}
 
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-sm shadow-violet-200">
+
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm shadow-emerald-200">
               <Dice5 className="h-5 w-5" />
             </div>
 
             <div className="min-w-0">
+
               <h2 className="text-lg font-bold text-slate-900">
                 Place 3D Bet
               </h2>
@@ -710,18 +739,21 @@ export default function Play3D() {
                 Choose one or more 3-digit
                 numbers
               </p>
+
             </div>
+
           </div>
 
-          {/* ==================================================
-              NUMBER SELECTION
-          ================================================== */}
+          {/* NUMBER SELECTION */}
 
           <div className="mt-6 min-w-0">
+
             {/* NUMBER HEADER */}
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
               <div className="min-w-0">
+
                 <label className="block text-sm font-semibold text-slate-700">
                   Select Numbers
                 </label>
@@ -730,41 +762,39 @@ export default function Play3D() {
                   Choose your 3D numbers from
                   000 to 999
                 </p>
+
               </div>
 
               <div className="flex shrink-0 items-center gap-1.5 self-start">
+
                 <button
                   type="button"
-                  onClick={
-                    selectAllAvailable
-                  }
-                  className="rounded-md border border-violet-200 bg-violet-100 px-2.5 py-1.5 text-[10px] font-bold text-violet-700 transition hover:border-violet-300 hover:bg-violet-200"
+                  onClick={selectAllAvailable}
+                  className="rounded-md border border-emerald-200 bg-emerald-100 px-2 py-1 text-[9px] font-bold leading-none text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-200"
                 >
                   Select All
                 </button>
 
                 <button
                   type="button"
-                  onClick={
-                    clearSelection
-                  }
+                  onClick={clearSelection}
                   disabled={
-                    selectedNumbers.length ===
-                    0
+                    selectedNumbers.length === 0
                   }
-                  className="rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-[10px] font-bold text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-[9px] font-bold leading-none text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Clear
                 </button>
+
               </div>
+
             </div>
 
-            {/* =================================================
-                CURRENT PAGE RANGE
-            ================================================= */}
+            {/* CURRENT PAGE RANGE */}
 
-            <div className="mt-3 flex min-w-0 items-center justify-between gap-2 rounded-lg border border-violet-100 bg-violet-50 px-3 py-2">
-              <span className="truncate text-[10px] font-semibold text-violet-600 sm:text-xs">
+            <div className="mt-3 flex min-w-0 items-center justify-between gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-1.5">
+
+              <span className="truncate text-[9px] font-semibold text-emerald-600 sm:text-[10px]">
                 Numbers{" "}
                 {pageStartNumber
                   .toString()
@@ -775,32 +805,34 @@ export default function Play3D() {
                   .padStart(3, "0")}
               </span>
 
-              <span className="shrink-0 text-[10px] font-medium text-slate-400 sm:text-xs">
+              <span className="shrink-0 text-[9px] font-medium text-slate-400 sm:text-[10px]">
                 Page {currentPage} /{" "}
                 {TOTAL_PAGES}
               </span>
+
             </div>
 
-            {/* =================================================
-                3D NUMBER GRID
-            ================================================= */}
+            {/* NUMBER GRID */}
 
-            <div className="mt-3 w-full min-w-0 overflow-hidden rounded-xl border border-violet-200 bg-gradient-to-br from-violet-100 via-indigo-50 to-blue-100 p-1.5 shadow-inner xs:p-2 sm:p-3">
+            <div className="mt-2 w-full min-w-0 overflow-hidden rounded-lg border border-emerald-200 bg-gradient-to-br from-emerald-100 via-teal-50 to-cyan-100 p-1 shadow-inner sm:p-1.5">
+
               <div
                 className="
                   grid
                   w-full
-                  grid-cols-5
-                  gap-1
-                  min-[360px]:grid-cols-6
-                  min-[420px]:grid-cols-7
+                  grid-cols-6
+                  gap-0.5
+                  min-[360px]:grid-cols-7
+                  min-[420px]:grid-cols-8
                   sm:grid-cols-10
                   md:grid-cols-12
                   lg:grid-cols-15
                 "
               >
+
                 {currentPageNumbers.map(
                   (item) => {
+
                     const selected =
                       isSelected(item);
 
@@ -808,19 +840,13 @@ export default function Play3D() {
                       isBlocked(item);
 
                     const limitReached =
-                      isLimitReached(
-                        item,
-                      );
+                      isLimitReached(item);
 
                     const used =
-                      getUsedAmount(
-                        item,
-                      );
+                      getUsedAmount(item);
 
                     const progress =
-                      getProgress(
-                        item,
-                      );
+                      getProgress(item);
 
                     const unavailable =
                       blocked ||
@@ -834,13 +860,9 @@ export default function Play3D() {
                       <button
                         key={item}
                         type="button"
-                        disabled={
-                          unavailable
-                        }
+                        disabled={unavailable}
                         onClick={() =>
-                          toggleNumber(
-                            item,
-                          )
+                          toggleNumber(item)
                         }
                         title={
                           blocked
@@ -856,19 +878,21 @@ export default function Play3D() {
                         className={`
                           relative
                           flex
-                          h-9
+                          h-7
                           min-w-0
                           flex-col
                           items-center
                           justify-center
                           overflow-hidden
-                          rounded-md
+                          rounded
                           border
                           px-0
                           transition-all
                           duration-150
-                          min-[420px]:h-9
-                          sm:h-10
+
+                          min-[360px]:h-7
+                          min-[420px]:h-7
+                          sm:h-8
 
                           ${
                             blocked
@@ -876,110 +900,124 @@ export default function Play3D() {
                               : limitReached
                                 ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300"
                                 : selected
-                                  ? "border-violet-600 bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 text-white shadow-sm shadow-violet-300 ring-1 ring-violet-400"
+                                  ? "border-emerald-600 bg-emerald-500 text-white shadow-sm shadow-emerald-300 ring-1 ring-emerald-300"
                                   : nearLimit
                                     ? "border-orange-300 bg-gradient-to-br from-orange-100 to-amber-100 text-orange-700 hover:border-orange-400 hover:bg-orange-200"
-                                    : "border-violet-200 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-violet-400 hover:bg-violet-100 hover:text-violet-700 hover:shadow-sm"
+                                    : "border-emerald-200 bg-white text-slate-700 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-sm"
                           }
                         `}
                       >
-                        {/* NUMBER */}
 
-                        <div className="flex items-center justify-center gap-0.5">
+                        <div className="flex h-2.5 items-center justify-center gap-0.5">
+
                           {blocked && (
-                            <Lock className="h-2 w-2" />
+                            <Lock className="h-1.5 w-1.5" />
                           )}
 
                           {selected && (
-                            <Check className="h-2 w-2" />
+                            <Check className="h-1.5 w-1.5" />
                           )}
 
-                          <span className="text-[8px] font-bold leading-none min-[360px]:text-[8px] min-[420px]:text-[9px] sm:text-[10px]">
+                          <span className="text-[7px] font-bold leading-none min-[360px]:text-[7px] min-[420px]:text-[8px] sm:text-[9px]">
                             {item}
                           </span>
+
                         </div>
 
-                        {/* MINI PROGRESS */}
-
                         <div
-                          className={`mt-0.5 h-0.5 w-3/4 overflow-hidden rounded-full ${
-                            selected
-                              ? "bg-white/30"
-                              : "bg-slate-200"
-                          }`}
+                          className={`
+                            mt-0.5
+                            h-[2px]
+                            w-3/4
+                            overflow-hidden
+                            rounded-full
+                            ${
+                              selected
+                                ? "bg-white/30"
+                                : "bg-slate-200"
+                            }
+                          `}
                         >
                           <div
-                            className={`h-full rounded-full ${
-                              blocked
-                                ? "bg-red-300"
-                                : limitReached
-                                  ? "bg-slate-400"
-                                  : selected
-                                    ? "bg-white"
-                                    : nearLimit
-                                      ? "bg-orange-400"
-                                      : "bg-violet-400"
-                            }`}
+                            className={`
+                              h-full
+                              rounded-full
+                              ${
+                                blocked
+                                  ? "bg-red-300"
+                                  : limitReached
+                                    ? "bg-slate-400"
+                                    : selected
+                                      ? "bg-white"
+                                      : nearLimit
+                                        ? "bg-orange-400"
+                                        : "bg-emerald-400"
+                              }
+                            `}
                             style={{
                               width: `${progress}%`,
                             }}
                           />
                         </div>
 
-                        {/* USED */}
-
                         <span
-                          className={`mt-0.5 max-w-full truncate px-0.5 text-[4px] font-medium leading-none min-[360px]:text-[4px] min-[420px]:text-[5px] sm:text-[6px] ${
-                            selected
-                              ? "text-violet-100"
-                              : blocked
-                                ? "text-red-300"
-                                : limitReached
-                                  ? "text-slate-400"
-                                  : nearLimit
-                                    ? "text-orange-500"
-                                    : "text-slate-400"
-                          }`}
+                          className={`
+                            mt-0.5
+                            max-w-full
+                            truncate
+                            px-0.5
+                            text-[3px]
+                            font-medium
+                            leading-none
+
+                            min-[360px]:text-[3px]
+                            min-[420px]:text-[4px]
+                            sm:text-[5px]
+
+                            ${
+                              selected
+                                ? "text-emerald-50"
+                                : blocked
+                                  ? "text-red-300"
+                                  : limitReached
+                                    ? "text-slate-400"
+                                    : nearLimit
+                                      ? "text-orange-500"
+                                      : "text-slate-400"
+                            }
+                          `}
                         >
                           {blocked
                             ? "OFF"
                             : limitReached
                               ? "FULL"
-                              : formatAmount(
-                                  used,
-                                )}
+                              : formatAmount(used)}
                         </span>
+
                       </button>
                     );
                   },
                 )}
+
               </div>
             </div>
 
-            {/* =================================================
-                SMALL RESPONSIVE PAGINATION
-            ================================================= */}
+            {/* PAGINATION */}
 
-            <div className="mt-3 flex min-w-0 items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2 py-2 shadow-sm">
-              {/* PREVIOUS */}
+            <div className="mt-2 flex min-w-0 items-center justify-between gap-1.5 rounded-lg border border-slate-200 bg-white px-1.5 py-1.5 shadow-sm">
 
               <button
                 type="button"
-                onClick={
-                  goToPreviousPage
-                }
-                disabled={
-                  currentPage === 1
-                }
+                onClick={goToPreviousPage}
+                disabled={currentPage === 1}
                 aria-label="Previous page"
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-600 disabled:cursor-not-allowed disabled:opacity-30"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-30"
               >
                 <ChevronLeft className="h-3 w-3" />
               </button>
 
-              {/* PAGE NUMBERS */}
-
               <div className="flex min-w-0 flex-1 items-center justify-center gap-0.5 overflow-hidden">
+
                 {Array.from(
                   {
                     length: TOTAL_PAGES,
@@ -999,39 +1037,35 @@ export default function Play3D() {
                         ? "page"
                         : undefined
                     }
-                    className={`flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1 text-[9px] font-bold transition sm:h-7 sm:min-w-7 sm:text-[10px] ${
-                      currentPage ===
-                      page
-                        ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm"
-                        : "border border-slate-200 bg-white text-slate-500 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-600"
+                    className={`flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1 text-[9px] font-bold transition ${
+                      currentPage === page
+                        ? "bg-emerald-600 text-white shadow-sm"
+                        : "border border-slate-200 bg-white text-slate-500 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-600"
                     }`}
                   >
                     {page}
                   </button>
                 ))}
-              </div>
 
-              {/* NEXT */}
+              </div>
 
               <button
                 type="button"
-                onClick={
-                  goToNextPage
-                }
+                onClick={goToNextPage}
                 disabled={
-                  currentPage ===
-                  TOTAL_PAGES
+                  currentPage === TOTAL_PAGES
                 }
                 aria-label="Next page"
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-600 disabled:cursor-not-allowed disabled:opacity-30"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-30"
               >
                 <ChevronRight className="h-3 w-3" />
               </button>
+
             </div>
 
             {/* PAGE INFO */}
 
-            <div className="mt-1.5 text-center text-[9px] text-slate-400">
+            <div className="mt-1 text-center text-[8px] text-slate-400">
               Showing{" "}
               <span className="font-bold text-slate-600">
                 {pageStartNumber
@@ -1048,51 +1082,60 @@ export default function Play3D() {
 
             {/* LEGEND */}
 
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] text-slate-400">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-violet-500" />
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px] text-slate-400">
+
+              <div className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                 Available
               </div>
 
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-orange-400" />
+              <div className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
                 Near limit
               </div>
 
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-slate-400" />
+              <div className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
                 Full
               </div>
 
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-red-300" />
+              <div className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-300" />
                 Blocked
               </div>
+
+              <div className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                Selected
+              </div>
+
             </div>
+
           </div>
 
-          {/* ==================================================
-              SELECTED SUMMARY
-          ================================================== */}
+          {/* SELECTED SUMMARY */}
 
-          <div className="mt-5 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-100 via-indigo-50 to-blue-100 p-3 sm:p-4">
+          <div className="mt-5 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-100 via-teal-50 to-cyan-100 p-3 sm:p-4">
+
             <div className="flex items-center justify-between gap-4">
+
               <div>
-                <p className="text-[11px] font-semibold text-violet-600">
+                <p className="text-[11px] font-semibold text-emerald-600">
                   Selected Numbers
                 </p>
 
-                <p className="mt-0.5 text-lg font-bold text-violet-800">
+                <p className="mt-0.5 text-lg font-bold text-emerald-800">
                   {selectedNumbers.length}
                 </p>
               </div>
 
               <div className="text-right">
-                <p className="text-[11px] font-semibold text-indigo-600">
+
+                <p className="text-[11px] font-semibold text-teal-600">
                   Selected Bet Total
                 </p>
 
-                <p className="mt-0.5 text-lg font-bold text-indigo-800">
+                <p className="mt-0.5 text-lg font-bold text-teal-800">
                   {formatAmount(
                     selectedTotal,
                   )}{" "}
@@ -1100,25 +1143,23 @@ export default function Play3D() {
                     MMK
                   </span>
                 </p>
+
               </div>
+
             </div>
 
-            {/* SELECTED NUMBERS */}
-
-            {selectedNumbers.length >
-              0 && (
+            {selectedNumbers.length > 0 && (
               <div className="mt-3 flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
+
                 {selectedNumbers.map(
                   (item) => (
                     <button
                       key={item}
                       type="button"
                       onClick={() =>
-                        toggleNumber(
-                          item,
-                        )
+                        toggleNumber(item)
                       }
-                      className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[10px] font-bold tracking-wide text-violet-700 shadow-sm ring-1 ring-violet-200 transition hover:bg-violet-100"
+                      className="inline-flex items-center gap-1 rounded-md bg-emerald-500 px-2 py-1 text-[10px] font-bold tracking-wide text-white shadow-sm ring-1 ring-emerald-600 transition hover:bg-emerald-600"
                     >
                       {item}
 
@@ -1126,20 +1167,22 @@ export default function Play3D() {
                     </button>
                   ),
                 )}
+
               </div>
             )}
+
           </div>
 
-          {/* ==================================================
-              BET AMOUNT
-          ================================================== */}
+          {/* BET AMOUNT */}
 
           <div className="mt-5">
+
             <label className="mb-2 block text-sm font-semibold text-slate-700">
               Bet Amount Per Number
             </label>
 
             <div className="relative">
+
               <input
                 type="number"
                 value={amount}
@@ -1150,54 +1193,54 @@ export default function Play3D() {
                 }
                 placeholder="Enter amount"
                 min="100"
-                className="w-full rounded-xl border border-violet-200 bg-violet-50/50 px-4 py-3 pr-16 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100"
+                className="w-full rounded-xl border border-emerald-200 bg-emerald-50/50 px-4 py-3 pr-16 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
               />
 
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-violet-500">
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-500">
                 MMK
               </span>
+
             </div>
 
             <p className="mt-2 text-xs text-slate-400">
               Minimum bet: 100 MMK per
               number.
             </p>
+
           </div>
 
-          {/* ==================================================
-              ADD BET
-          ================================================== */}
+          {/* ADD BET */}
 
           <button
             type="button"
             onClick={addBet}
             disabled={
-              selectedNumbers.length ===
-                0 ||
+              selectedNumbers.length === 0 ||
               !Number(amount) ||
               Number(amount) < 100
             }
-            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-5 py-3 font-semibold text-white shadow-md shadow-violet-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-violet-700 hover:via-indigo-700 hover:to-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 px-5 py-3 font-semibold text-white shadow-md shadow-emerald-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-emerald-600 hover:via-emerald-700 hover:to-teal-700 hover:shadow-lg disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
           >
             <Dice5 className="h-4 w-4" />
 
             Add{" "}
-            {selectedNumbers.length >
-            0
+            {selectedNumbers.length > 0
               ? `${selectedNumbers.length} Numbers`
               : "Selected Bet"}
           </button>
+
         </div>
 
         {/* ====================================================
             DESKTOP - SELECTED BETS
         ==================================================== */}
 
-        <div className="hidden min-w-0 rounded-2xl border border-violet-100 bg-white p-5 shadow-sm sm:p-6 xl:block">
-          {/* HEADER */}
+        <div className="hidden min-w-0 rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 xl:block">
 
           <div className="flex items-center justify-between">
+
             <div>
+
               <h2 className="text-lg font-bold text-slate-900">
                 Selected Bets
               </h2>
@@ -1206,19 +1249,22 @@ export default function Play3D() {
                 Review your selected 3D
                 numbers
               </p>
+
             </div>
 
-            <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 px-2 text-xs font-bold text-white shadow-sm">
+            <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 px-2 text-xs font-bold text-white shadow-sm">
               {bets.length}
             </span>
+
           </div>
 
-          {/* BET LIST */}
-
           <div className="mt-5 max-h-[520px] space-y-3 overflow-y-auto pr-1">
+
             {bets.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 p-8 text-center">
-                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-indigo-100 text-violet-600">
+
+              <div className="rounded-xl border border-dashed border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-8 text-center">
+
+                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-600">
                   <Dice5 className="h-5 w-5" />
                 </div>
 
@@ -1230,16 +1276,21 @@ export default function Play3D() {
                   Select 3D numbers and
                   enter an amount.
                 </p>
+
               </div>
+
             ) : (
+
               bets.map(renderBetCard)
+
             )}
+
           </div>
 
-          {/* TOTAL */}
-
           <div className="mt-6 border-t border-slate-100 pt-5">
+
             <div className="flex items-center justify-between">
+
               <span className="text-sm font-medium text-slate-500">
                 Total Bet Amount
               </span>
@@ -1252,49 +1303,55 @@ export default function Play3D() {
                   MMK
                 </span>
               </span>
+
             </div>
 
             <button
               type="button"
               onClick={submitBets}
-              disabled={
-                bets.length === 0
-              }
-              className="mt-4 w-full rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-5 py-3 font-semibold text-white shadow-md shadow-violet-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-violet-700 hover:via-indigo-700 hover:to-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
+              disabled={bets.length === 0}
+              className="mt-4 w-full rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 px-5 py-3 font-semibold text-white shadow-md shadow-emerald-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-emerald-600 hover:via-emerald-700 hover:to-teal-700 hover:shadow-lg disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
             >
               Place 3D Bets
             </button>
+
           </div>
+
         </div>
+
       </div>
 
       {/* ======================================================
           MOBILE FIXED SELECTED BETS BAR
       ======================================================= */}
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-violet-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 shadow-[0_-8px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-emerald-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 shadow-[0_-8px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:hidden">
+
         <button
           type="button"
           onClick={() =>
             setMobileBetsOpen(true)
           }
-          className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-4 py-3 text-left text-white shadow-lg shadow-violet-200 transition active:scale-[0.99]"
+          className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 px-4 py-3 text-left text-white shadow-lg shadow-emerald-200 transition active:scale-[0.99]"
         >
-          {/* LEFT */}
 
           <div className="flex min-w-0 items-center gap-3">
+
             <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">
+
               <ShoppingBasket className="h-5 w-5" />
 
               {bets.length > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-extrabold text-slate-900 ring-2 ring-violet-600">
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-extrabold text-slate-900 ring-2 ring-emerald-600">
                   {bets.length}
                 </span>
               )}
+
             </div>
 
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-violet-100">
+
+              <p className="text-xs font-semibold text-emerald-100">
                 Selected Bets
               </p>
 
@@ -1302,20 +1359,21 @@ export default function Play3D() {
                 {bets.length === 0
                   ? "No bets selected"
                   : `${bets.length} ${
-                      bets.length ===
-                      1
+                      bets.length === 1
                         ? "bet"
                         : "bets"
                     } selected`}
               </p>
+
             </div>
+
           </div>
 
-          {/* RIGHT */}
-
           <div className="flex shrink-0 items-center gap-3">
+
             <div className="text-right">
-              <p className="text-[10px] font-medium text-violet-100">
+
+              <p className="text-[10px] font-medium text-emerald-100">
                 Total
               </p>
 
@@ -1325,6 +1383,7 @@ export default function Play3D() {
                 )}{" "}
                 MMK
               </p>
+
             </div>
 
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
@@ -1332,12 +1391,15 @@ export default function Play3D() {
                 ↑
               </span>
             </div>
+
           </div>
+
         </button>
+
       </div>
 
       {/* ======================================================
-          MOBILE SELECTED BETS MODAL
+          COMPACT MOBILE SELECTED BETS MODAL
       ======================================================= */}
 
       {mobileBetsOpen && (
@@ -1347,6 +1409,7 @@ export default function Play3D() {
           aria-modal="true"
           aria-label="Selected 3D Bets"
         >
+
           {/* BACKDROP */}
 
           <button
@@ -1358,143 +1421,263 @@ export default function Play3D() {
             className="absolute inset-0 h-full w-full bg-slate-950/60 backdrop-blur-[2px]"
           />
 
-          {/* BOTTOM SHEET */}
+          {/* ==================================================
+              COMPACT BOTTOM SHEET
 
-          <div className="absolute inset-x-0 bottom-0 flex max-h-[92vh] flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl">
+              78vh instead of 92vh
+          ================================================== */}
+
+          <div
+            className="
+              absolute
+              inset-x-0
+              bottom-0
+              flex
+              max-h-[78vh]
+              flex-col
+              overflow-hidden
+              rounded-t-[20px]
+              bg-white
+              shadow-2xl
+            "
+          >
+
             {/* HANDLE */}
 
-            <div className="flex shrink-0 justify-center pt-3">
-              <div className="h-1.5 w-12 rounded-full bg-slate-200" />
+            <div className="flex shrink-0 justify-center pt-2">
+
+              <div className="h-1 w-9 rounded-full bg-slate-200" />
+
             </div>
 
-            {/* HEADER */}
+            {/* ==================================================
+                COMPACT HEADER
+            ================================================== */}
 
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-sm">
-                  <ShoppingBasket className="h-5 w-5" />
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-3 py-2.5">
+
+              <div className="flex min-w-0 items-center gap-2">
+
+                {/* SMALL ICON */}
+
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm">
+
+                  <ShoppingBasket className="h-4 w-4" />
+
                 </div>
 
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h2 className="truncate text-base font-bold text-slate-900">
+
+                  <div className="flex items-center gap-1.5">
+
+                    <h2 className="truncate text-sm font-bold text-slate-900">
                       Selected 3D Bets
                     </h2>
 
-                    <span className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 px-1.5 text-[10px] font-bold text-violet-700">
+                    <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 px-1 text-[8px] font-bold text-emerald-700">
                       {bets.length}
                     </span>
+
                   </div>
 
-                  <p className="mt-0.5 text-xs text-slate-400">
-                    Review and edit your 3D
-                    bets
+                  <p className="mt-0.5 truncate text-[9px] text-slate-400">
+                    Review and edit your bets
                   </p>
+
                 </div>
+
               </div>
+
+              {/* CLOSE */}
 
               <button
                 type="button"
                 onClick={() =>
-                  setMobileBetsOpen(
-                    false,
-                  )
+                  setMobileBetsOpen(false)
                 }
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+                className="
+                  flex
+                  h-7
+                  w-7
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-lg
+                  bg-slate-100
+                  text-slate-500
+                  transition
+                  hover:bg-slate-200
+                  hover:text-slate-700
+                "
                 aria-label="Close selected bets"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
+
             </div>
 
-            {/* BET LIST */}
+            {/* ==================================================
+                COMPACT BET LIST
+            ================================================== */}
 
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
+            <div
+              className="
+                min-h-0
+                flex-1
+                overflow-y-auto
+                overscroll-contain
+                px-3
+                py-2.5
+              "
+            >
+
               {bets.length === 0 ? (
-                <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 p-8 text-center">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-indigo-100 text-violet-600">
-                    <Dice5 className="h-6 w-6" />
+
+                <div className="flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-5 text-center">
+
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-600">
+
+                    <Dice5 className="h-5 w-5" />
+
                   </div>
 
-                  <p className="mt-4 text-sm font-bold text-slate-700">
+                  <p className="mt-2 text-xs font-bold text-slate-700">
                     No bets selected
                   </p>
 
-                  <p className="mt-1 max-w-xs text-xs leading-5 text-slate-400">
-                    Select 3D numbers from
-                    the grid, enter your
-                    amount, then add the bet.
+                  <p className="mt-1 max-w-xs text-[10px] leading-4 text-slate-400">
+                    Select 3D numbers from the
+                    grid, enter an amount, then
+                    add the bet.
                   </p>
 
                   <button
                     type="button"
                     onClick={() =>
-                      setMobileBetsOpen(
-                        false,
-                      )
+                      setMobileBetsOpen(false)
                     }
-                    className="mt-5 rounded-xl bg-violet-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-violet-700"
+                    className="mt-3 rounded-lg bg-emerald-600 px-3 py-1.5 text-[10px] font-bold text-white shadow-sm transition hover:bg-emerald-700"
                   >
                     Choose Numbers
                   </button>
+
                 </div>
+
               ) : (
-                <div className="space-y-3">
-                  {bets.map(
-                    renderBetCard,
-                  )}
+
+                <div className="space-y-1.5">
+                  {bets.map(renderBetCard)}
                 </div>
+
               )}
+
             </div>
 
-            {/* MOBILE TOTAL / SUBMIT */}
+            {/* ==================================================
+                COMPACT TOTAL / SUBMIT
+            ================================================== */}
 
-            <div className="shrink-0 border-t border-slate-100 bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] sm:px-6">
+            <div
+              className="
+                shrink-0
+                border-t
+                border-slate-100
+                bg-white
+                px-3
+                pb-[calc(env(safe-area-inset-bottom)+0.65rem)]
+                pt-2.5
+                shadow-[0_-6px_20px_rgba(15,23,42,0.05)]
+              "
+            >
+
+              {/* TOTAL ROW */}
+
               <div className="flex items-center justify-between">
+
                 <div>
-                  <p className="text-xs font-medium text-slate-400">
+
+                  <p className="text-[9px] font-medium text-slate-400">
                     Total Bet Amount
                   </p>
 
-                  <p className="mt-0.5 text-xl font-extrabold text-slate-900">
+                  <p className="mt-0.5 text-base font-extrabold text-slate-900">
+
                     {formatAmount(
                       totalAmount,
                     )}{" "}
-                    <span className="text-sm font-bold text-slate-400">
+
+                    <span className="text-[10px] font-bold text-slate-400">
                       MMK
                     </span>
+
                   </p>
+
                 </div>
 
                 <div className="text-right">
-                  <p className="text-xs font-medium text-slate-400">
+
+                  <p className="text-[9px] font-medium text-slate-400">
                     Numbers
                   </p>
 
-                  <p className="mt-0.5 text-lg font-extrabold text-violet-600">
+                  <p className="mt-0.5 text-base font-extrabold text-emerald-600">
                     {bets.length}
                   </p>
+
                 </div>
+
               </div>
+
+              {/* SUBMIT */}
 
               <button
                 type="button"
-                onClick={
-                  submitBets
-                }
-                disabled={
-                  bets.length === 0
-                }
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-5 py-3.5 text-sm font-bold text-white shadow-md shadow-violet-200 transition-all hover:from-violet-700 hover:via-indigo-700 hover:to-blue-700 disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
+                onClick={submitBets}
+                disabled={bets.length === 0}
+                className="
+                  mt-2
+                  flex
+                  h-9
+                  w-full
+                  items-center
+                  justify-center
+                  gap-1.5
+                  rounded-lg
+                  bg-gradient-to-r
+                  from-emerald-500
+                  via-emerald-600
+                  to-teal-600
+                  px-4
+                  text-xs
+                  font-bold
+                  text-white
+                  shadow-md
+                  shadow-emerald-200
+                  transition-all
+                  hover:from-emerald-600
+                  hover:via-emerald-700
+                  hover:to-teal-700
+                  disabled:cursor-not-allowed
+                  disabled:from-slate-300
+                  disabled:via-slate-300
+                  disabled:to-slate-300
+                  disabled:shadow-none
+                "
               >
-                <Check className="h-4 w-4" />
+
+                <Check className="h-3.5 w-3.5" />
 
                 Place 3D Bets
+
               </button>
+
             </div>
+
           </div>
+
         </div>
       )}
+
     </div>
   );
 }

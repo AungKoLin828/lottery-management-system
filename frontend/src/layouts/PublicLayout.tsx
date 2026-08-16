@@ -1,4 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
 import {
   Link,
   Outlet,
@@ -17,6 +22,7 @@ import {
   ChevronDown,
   Sparkles,
   Ticket,
+  ArrowLeft,
 } from "lucide-react";
 
 /* ============================================================
@@ -54,7 +60,7 @@ function NavItem({
           : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
       }`}
     >
-      {/* Icon */}
+      {/* ICON */}
 
       <span
         className={`shrink-0 transition-all duration-200 ${
@@ -66,16 +72,30 @@ function NavItem({
         {icon}
       </span>
 
-      {/* Label */}
+      {/* LABEL */}
 
       <span>{label}</span>
 
-      {/* Active Indicator */}
+      {/* ACTIVE INDICATOR */}
 
       {active && !mobile && (
         <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
       )}
     </Link>
+  );
+}
+
+/* ============================================================
+   PUBLIC ROUTE CHECK
+============================================================ */
+
+function isPublicPath(path: string) {
+  return (
+    path === "/" ||
+    path === "/results-history" ||
+    path === "/about" ||
+    path === "/login" ||
+    path === "/register"
   );
 }
 
@@ -87,18 +107,47 @@ export default function PublicLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  /* ============================================================
+     MOBILE MENU
+  ============================================================ */
+
   const [mobileMenuOpen, setMobileMenuOpen] =
     useState(false);
 
-  // Desktop dropdown
+  /* ============================================================
+     DESKTOP PLAY DROPDOWN
+  ============================================================ */
+
   const [desktopPlayOpen, setDesktopPlayOpen] =
     useState(false);
 
-  // Mobile dropdown
+  /* ============================================================
+     MOBILE PLAY DROPDOWN
+  ============================================================ */
+
   const [mobilePlayOpen, setMobilePlayOpen] =
     useState(false);
 
-  const playMenuRef = useRef<HTMLDivElement>(null);
+  /* ============================================================
+     MOBILE BACK BUTTON / SCROLL
+  ============================================================ */
+
+  const [showBackButton, setShowBackButton] =
+    useState(false);
+
+  /* ============================================================
+     REFS
+  ============================================================ */
+
+  const playMenuRef =
+    useRef<HTMLDivElement>(null);
+
+  /* ============================================================
+     PUBLIC HISTORY STORAGE KEY
+  ============================================================ */
+
+  const PUBLIC_HISTORY_KEY =
+    "lottery_public_navigation_history";
 
   /* ============================================================
      ACTIVE ROUTES
@@ -132,12 +181,232 @@ export default function PublicLayout() {
   }, [location.pathname]);
 
   /* ============================================================
-     CLOSE DESKTOP DROPDOWN WHEN CLICKING OUTSIDE
+     TRACK PUBLIC ROUTES
+
+     ONLY PUBLIC ROUTES ARE STORED.
+
+     /player/*
+     IS NEVER STORED.
   ============================================================ */
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
+    if (!isPublicPath(location.pathname)) {
+      return;
+    }
+
+    try {
+      const stored =
+        sessionStorage.getItem(
+          PUBLIC_HISTORY_KEY
+        );
+
+      let history: string[] = [];
+
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+
+          if (Array.isArray(parsed)) {
+            history = parsed.filter(
+              (item): item is string =>
+                typeof item === "string" &&
+                isPublicPath(item)
+            );
+          }
+        } catch {
+          history = [];
+        }
+      }
+
+      /*
+       * Do not add the same route twice consecutively.
+       */
+
+      const lastRoute =
+        history[history.length - 1];
+
+      if (lastRoute !== location.pathname) {
+        history.push(location.pathname);
+      }
+
+      /*
+       * Keep only latest 20 public routes.
+       */
+
+      if (history.length > 20) {
+        history = history.slice(-20);
+      }
+
+      sessionStorage.setItem(
+        PUBLIC_HISTORY_KEY,
+        JSON.stringify(history)
+      );
+    } catch {
+      // Ignore sessionStorage errors.
+    }
+  }, [location.pathname]);
+
+  /* ============================================================
+     SCROLL DETECTION
+
+     Back button appears after scrolling.
+  ============================================================ */
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackButton(
+        window.scrollY > 120
+      );
+    };
+
+    handleScroll();
+
+    window.addEventListener(
+      "scroll",
+      handleScroll,
+      { passive: true }
+    );
+
+    return () => {
+      window.removeEventListener(
+        "scroll",
+        handleScroll
+      );
+    };
+  }, []);
+
+  /* ============================================================
+     SAFE PUBLIC BACK
+
+     NEVER USE navigate(-1).
+
+     This only uses our public navigation history.
+  ============================================================ */
+
+  const handlePublicBack = () => {
+    try {
+      const stored =
+        sessionStorage.getItem(
+          PUBLIC_HISTORY_KEY
+        );
+
+      let history: string[] = [];
+
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+
+          if (Array.isArray(parsed)) {
+            history = parsed.filter(
+              (item): item is string =>
+                typeof item === "string" &&
+                isPublicPath(item)
+            );
+          }
+        } catch {
+          history = [];
+        }
+      }
+
+      /*
+       * Remove current page.
+       */
+
+      if (
+        history.length > 0 &&
+        history[history.length - 1] ===
+          location.pathname
+      ) {
+        history.pop();
+      }
+
+      /*
+       * Find previous public page.
+       */
+
+      const previousPublicPage =
+        history[history.length - 1];
+
+      /*
+       * Save updated history.
+       */
+
+      sessionStorage.setItem(
+        PUBLIC_HISTORY_KEY,
+        JSON.stringify(history)
+      );
+
+      /*
+       * Navigate to previous PUBLIC page.
+       */
+
+      if (
+        previousPublicPage &&
+        isPublicPath(previousPublicPage) &&
+        !previousPublicPage.startsWith(
+          "/player"
+        )
+      ) {
+        navigate(previousPublicPage);
+        return;
+      }
+
+      /*
+       * Safe fallback.
+       */
+
+      navigate("/");
+    } catch {
+      navigate("/");
+    }
+  };
+
+  /* ============================================================
+     TOGGLE MOBILE MENU
+  ============================================================ */
+
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen((current) => {
+      const next = !current;
+
+      if (!next) {
+        setMobilePlayOpen(false);
+      }
+
+      return next;
+    });
+  };
+
+  /* ============================================================
+     TOGGLE MOBILE PLAY
+  ============================================================ */
+
+  const toggleMobilePlay = () => {
+    setMobilePlayOpen(
+      (current) => !current
+    );
+  };
+
+  /* ============================================================
+     TOGGLE DESKTOP PLAY
+  ============================================================ */
+
+  const toggleDesktopPlay = () => {
+    setDesktopPlayOpen(
+      (current) => !current
+    );
+  };
+
+  /* ============================================================
+     CLOSE DESKTOP DROPDOWN OUTSIDE CLICK
+  ============================================================ */
+
+  useEffect(() => {
+    const handleClickOutside = (
+      event: MouseEvent
+    ) => {
+      const target =
+        event.target as Node;
 
       if (
         playMenuRef.current &&
@@ -164,7 +433,9 @@ export default function PublicLayout() {
      PLAY LOGIN REDIRECT
   ============================================================ */
 
-  const handlePlay = (destination: string) => {
+  const handlePlay = (
+    destination: string
+  ) => {
     setDesktopPlayOpen(false);
     setMobilePlayOpen(false);
     setMobileMenuOpen(false);
@@ -177,46 +448,22 @@ export default function PublicLayout() {
   };
 
   /* ============================================================
-     TOGGLE MOBILE MENU
+     RENDER
   ============================================================ */
-
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen((current) => {
-      const next = !current;
-
-      if (!next) {
-        setMobilePlayOpen(false);
-      }
-
-      return next;
-    });
-  };
-
-  /* ============================================================
-     TOGGLE MOBILE PLAY
-  ============================================================ */
-
-  const toggleMobilePlay = () => {
-    setMobilePlayOpen((current) => !current);
-  };
-
-  /* ============================================================
-     TOGGLE DESKTOP PLAY
-  ============================================================ */
-
-  const toggleDesktopPlay = () => {
-    setDesktopPlayOpen((current) => !current);
-  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
+
       {/* ======================================================
           HEADER
       ======================================================= */}
 
       <header className="sticky top-0 z-50 border-b border-slate-700/80 bg-slate-900/95 backdrop-blur-xl">
+
         <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
+
           <div className="flex h-[64px] items-center justify-between sm:h-[72px]">
+
             {/* ==================================================
                 LOGO
             =================================================== */}
@@ -226,13 +473,9 @@ export default function PublicLayout() {
               onClick={closeMobileMenu}
               className="group flex shrink-0 items-center gap-2"
             >
-              {/* Logo Icon */}
-
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30 transition-transform duration-200 group-hover:scale-105 sm:h-9 sm:w-9 sm:rounded-xl">
                 <Ticket className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
-
-              {/* Logo Text */}
 
               <div className="flex items-center">
                 <span className="text-base font-extrabold tracking-tight text-white sm:text-lg">
@@ -250,13 +493,16 @@ export default function PublicLayout() {
             =================================================== */}
 
             <nav className="hidden items-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 md:flex">
-              {/* Home */}
+
+              {/* HOME */}
 
               <NavItem
                 to="/"
                 label="Home"
                 active={isActive("/")}
-                icon={<Home className="h-4 w-4" />}
+                icon={
+                  <Home className="h-4 w-4" />
+                }
               />
 
               {/* =================================================
@@ -271,7 +517,9 @@ export default function PublicLayout() {
                   type="button"
                   onClick={toggleDesktopPlay}
                   aria-haspopup="menu"
-                  aria-expanded={desktopPlayOpen}
+                  aria-expanded={
+                    desktopPlayOpen
+                  }
                   className={`group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
                     isPlayActive
                       ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
@@ -288,8 +536,6 @@ export default function PublicLayout() {
 
                   <span>Play</span>
 
-                  {/* Arrow */}
-
                   <ChevronDown
                     className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${
                       desktopPlayOpen
@@ -303,17 +549,13 @@ export default function PublicLayout() {
                   )}
                 </button>
 
-                {/* =================================================
-                    DESKTOP PLAY DROPDOWN
-                ================================================= */}
+                {/* DESKTOP PLAY DROPDOWN */}
 
                 {desktopPlayOpen && (
                   <div
                     className="absolute left-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-2 shadow-xl shadow-slate-950/40"
                     role="menu"
                   >
-                    {/* Header */}
-
                     <div className="px-3 pb-2 pt-1">
                       <div className="flex items-center gap-2">
                         <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
@@ -330,7 +572,9 @@ export default function PublicLayout() {
                       type="button"
                       role="menuitem"
                       onClick={() =>
-                        handlePlay("/player/play-2d")
+                        handlePlay(
+                          "/player/play-2d"
+                        )
                       }
                       className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200 hover:bg-indigo-500/15"
                     >
@@ -355,7 +599,9 @@ export default function PublicLayout() {
                       type="button"
                       role="menuitem"
                       onClick={() =>
-                        handlePlay("/player/play-3d")
+                        handlePlay(
+                          "/player/play-3d"
+                        )
                       }
                       className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200 hover:bg-violet-500/15"
                     >
@@ -377,22 +623,28 @@ export default function PublicLayout() {
                 )}
               </div>
 
-              {/* Results History */}
+              {/* RESULTS HISTORY */}
 
               <NavItem
                 to="/results-history"
                 label="Results History"
-                active={isActive("/results-history")}
-                icon={<BarChart3 className="h-4 w-4" />}
+                active={isActive(
+                  "/results-history"
+                )}
+                icon={
+                  <BarChart3 className="h-4 w-4" />
+                }
               />
 
-              {/* About */}
+              {/* ABOUT */}
 
               <NavItem
                 to="/about"
                 label="About"
                 active={isActive("/about")}
-                icon={<Info className="h-4 w-4" />}
+                icon={
+                  <Info className="h-4 w-4" />
+                }
               />
             </nav>
 
@@ -401,7 +653,8 @@ export default function PublicLayout() {
             =================================================== */}
 
             <div className="hidden items-center gap-2 md:flex">
-              {/* Login */}
+
+              {/* LOGIN */}
 
               <Link
                 to="/login"
@@ -410,13 +663,14 @@ export default function PublicLayout() {
                 Login
               </Link>
 
-              {/* Register */}
+              {/* REGISTER */}
 
               <Link
                 to="/register"
                 className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-900/30 transition-all duration-200 hover:-translate-y-0.5 hover:from-indigo-500 hover:to-violet-500 hover:shadow-lg hover:shadow-indigo-900/40"
               >
                 <Sparkles className="h-4 w-4" />
+
                 Register
               </Link>
             </div>
@@ -438,7 +692,9 @@ export default function PublicLayout() {
                   ? "Close menu"
                   : "Open menu"
               }
-              aria-expanded={mobileMenuOpen}
+              aria-expanded={
+                mobileMenuOpen
+              }
             >
               {mobileMenuOpen ? (
                 <X className="h-[18px] w-[18px]" />
@@ -460,10 +716,10 @@ export default function PublicLayout() {
             }`}
           >
             <div className="rounded-xl border border-slate-700 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20">
+
               <nav className="space-y-0.5">
-                {/* =================================================
-                    HOME
-                ================================================= */}
+
+                {/* HOME */}
 
                 <NavItem
                   to="/"
@@ -476,18 +732,17 @@ export default function PublicLayout() {
                   }
                 />
 
-                {/* =================================================
-                    MOBILE PLAY
-                ================================================= */}
+                {/* MOBILE PLAY */}
 
                 <div className="rounded-lg bg-slate-900/80 p-1">
-                  {/* Play Toggle */}
 
                   <button
                     type="button"
                     onClick={toggleMobilePlay}
                     aria-haspopup="menu"
-                    aria-expanded={mobilePlayOpen}
+                    aria-expanded={
+                      mobilePlayOpen
+                    }
                     className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-all ${
                       isPlayActive
                         ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm"
@@ -500,9 +755,6 @@ export default function PublicLayout() {
                       <span>Play</span>
                     </span>
 
-                    {/* IMPORTANT:
-                        Arrow rotates independently */}
-
                     <ChevronDown
                       className={`h-4 w-4 transition-transform duration-200 ${
                         mobilePlayOpen
@@ -512,9 +764,7 @@ export default function PublicLayout() {
                     />
                   </button>
 
-                  {/* =================================================
-                      MOBILE PLAY OPTIONS
-                  ================================================= */}
+                  {/* MOBILE PLAY OPTIONS */}
 
                   {mobilePlayOpen && (
                     <div
@@ -578,9 +828,7 @@ export default function PublicLayout() {
                   )}
                 </div>
 
-                {/* =================================================
-                    RESULTS HISTORY
-                ================================================= */}
+                {/* RESULTS HISTORY */}
 
                 <NavItem
                   to="/results-history"
@@ -595,9 +843,7 @@ export default function PublicLayout() {
                   }
                 />
 
-                {/* =================================================
-                    ABOUT
-                ================================================= */}
+                {/* ABOUT */}
 
                 <NavItem
                   to="/about"
@@ -611,12 +857,11 @@ export default function PublicLayout() {
                 />
               </nav>
 
-              {/* ==================================================
-                  MOBILE AUTH
-              ================================================== */}
+              {/* MOBILE AUTH */}
 
               <div className="mt-1.5 grid grid-cols-2 gap-1.5 border-t border-slate-700 pt-2">
-                {/* Login */}
+
+                {/* LOGIN */}
 
                 <Link
                   to="/login"
@@ -626,7 +871,7 @@ export default function PublicLayout() {
                   Login
                 </Link>
 
-                {/* Register */}
+                {/* REGISTER */}
 
                 <Link
                   to="/register"
@@ -653,11 +898,14 @@ export default function PublicLayout() {
 
       {/* ========================================================
           FOOTER
-      ========================================================= */}
+      ======================================================== */}
 
       <footer className="mt-12 bg-slate-950 text-slate-400 sm:mt-16">
+
         <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
+
           <div className="grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-10">
+
             {/* ABOUT */}
 
             <div>
@@ -696,6 +944,7 @@ export default function PublicLayout() {
               </h3>
 
               <div className="space-y-3 text-sm">
+
                 <Link
                   to="/"
                   className="block transition-colors hover:text-indigo-400"
@@ -734,6 +983,7 @@ export default function PublicLayout() {
               </h3>
 
               <div className="space-y-3 text-sm">
+
                 <p>
                   <span className="text-slate-500">
                     Phone:
@@ -761,21 +1011,132 @@ export default function PublicLayout() {
           {/* FOOTER BOTTOM */}
 
           <div className="mt-8 flex flex-col gap-3 border-t border-slate-800 pt-5 text-center text-sm text-slate-500 md:mt-10 md:flex-row md:items-center md:justify-between md:pt-6 md:text-left">
+
             <p>
               © {new Date().getFullYear()} LotteryPlay. All
               rights reserved.
             </p>
 
             <div className="flex items-center justify-center gap-1 text-xs">
+
               <span>Powered by</span>
 
               <span className="font-semibold text-indigo-400">
                 LotteryPlay
               </span>
+
             </div>
           </div>
         </div>
       </footer>
+
+      {/* ========================================================
+          MOBILE FLOATING BACK BUTTON
+          
+          NEW DESIGN
+          
+          - Indigo / Violet brand gradient
+          - Matches Register / Active navigation
+          - Soft colored glow
+          - White arrow
+          - No dark gray button
+          - Mobile only
+          - Appears after scrolling
+          - Never enters /player/*
+      ========================================================= */}
+
+      <div
+        className={`fixed bottom-5 right-4 z-[60] md:hidden ${
+          showBackButton
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-5 opacity-0"
+        } transition-all duration-300`}
+      >
+
+        <button
+          type="button"
+          onClick={handlePublicBack}
+          aria-label="Go back"
+          className="
+            group
+            flex
+            items-center
+            gap-2
+            rounded-full
+            border
+            border-indigo-400/40
+            bg-gradient-to-r
+            from-indigo-600
+            to-violet-600
+            px-3
+            py-2.5
+            text-sm
+            font-bold
+            text-white
+            shadow-lg
+            shadow-indigo-900/40
+            ring-1
+            ring-white/10
+            backdrop-blur-md
+            transition-all
+            duration-200
+            hover:-translate-y-1
+            hover:from-indigo-500
+            hover:to-violet-500
+            hover:border-indigo-300/60
+            hover:shadow-xl
+            hover:shadow-indigo-900/50
+            active:translate-y-0
+            active:scale-95
+            focus:outline-none
+            focus:ring-2
+            focus:ring-indigo-400/60
+            focus:ring-offset-2
+            focus:ring-offset-slate-50
+          "
+        >
+
+          {/* ==================================================
+              ARROW ICON
+          =================================================== */}
+
+          <span
+            className="
+              flex
+              h-8
+              w-8
+              shrink-0
+              items-center
+              justify-center
+              rounded-full
+              bg-white/15
+              text-white
+              shadow-inner
+              shadow-white/10
+              ring-1
+              ring-white/20
+              transition-all
+              duration-200
+              group-hover:-translate-x-0.5
+              group-hover:bg-white/20
+            "
+          >
+            <ArrowLeft
+              className="h-4 w-4"
+              strokeWidth={2.75}
+            />
+          </span>
+
+          {/* ==================================================
+              TEXT
+          =================================================== */}
+
+          <span className="pr-1 tracking-wide">
+            Back
+          </span>
+
+        </button>
+      </div>
     </div>
   );
 }

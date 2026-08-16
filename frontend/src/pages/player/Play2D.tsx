@@ -239,7 +239,7 @@ export default function Play2D() {
     setAmount("");
 
     /*
-     * On mobile, automatically open the selected bets modal
+     * Automatically open mobile bets modal
      * after adding a bet.
      */
     if (window.innerWidth < 1024) {
@@ -318,9 +318,6 @@ export default function Play2D() {
 
     console.log("2D Bets:", bets);
 
-    /*
-     * Close mobile modal after submitting.
-     */
     setMobileBetsOpen(false);
   };
 
@@ -332,7 +329,7 @@ export default function Play2D() {
     value.toLocaleString();
 
   /* ============================================================
-     MOBILE MODAL
+     MOBILE MODAL BODY LOCK
   ============================================================ */
 
   useEffect(() => {
@@ -350,9 +347,15 @@ export default function Play2D() {
 
   /* ============================================================
      BET CARD
+     
+     compact = true
+     Used inside mobile modal to keep cards small.
   ============================================================ */
 
-  const renderBetCard = (bet: Bet2D) => {
+  const renderBetCard = (
+    bet: Bet2D,
+    compact = false,
+  ) => {
     const isEditing = editingBetId === bet.id;
 
     const usedAmount = getUsedAmount(bet.number);
@@ -361,10 +364,153 @@ export default function Play2D() {
       MAX_BET_AMOUNT -
       (usedAmount - bet.amount);
 
+    /*
+     * COMPACT MOBILE CARD
+     */
+    if (compact) {
+      return (
+        <div
+          key={bet.id}
+          className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/50"
+        >
+          {/* ================================================
+              COMPACT HEADER
+          ================================================= */}
+
+          <div className="flex items-center gap-2">
+            {/* NUMBER */}
+
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-600 to-green-600 text-sm font-bold tracking-wide text-white shadow-sm">
+              {bet.number}
+            </div>
+
+            {/* SESSION + AMOUNT */}
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`rounded px-1.5 py-0.5 text-[8px] font-bold leading-none text-white ${
+                    bet.session === "AM"
+                      ? "bg-blue-500"
+                      : "bg-emerald-500"
+                  }`}
+                >
+                  {bet.session}
+                </span>
+
+                <span className="truncate text-[10px] text-slate-400">
+                  Session
+                </span>
+              </div>
+
+              {!isEditing && (
+                <div className="mt-1">
+                  <span className="text-sm font-bold text-slate-800">
+                    {formatAmount(bet.amount)}
+                  </span>
+
+                  <span className="ml-1 text-[9px] font-semibold text-slate-400">
+                    MMK
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* ACTIONS */}
+
+            {!isEditing && (
+              <div className="flex shrink-0 items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => startEditBet(bet)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-emerald-100 hover:text-emerald-600"
+                  title="Edit amount"
+                  aria-label={`Edit bet ${bet.number}`}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => removeBet(bet.id)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-500"
+                  title="Delete bet"
+                  aria-label={`Delete bet ${bet.number}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ================================================
+              COMPACT EDIT
+          ================================================= */}
+
+          {isEditing && (
+            <div className="mt-2.5 border-t border-slate-200 pt-2.5">
+              <label className="mb-1.5 block text-[10px] font-semibold text-slate-600">
+                Bet Amount
+              </label>
+
+              <div className="flex gap-1.5">
+                <div className="relative min-w-0 flex-1">
+                  <input
+                    type="number"
+                    min="100"
+                    max={maxEditableAmount}
+                    value={editingAmount}
+                    onChange={(event) =>
+                      setEditingAmount(event.target.value)
+                    }
+                    autoFocus
+                    className="w-full rounded-md border border-emerald-300 bg-white px-2.5 py-1.5 pr-10 text-xs font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-50"
+                  />
+
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[8px] font-semibold text-slate-400">
+                    MMK
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => saveEditBet(bet)}
+                  disabled={
+                    !Number(editingAmount) ||
+                    Number(editingAmount) < 100 ||
+                    Number(editingAmount) >
+                      maxEditableAmount
+                  }
+                  className="rounded-md bg-emerald-600 px-2.5 text-[10px] font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  Save
+                </button>
+
+                <button
+                  type="button"
+                  onClick={cancelEditBet}
+                  className="rounded-md border border-slate-200 bg-white px-2.5 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              <p className="mt-1 text-[8px] text-slate-400">
+                Maximum: {formatAmount(maxEditableAmount)} MMK
+              </p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    /*
+     * NORMAL DESKTOP CARD
+     */
     return (
       <div
         key={bet.id}
-        className="rounded-xl border border-slate-100 bg-slate-50 p-4 transition-all hover:border-violet-200 hover:bg-violet-50/50"
+        className="rounded-xl border border-slate-100 bg-slate-50 p-4 transition-all hover:border-emerald-200 hover:bg-emerald-50/50"
       >
         {/* ====================================================
             BET HEADER
@@ -374,7 +520,7 @@ export default function Play2D() {
           {/* NUMBER */}
 
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-lg font-bold tracking-wider text-white shadow-sm shadow-violet-200">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-600 to-green-600 text-lg font-bold tracking-wider text-white shadow-sm shadow-emerald-200">
               {bet.number}
             </div>
 
@@ -384,7 +530,7 @@ export default function Play2D() {
                   className={`rounded-md px-2 py-0.5 text-[10px] font-bold text-white ${
                     bet.session === "AM"
                       ? "bg-blue-500"
-                      : "bg-violet-500"
+                      : "bg-emerald-500"
                   }`}
                 >
                   {bet.session}
@@ -404,7 +550,7 @@ export default function Play2D() {
               <button
                 type="button"
                 onClick={() => startEditBet(bet)}
-                className="rounded-lg p-2 text-slate-400 transition-all hover:bg-violet-100 hover:text-violet-600"
+                className="rounded-lg p-2 text-slate-400 transition-all hover:bg-emerald-100 hover:text-emerald-600"
                 title="Edit amount"
                 aria-label={`Edit bet ${bet.number}`}
               >
@@ -445,7 +591,7 @@ export default function Play2D() {
                     setEditingAmount(event.target.value)
                   }
                   autoFocus
-                  className="w-full rounded-lg border border-violet-300 bg-white px-3 py-2 pr-12 text-sm font-semibold text-slate-900 outline-none focus:ring-4 focus:ring-violet-50"
+                  className="w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 pr-12 text-sm font-semibold text-slate-900 outline-none focus:ring-4 focus:ring-emerald-50"
                 />
 
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-slate-400">
@@ -462,7 +608,7 @@ export default function Play2D() {
                   Number(editingAmount) >
                     maxEditableAmount
                 }
-                className="rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 Save
               </button>
@@ -481,10 +627,6 @@ export default function Play2D() {
             </p>
           </div>
         ) : (
-          /* ==================================================
-             AMOUNT
-          ================================================== */
-
           <div className="mt-3 flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-slate-100">
             <span className="text-xs text-slate-400">
               Amount
@@ -518,11 +660,11 @@ export default function Play2D() {
             Lottery
           </span>
 
-          <span className="text-violet-600">
+          <span className="text-emerald-600">
             /
           </span>
 
-          <span className="text-violet-600">
+          <span className="text-emerald-600">
             Play
           </span>
         </div>
@@ -545,11 +687,11 @@ export default function Play2D() {
             LEFT - BET FORM
         ==================================================== */}
 
-        <div className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm sm:p-6">
+        <div className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
           {/* HEADER */}
 
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-sm shadow-violet-200">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-600 to-green-600 text-white shadow-sm shadow-emerald-200">
               <Dice5 className="h-5 w-5" />
             </div>
 
@@ -589,8 +731,8 @@ export default function Play2D() {
                         active
                           ? item === "AM"
                             ? "border-blue-400 bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md shadow-blue-100"
-                            : "border-violet-400 bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-md shadow-violet-100"
-                          : "border-slate-200 bg-slate-50 text-slate-500 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600"
+                            : "border-emerald-400 bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md shadow-emerald-100"
+                          : "border-slate-200 bg-slate-50 text-slate-500 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600"
                       }`}
                     >
                       <div className="flex items-center justify-center gap-2">
@@ -633,7 +775,7 @@ export default function Play2D() {
                 <button
                   type="button"
                   onClick={selectAllAvailable}
-                  className="rounded-md border border-violet-200 bg-violet-100 px-2 py-1 text-[10px] font-bold text-violet-700 transition hover:border-violet-300 hover:bg-violet-200"
+                  className="rounded-md border border-emerald-200 bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-200"
                 >
                   Select All
                 </button>
@@ -651,11 +793,9 @@ export default function Play2D() {
               </div>
             </div>
 
-            {/* =================================================
-                NUMBER GRID
-            ================================================= */}
+            {/* NUMBER GRID */}
 
-            <div className="mt-3 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-100 via-indigo-50 to-blue-100 p-2.5 shadow-inner sm:p-3">
+            <div className="mt-3 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 p-2.5 shadow-inner sm:p-3">
               <div className="grid grid-cols-10 gap-1">
                 {NUMBER_LIST.map((item) => {
                   const selected = isSelected(item);
@@ -709,21 +849,20 @@ export default function Play2D() {
                         transition-all
                         duration-150
                         sm:h-9
+
                         ${
                           blocked
-                            ? "cursor-not-allowed border-red-200 bg-red-50 text-red-300"
+                            ? "cursor-not-allowed border-red-200 bg-red-50 text-red-400"
                             : limitReached
-                              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300"
+                              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
                               : selected
-                                ? "border-violet-600 bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 text-white shadow-sm shadow-violet-300 ring-1 ring-violet-400"
+                                ? "border-emerald-600 bg-emerald-600 text-white shadow-md shadow-emerald-200 ring-1 ring-emerald-500"
                                 : nearLimit
-                                  ? "border-orange-300 bg-gradient-to-br from-orange-100 to-amber-100 text-orange-700 hover:border-orange-400 hover:bg-orange-200"
-                                  : "border-violet-200 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-violet-400 hover:bg-violet-100 hover:text-violet-700 hover:shadow-sm"
+                                  ? "border-orange-300 bg-orange-100 text-orange-800 hover:border-orange-400 hover:bg-orange-200"
+                                  : "border-slate-200 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-sm"
                         }
                       `}
                     >
-                      {/* NUMBER */}
-
                       <div className="flex items-center justify-center gap-0.5">
                         {blocked && (
                           <Lock className="h-2 w-2" />
@@ -738,12 +877,10 @@ export default function Play2D() {
                         </span>
                       </div>
 
-                      {/* MINI PROGRESS */}
-
                       <div
                         className={`mt-0.5 h-0.5 w-3/4 overflow-hidden rounded-full ${
                           selected
-                            ? "bg-white/30"
+                            ? "bg-white/40"
                             : "bg-slate-200"
                         }`}
                       >
@@ -757,7 +894,7 @@ export default function Play2D() {
                                   ? "bg-white"
                                   : nearLimit
                                     ? "bg-orange-400"
-                                    : "bg-violet-400"
+                                    : "bg-emerald-400"
                           }`}
                           style={{
                             width: `${progress}%`,
@@ -765,12 +902,10 @@ export default function Play2D() {
                         />
                       </div>
 
-                      {/* USED */}
-
                       <span
                         className={`mt-0.5 text-[6px] font-medium leading-none ${
                           selected
-                            ? "text-violet-100"
+                            ? "text-emerald-100"
                             : blocked
                               ? "text-red-300"
                               : limitReached
@@ -796,7 +931,7 @@ export default function Play2D() {
 
             <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] text-slate-400">
               <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-violet-500" />
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 Available
               </div>
 
@@ -821,24 +956,24 @@ export default function Play2D() {
               SELECTED SUMMARY
           ================================================== */}
 
-          <div className="mt-5 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-100 via-indigo-50 to-blue-100 p-4">
+          <div className="mt-5 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-green-50 to-teal-50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] font-semibold text-violet-600">
+                <p className="text-[11px] font-semibold text-emerald-600">
                   Selected Numbers
                 </p>
 
-                <p className="mt-0.5 text-lg font-bold text-violet-800">
+                <p className="mt-0.5 text-lg font-bold text-emerald-800">
                   {selectedNumbers.length}
                 </p>
               </div>
 
               <div className="text-right">
-                <p className="text-[11px] font-semibold text-indigo-600">
+                <p className="text-[11px] font-semibold text-teal-600">
                   Selected Bet Total
                 </p>
 
-                <p className="mt-0.5 text-lg font-bold text-indigo-800">
+                <p className="mt-0.5 text-lg font-bold text-teal-800">
                   {formatAmount(selectedTotal)}{" "}
                   <span className="text-xs">
                     MMK
@@ -856,7 +991,7 @@ export default function Play2D() {
                     onClick={() =>
                       toggleNumber(item)
                     }
-                    className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[10px] font-bold text-violet-700 shadow-sm ring-1 ring-violet-200 transition hover:bg-violet-100"
+                    className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white shadow-sm transition hover:bg-emerald-700"
                   >
                     {item}
 
@@ -885,10 +1020,10 @@ export default function Play2D() {
                 }
                 placeholder="Enter amount"
                 min="100"
-                className="w-full rounded-xl border border-violet-200 bg-violet-50/50 px-4 py-3 pr-16 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100"
+                className="w-full rounded-xl border border-emerald-200 bg-emerald-50/50 px-4 py-3 pr-16 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
               />
 
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-violet-500">
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-500">
                 MMK
               </span>
             </div>
@@ -910,7 +1045,7 @@ export default function Play2D() {
               !Number(amount) ||
               Number(amount) <= 0
             }
-            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-5 py-3 font-semibold text-white shadow-md shadow-violet-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-violet-700 hover:via-indigo-700 hover:to-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 px-5 py-3 font-semibold text-white shadow-md shadow-emerald-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-emerald-700 hover:via-green-700 hover:to-teal-700 hover:shadow-lg disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
           >
             <Dice5 className="h-4 w-4" />
 
@@ -923,10 +1058,9 @@ export default function Play2D() {
 
         {/* ====================================================
             DESKTOP - SELECTED BETS
-            Hidden on mobile/tablet.
         ==================================================== */}
 
-        <div className="hidden rounded-2xl border border-violet-100 bg-white p-5 shadow-sm sm:p-6 xl:block">
+        <div className="hidden rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 xl:block">
           {/* HEADER */}
 
           <div className="flex items-center justify-between">
@@ -940,7 +1074,7 @@ export default function Play2D() {
               </p>
             </div>
 
-            <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 px-2 text-xs font-bold text-white shadow-sm">
+            <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-green-500 px-2 text-xs font-bold text-white shadow-sm">
               {bets.length}
             </span>
           </div>
@@ -949,8 +1083,8 @@ export default function Play2D() {
 
           <div className="mt-5 max-h-[520px] space-y-3 overflow-y-auto pr-1">
             {bets.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 p-8 text-center">
-                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-indigo-100 text-violet-600">
+              <div className="rounded-xl border border-dashed border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-50 p-8 text-center">
+                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-emerald-100 to-green-100 text-emerald-600">
                   <Dice5 className="h-5 w-5" />
                 </div>
 
@@ -963,7 +1097,7 @@ export default function Play2D() {
                 </p>
               </div>
             ) : (
-              bets.map(renderBetCard)
+              bets.map((bet) => renderBetCard(bet))
             )}
           </div>
 
@@ -987,7 +1121,7 @@ export default function Play2D() {
               type="button"
               onClick={submitBets}
               disabled={bets.length === 0}
-              className="mt-4 w-full rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-5 py-3 font-semibold text-white shadow-md shadow-violet-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-violet-700 hover:via-indigo-700 hover:to-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
+              className="mt-4 w-full rounded-xl bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 px-5 py-3 font-semibold text-white shadow-md shadow-emerald-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-emerald-700 hover:via-green-700 hover:to-teal-700 hover:shadow-lg disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
             >
               Place 2D Bets
             </button>
@@ -999,11 +1133,11 @@ export default function Play2D() {
           MOBILE FIXED SELECTED BETS BAR
       ======================================================= */}
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-violet-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 shadow-[0_-8px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-emerald-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 shadow-[0_-8px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:hidden">
         <button
           type="button"
           onClick={() => setMobileBetsOpen(true)}
-          className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-4 py-3 text-left text-white shadow-lg shadow-violet-200 transition active:scale-[0.99]"
+          className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 px-4 py-3 text-left text-white shadow-lg shadow-emerald-200 transition active:scale-[0.99]"
         >
           {/* LEFT */}
 
@@ -1012,14 +1146,14 @@ export default function Play2D() {
               <ShoppingBasket className="h-5 w-5" />
 
               {bets.length > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-extrabold text-slate-900 ring-2 ring-violet-600">
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-extrabold text-slate-900 ring-2 ring-emerald-600">
                   {bets.length}
                 </span>
               )}
             </div>
 
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-violet-100">
+              <p className="text-xs font-semibold text-emerald-100">
                 Selected Bets
               </p>
 
@@ -1039,7 +1173,7 @@ export default function Play2D() {
 
           <div className="flex shrink-0 items-center gap-3">
             <div className="text-right">
-              <p className="text-[10px] font-medium text-violet-100">
+              <p className="text-[10px] font-medium text-emerald-100">
                 Total
               </p>
 
@@ -1076,37 +1210,37 @@ export default function Play2D() {
           />
 
           {/* ==================================================
-              BOTTOM SHEET
+              COMPACT BOTTOM SHEET
           ================================================== */}
 
-          <div className="absolute inset-x-0 bottom-0 flex max-h-[92vh] flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl">
+          <div className="absolute inset-x-0 bottom-0 flex max-h-[85vh] flex-col overflow-hidden rounded-t-[22px] bg-white shadow-2xl">
             {/* HANDLE */}
 
-            <div className="flex shrink-0 justify-center pt-3">
-              <div className="h-1.5 w-12 rounded-full bg-slate-200" />
+            <div className="flex shrink-0 justify-center pt-2">
+              <div className="h-1 w-9 rounded-full bg-slate-200" />
             </div>
 
             {/* HEADER */}
 
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-sm">
-                  <ShoppingBasket className="h-5 w-5" />
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-3 py-2.5 sm:px-5">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-600 to-green-600 text-white shadow-sm">
+                  <ShoppingBasket className="h-4 w-4" />
                 </div>
 
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base font-bold text-slate-900">
+                  <div className="flex items-center gap-1.5">
+                    <h2 className="text-sm font-bold text-slate-900">
                       Selected Bets
                     </h2>
 
-                    <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-violet-100 px-1.5 text-[10px] font-bold text-violet-700">
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-100 px-1.5 text-[9px] font-bold text-emerald-700">
                       {bets.length}
                     </span>
                   </div>
 
-                  <p className="mt-0.5 text-xs text-slate-400">
-                    Review and edit your bets
+                  <p className="mt-0.5 text-[9px] text-slate-400">
+                    Review your bets
                   </p>
                 </div>
               </div>
@@ -1116,31 +1250,31 @@ export default function Play2D() {
                 onClick={() =>
                   setMobileBetsOpen(false)
                 }
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
                 aria-label="Close selected bets"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
             {/* ==================================================
-                BET LIST
+                COMPACT BET LIST
             ================================================== */}
 
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2.5 sm:px-5">
               {bets.length === 0 ? (
-                <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 p-8 text-center">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-indigo-100 text-violet-600">
-                    <Dice5 className="h-6 w-6" />
+                <div className="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-50 p-6 text-center">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-emerald-100 to-green-100 text-emerald-600">
+                    <Dice5 className="h-5 w-5" />
                   </div>
 
-                  <p className="mt-4 text-sm font-bold text-slate-700">
+                  <p className="mt-3 text-xs font-bold text-slate-700">
                     No bets selected
                   </p>
 
-                  <p className="mt-1 max-w-xs text-xs leading-5 text-slate-400">
-                    Select numbers from the 2D grid, enter
-                    your amount, then add the bet.
+                  <p className="mt-1 max-w-xs text-[10px] leading-4 text-slate-400">
+                    Select numbers, enter your amount,
+                    then add the bet.
                   </p>
 
                   <button
@@ -1148,43 +1282,45 @@ export default function Play2D() {
                     onClick={() =>
                       setMobileBetsOpen(false)
                     }
-                    className="mt-5 rounded-xl bg-violet-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-violet-700"
+                    className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-emerald-700"
                   >
                     Choose Numbers
                   </button>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {bets.map(renderBetCard)}
+                <div className="space-y-1.5">
+                  {bets.map((bet) =>
+                    renderBetCard(bet, true),
+                  )}
                 </div>
               )}
             </div>
 
             {/* ==================================================
-                MOBILE TOTAL / SUBMIT
+                COMPACT MOBILE TOTAL / SUBMIT
             ================================================== */}
 
-            <div className="shrink-0 border-t border-slate-100 bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] sm:px-6">
+            <div className="shrink-0 border-t border-slate-100 bg-white px-3 pb-[calc(env(safe-area-inset-bottom)+0.65rem)] pt-2.5 shadow-[0_-6px_20px_rgba(15,23,42,0.06)] sm:px-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-slate-400">
+                  <p className="text-[9px] font-medium text-slate-400">
                     Total Bet Amount
                   </p>
 
-                  <p className="mt-0.5 text-xl font-extrabold text-slate-900">
+                  <p className="mt-0.5 text-base font-extrabold text-slate-900">
                     {formatAmount(totalAmount)}{" "}
-                    <span className="text-sm font-bold text-slate-400">
+                    <span className="text-[10px] font-bold text-slate-400">
                       MMK
                     </span>
                   </p>
                 </div>
 
                 <div className="text-right">
-                  <p className="text-xs font-medium text-slate-400">
+                  <p className="text-[9px] font-medium text-slate-400">
                     Numbers
                   </p>
 
-                  <p className="mt-0.5 text-lg font-extrabold text-violet-600">
+                  <p className="mt-0.5 text-base font-extrabold text-emerald-600">
                     {bets.length}
                   </p>
                 </div>
@@ -1194,9 +1330,9 @@ export default function Play2D() {
                 type="button"
                 onClick={submitBets}
                 disabled={bets.length === 0}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-5 py-3.5 text-sm font-bold text-white shadow-md shadow-violet-200 transition-all hover:from-violet-700 hover:via-indigo-700 hover:to-blue-700 disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
+                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-200 transition-all hover:from-emerald-700 hover:via-green-700 hover:to-teal-700 disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
               >
-                <Check className="h-4 w-4" />
+                <Check className="h-3.5 w-3.5" />
                 Place 2D Bets
               </button>
             </div>

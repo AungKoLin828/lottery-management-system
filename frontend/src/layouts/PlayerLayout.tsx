@@ -2,6 +2,7 @@ import {
   NavLink,
   Outlet,
   useLocation,
+  useNavigate,
 } from "react-router-dom";
 
 import {
@@ -18,6 +19,7 @@ import {
   BarChart3,
   ChevronDown,
   Sparkles,
+  ArrowLeft,
 } from "lucide-react";
 
 import {
@@ -87,11 +89,23 @@ const moreNavigation = [
 ];
 
 /* ============================================================
+   PLAYER ROUTE CHECK
+============================================================ */
+
+function isPlayerPath(path: string) {
+  return (
+    path === "/player" ||
+    path.startsWith("/player/")
+  );
+}
+
+/* ============================================================
    COMPONENT
 ============================================================ */
 
 export default function PlayerLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
 
   /* ============================================================
      DESKTOP DROPDOWN STATE
@@ -108,16 +122,19 @@ export default function PlayerLayout() {
 
   /* ============================================================
      MOBILE STATE
-
-     IMPORTANT:
-     mobilePlayOpen is intentionally separate from
-     desktop playMenuOpen.
   ============================================================ */
 
   const [mobileMenuOpen, setMobileMenuOpen] =
     useState(false);
 
   const [mobilePlayOpen, setMobilePlayOpen] =
+    useState(false);
+
+  /* ============================================================
+     MOBILE BACK BUTTON
+  ============================================================ */
+
+  const [showBackButton, setShowBackButton] =
     useState(false);
 
   /* ============================================================
@@ -134,8 +151,19 @@ export default function PlayerLayout() {
     useRef<HTMLDivElement>(null);
 
   /* ============================================================
+     PLAYER HISTORY STORAGE KEY
+  ============================================================ */
+
+  const PLAYER_HISTORY_KEY =
+    "lottery_player_navigation_history";
+
+  /* ============================================================
      ACTIVE ROUTES
   ============================================================ */
+
+  const isDashboard =
+    location.pathname === "/player" ||
+    location.pathname === "/player/";
 
   const isPlayActive =
     location.pathname.startsWith(
@@ -167,14 +195,13 @@ export default function PlayerLayout() {
   };
 
   /* ============================================================
-     CLOSE MOBILE NAVIGATION
+     CLOSE MOBILE MENU
   ============================================================ */
 
   const closeMobileMenu = () => {
     setMobileMenuOpen(false);
     setMobilePlayOpen(false);
 
-    // Also close desktop dropdown states.
     setPlayMenuOpen(false);
     setMoreMenuOpen(false);
     setProfileMenuOpen(false);
@@ -182,20 +209,15 @@ export default function PlayerLayout() {
 
   /* ============================================================
      MOBILE NAVIGATION CLICK
-
-     This is the important part.
-
-     It immediately closes the mobile navigation even when
-     clicking the currently active route.
   ============================================================ */
 
   const handleMobileNavigation = () => {
-    setMobileMenuOpen(false);
-    setMobilePlayOpen(false);
+    closeMobileMenu();
 
-    setPlayMenuOpen(false);
-    setMoreMenuOpen(false);
-    setProfileMenuOpen(false);
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   };
 
   /* ============================================================
@@ -206,17 +228,13 @@ export default function PlayerLayout() {
     setMobileMenuOpen((current) => {
       const next = !current;
 
-      // If opening the main menu, start with Play closed.
-      if (next) {
-        setMobilePlayOpen(false);
-      } else {
+      if (!next) {
         setMobilePlayOpen(false);
       }
 
       return next;
     });
 
-    // Never leave desktop dropdowns open.
     setPlayMenuOpen(false);
     setMoreMenuOpen(false);
     setProfileMenuOpen(false);
@@ -224,16 +242,11 @@ export default function PlayerLayout() {
 
   /* ============================================================
      TOGGLE MOBILE PLAY
-
-     This ONLY controls the Play submenu.
-
-     It does NOT control mobileMenuOpen.
   ============================================================ */
 
   const toggleMobilePlay = () => {
     setMobilePlayOpen((current) => !current);
 
-    // Close desktop dropdowns.
     setPlayMenuOpen(false);
     setMoreMenuOpen(false);
     setProfileMenuOpen(false);
@@ -273,13 +286,170 @@ export default function PlayerLayout() {
   };
 
   /* ============================================================
-     ROUTE CHANGE
+     TRACK PLAYER ROUTES
+  ============================================================ */
 
-     Whenever React Router changes location, close all menus.
+  useEffect(() => {
+    if (!isPlayerPath(location.pathname)) {
+      return;
+    }
+
+    try {
+      const stored =
+        sessionStorage.getItem(
+          PLAYER_HISTORY_KEY,
+        );
+
+      let history: string[] = [];
+
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+
+          if (Array.isArray(parsed)) {
+            history = parsed.filter(
+              (item): item is string =>
+                typeof item === "string" &&
+                isPlayerPath(item),
+            );
+          }
+        } catch {
+          history = [];
+        }
+      }
+
+      const lastRoute =
+        history[history.length - 1];
+
+      if (lastRoute !== location.pathname) {
+        history.push(location.pathname);
+      }
+
+      if (history.length > 30) {
+        history = history.slice(-30);
+      }
+
+      sessionStorage.setItem(
+        PLAYER_HISTORY_KEY,
+        JSON.stringify(history),
+      );
+    } catch {
+      // Ignore sessionStorage errors.
+    }
+  }, [location.pathname]);
+
+  /* ============================================================
+     MOBILE BACK BUTTON VISIBILITY
+     
+     Hidden at top.
+     Appears after 120px.
+  ============================================================ */
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackButton(
+        window.scrollY > 120,
+      );
+    };
+
+    handleScroll();
+
+    window.addEventListener(
+      "scroll",
+      handleScroll,
+      {
+        passive: true,
+      },
+    );
+
+    return () => {
+      window.removeEventListener(
+        "scroll",
+        handleScroll,
+      );
+    };
+  }, []);
+
+  /* ============================================================
+     SAFE PLAYER BACK
+  ============================================================ */
+
+  const handlePlayerBack = () => {
+    try {
+      const stored =
+        sessionStorage.getItem(
+          PLAYER_HISTORY_KEY,
+        );
+
+      let history: string[] = [];
+
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+
+          if (Array.isArray(parsed)) {
+            history = parsed.filter(
+              (item): item is string =>
+                typeof item === "string" &&
+                isPlayerPath(item),
+            );
+          }
+        } catch {
+          history = [];
+        }
+      }
+
+      /* Remove current page */
+
+      if (
+        history.length > 0 &&
+        history[history.length - 1] ===
+          location.pathname
+      ) {
+        history.pop();
+      }
+
+      /* Previous player page */
+
+      const previousPlayerPage =
+        history[history.length - 1];
+
+      /* Save updated history */
+
+      sessionStorage.setItem(
+        PLAYER_HISTORY_KEY,
+        JSON.stringify(history),
+      );
+
+      /* Navigate to previous player page */
+
+      if (
+        previousPlayerPage &&
+        isPlayerPath(previousPlayerPage)
+      ) {
+        navigate(previousPlayerPage);
+        return;
+      }
+
+      /* Safe fallback */
+
+      navigate("/player");
+    } catch {
+      navigate("/player");
+    }
+  };
+
+  /* ============================================================
+     ROUTE CHANGE
   ============================================================ */
 
   useEffect(() => {
     closeAllMenus();
+
+    window.scrollTo({
+      top: 0,
+      behavior: "instant",
+    });
   }, [location.pathname]);
 
   /* ============================================================
@@ -290,7 +460,8 @@ export default function PlayerLayout() {
     const handleClickOutside = (
       event: MouseEvent,
     ) => {
-      const target = event.target as Node;
+      const target =
+        event.target as Node;
 
       if (
         profileMenuRef.current &&
@@ -334,12 +505,21 @@ export default function PlayerLayout() {
   const handleLogout = () => {
     closeAllMenus();
 
-    console.log("Logout");
+    /*
+      Replace this with your actual logout logic.
 
-    // Replace with your actual logout logic.
-    //
-    // localStorage.removeItem("token");
-    // navigate("/login");
+      Example:
+
+      localStorage.removeItem("token");
+
+      sessionStorage.removeItem(
+        PLAYER_HISTORY_KEY,
+      );
+
+      navigate("/login");
+    */
+
+    console.log("Logout");
   };
 
   /* ============================================================
@@ -427,10 +607,7 @@ export default function PlayerLayout() {
               end
               className={navClass}
             >
-              <LayoutDashboard
-                size={17}
-              />
-
+              <LayoutDashboard size={17} />
               Dashboard
             </NavLink>
 
@@ -730,6 +907,7 @@ export default function PlayerLayout() {
                   </div>
 
                   <div className="p-2">
+
                     <NavLink
                       to="/player/profile"
                       onClick={closeAllMenus}
@@ -753,13 +931,14 @@ export default function PlayerLayout() {
                       <LogOut size={17} />
                       Logout
                     </button>
+
                   </div>
                 </div>
               )}
             </div>
 
             {/* ==================================================
-                MOBILE BUTTON
+                MOBILE MENU BUTTON
             =================================================== */}
 
             <button
@@ -795,9 +974,7 @@ export default function PlayerLayout() {
 
             <nav className="mx-auto max-w-7xl space-y-1 px-3 py-3 sm:px-5">
 
-              {/* =================================================
-                  DASHBOARD
-              ================================================= */}
+              {/* DASHBOARD */}
 
               <NavLink
                 to="/player"
@@ -812,13 +989,10 @@ export default function PlayerLayout() {
                 }
               >
                 <LayoutDashboard size={17} />
-
                 <span>Dashboard</span>
               </NavLink>
 
-              {/* =================================================
-                  MOBILE PLAY
-              ================================================= */}
+              {/* MOBILE PLAY */}
 
               <div
                 className={`rounded-xl border p-1 transition-colors ${
@@ -827,9 +1001,6 @@ export default function PlayerLayout() {
                     : "border-slate-700 bg-slate-800/80"
                 }`}
               >
-
-                {/* PLAY HEADER */}
-
                 <button
                   type="button"
                   onClick={toggleMobilePlay}
@@ -876,14 +1047,10 @@ export default function PlayerLayout() {
                     className={`shrink-0 transition-transform duration-200 ${
                       mobilePlayOpen
                         ? "rotate-180"
-                        : "rotate-0"
+                        : ""
                     }`}
                   />
                 </button>
-
-                {/* =================================================
-                    MOBILE PLAY ITEMS
-                ================================================= */}
 
                 {mobilePlayOpen && (
                   <div className="mt-1 space-y-1 border-t border-slate-700 pt-1">
@@ -948,9 +1115,7 @@ export default function PlayerLayout() {
                 )}
               </div>
 
-              {/* =================================================
-                  MY TICKETS
-              ================================================= */}
+              {/* MY TICKETS */}
 
               <NavLink
                 to="/player/tickets"
@@ -964,13 +1129,10 @@ export default function PlayerLayout() {
                 }
               >
                 <Ticket size={17} />
-
                 <span>My Tickets</span>
               </NavLink>
 
-              {/* =================================================
-                  WALLET
-              ================================================= */}
+              {/* WALLET */}
 
               <NavLink
                 to="/player/wallet"
@@ -992,9 +1154,7 @@ export default function PlayerLayout() {
                 </span>
               </NavLink>
 
-              {/* =================================================
-                  MORE
-              ================================================= */}
+              {/* MORE */}
 
               <div className="mt-2 border-t border-slate-700 pt-2">
 
@@ -1062,6 +1222,115 @@ export default function PlayerLayout() {
           </div>
         )}
       </header>
+
+      {/* ======================================================
+          MOBILE FLOATING BACK BUTTON
+
+          UPDATED DESIGN
+
+          - Mobile only
+          - Hidden at top
+          - Appears after 120px
+          - Indigo / violet primary color
+          - Matches PlayerLayout navigation
+          - Colored icon section
+          - Soft glow
+          - No dark standalone pill
+          - Never uses navigate(-1)
+          - Never leaves /player/*
+      ======================================================= */}
+
+      <div
+        className={`fixed bottom-5 right-4 z-[60] lg:hidden ${
+          showBackButton
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-6 opacity-0"
+        } transition-all duration-300 ease-out`}
+      >
+        <button
+          type="button"
+          onClick={handlePlayerBack}
+          aria-label="Go back"
+          className="
+            group
+            flex
+            items-center
+            gap-2
+            rounded-full
+            border
+            border-indigo-400/40
+            bg-gradient-to-r
+            from-indigo-600
+            to-violet-600
+            px-3
+            py-2.5
+            text-sm
+            font-bold
+            text-white
+            shadow-lg
+            shadow-indigo-900/40
+            ring-1
+            ring-white/10
+            backdrop-blur-md
+            transition-all
+            duration-200
+            hover:-translate-y-1
+            hover:from-indigo-500
+            hover:to-violet-500
+            hover:border-indigo-300/60
+            hover:shadow-xl
+            hover:shadow-indigo-900/50
+            active:translate-y-0
+            active:scale-95
+            focus:outline-none
+            focus:ring-2
+            focus:ring-indigo-400/60
+            focus:ring-offset-2
+            focus:ring-offset-slate-50
+          "
+        >
+
+          {/* ==================================================
+              ARROW ICON
+          =================================================== */}
+
+          <span
+            className="
+              flex
+              h-8
+              w-8
+              shrink-0
+              items-center
+              justify-center
+              rounded-full
+              bg-white/15
+              text-white
+              shadow-inner
+              shadow-white/10
+              ring-1
+              ring-white/20
+              transition-all
+              duration-200
+              group-hover:-translate-x-0.5
+              group-hover:bg-white/20
+            "
+          >
+            <ArrowLeft
+              className="h-4 w-4"
+              strokeWidth={2.75}
+            />
+          </span>
+
+          {/* ==================================================
+              LABEL
+          =================================================== */}
+
+          <span className="pr-1 tracking-wide">
+            Back
+          </span>
+
+        </button>
+      </div>
 
       {/* ======================================================
           MAIN CONTENT
