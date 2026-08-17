@@ -12,6 +12,7 @@ import PublicLayout from "@/layouts/PublicLayout";
 import Home from "@/pages/public/Home";
 import Login from "@/pages/auth/Login";
 import Register from "@/pages/auth/Register";
+import ForgotPassword from "@/pages/auth/ForgotPassword";
 import ResultsHistory from "@/pages/public/ResultsHistory";
 import About from "@/pages/public/About";
 import AdminNotifications from "@/pages/admin/Notifications";
@@ -40,6 +41,7 @@ export default function AppRoutes() {
         <Route path="/results-history" element={<ResultsHistory />} />
         <Route path="/register" element={<Register />} />
         <Route path="/about" element={<About />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
       </Route>
     </Routes>
   );
