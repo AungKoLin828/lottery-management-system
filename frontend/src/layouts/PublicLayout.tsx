@@ -1,15 +1,6 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 
-import {
-  Link,
-  Outlet,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import {
   Menu,
@@ -111,43 +102,37 @@ export default function PublicLayout() {
      MOBILE MENU
   ============================================================ */
 
-  const [mobileMenuOpen, setMobileMenuOpen] =
-    useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   /* ============================================================
      DESKTOP PLAY DROPDOWN
   ============================================================ */
 
-  const [desktopPlayOpen, setDesktopPlayOpen] =
-    useState(false);
+  const [desktopPlayOpen, setDesktopPlayOpen] = useState(false);
 
   /* ============================================================
      MOBILE PLAY DROPDOWN
   ============================================================ */
 
-  const [mobilePlayOpen, setMobilePlayOpen] =
-    useState(false);
+  const [mobilePlayOpen, setMobilePlayOpen] = useState(false);
 
   /* ============================================================
      MOBILE BACK BUTTON / SCROLL
   ============================================================ */
 
-  const [showBackButton, setShowBackButton] =
-    useState(false);
+  const [showBackButton, setShowBackButton] = useState(false);
 
   /* ============================================================
      REFS
   ============================================================ */
 
-  const playMenuRef =
-    useRef<HTMLDivElement>(null);
+  const playMenuRef = useRef<HTMLDivElement>(null);
 
   /* ============================================================
      PUBLIC HISTORY STORAGE KEY
   ============================================================ */
 
-  const PUBLIC_HISTORY_KEY =
-    "lottery_public_navigation_history";
+  const PUBLIC_HISTORY_KEY = "lottery_public_navigation_history";
 
   /* ============================================================
      ACTIVE ROUTES
@@ -195,10 +180,7 @@ export default function PublicLayout() {
     }
 
     try {
-      const stored =
-        sessionStorage.getItem(
-          PUBLIC_HISTORY_KEY
-        );
+      const stored = sessionStorage.getItem(PUBLIC_HISTORY_KEY);
 
       let history: string[] = [];
 
@@ -209,8 +191,7 @@ export default function PublicLayout() {
           if (Array.isArray(parsed)) {
             history = parsed.filter(
               (item): item is string =>
-                typeof item === "string" &&
-                isPublicPath(item)
+                typeof item === "string" && isPublicPath(item),
             );
           }
         } catch {
@@ -222,8 +203,7 @@ export default function PublicLayout() {
        * Do not add the same route twice consecutively.
        */
 
-      const lastRoute =
-        history[history.length - 1];
+      const lastRoute = history[history.length - 1];
 
       if (lastRoute !== location.pathname) {
         history.push(location.pathname);
@@ -237,10 +217,7 @@ export default function PublicLayout() {
         history = history.slice(-20);
       }
 
-      sessionStorage.setItem(
-        PUBLIC_HISTORY_KEY,
-        JSON.stringify(history)
-      );
+      sessionStorage.setItem(PUBLIC_HISTORY_KEY, JSON.stringify(history));
     } catch {
       // Ignore sessionStorage errors.
     }
@@ -254,24 +231,15 @@ export default function PublicLayout() {
 
   useEffect(() => {
     const handleScroll = () => {
-      setShowBackButton(
-        window.scrollY > 120
-      );
+      setShowBackButton(window.scrollY > 120);
     };
 
     handleScroll();
 
-    window.addEventListener(
-      "scroll",
-      handleScroll,
-      { passive: true }
-    );
+    window.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => {
-      window.removeEventListener(
-        "scroll",
-        handleScroll
-      );
+      window.removeEventListener("scroll", handleScroll);
     };
   }, []);
 
@@ -285,10 +253,7 @@ export default function PublicLayout() {
 
   const handlePublicBack = () => {
     try {
-      const stored =
-        sessionStorage.getItem(
-          PUBLIC_HISTORY_KEY
-        );
+      const stored = sessionStorage.getItem(PUBLIC_HISTORY_KEY);
 
       let history: string[] = [];
 
@@ -299,8 +264,7 @@ export default function PublicLayout() {
           if (Array.isArray(parsed)) {
             history = parsed.filter(
               (item): item is string =>
-                typeof item === "string" &&
-                isPublicPath(item)
+                typeof item === "string" && isPublicPath(item),
             );
           }
         } catch {
@@ -314,8 +278,7 @@ export default function PublicLayout() {
 
       if (
         history.length > 0 &&
-        history[history.length - 1] ===
-          location.pathname
+        history[history.length - 1] === location.pathname
       ) {
         history.pop();
       }
@@ -324,17 +287,13 @@ export default function PublicLayout() {
        * Find previous public page.
        */
 
-      const previousPublicPage =
-        history[history.length - 1];
+      const previousPublicPage = history[history.length - 1];
 
       /*
        * Save updated history.
        */
 
-      sessionStorage.setItem(
-        PUBLIC_HISTORY_KEY,
-        JSON.stringify(history)
-      );
+      sessionStorage.setItem(PUBLIC_HISTORY_KEY, JSON.stringify(history));
 
       /*
        * Navigate to previous PUBLIC page.
@@ -343,9 +302,7 @@ export default function PublicLayout() {
       if (
         previousPublicPage &&
         isPublicPath(previousPublicPage) &&
-        !previousPublicPage.startsWith(
-          "/player"
-        )
+        !previousPublicPage.startsWith("/player")
       ) {
         navigate(previousPublicPage);
         return;
@@ -382,9 +339,7 @@ export default function PublicLayout() {
   ============================================================ */
 
   const toggleMobilePlay = () => {
-    setMobilePlayOpen(
-      (current) => !current
-    );
+    setMobilePlayOpen((current) => !current);
   };
 
   /* ============================================================
@@ -392,9 +347,7 @@ export default function PublicLayout() {
   ============================================================ */
 
   const toggleDesktopPlay = () => {
-    setDesktopPlayOpen(
-      (current) => !current
-    );
+    setDesktopPlayOpen((current) => !current);
   };
 
   /* ============================================================
@@ -402,30 +355,18 @@ export default function PublicLayout() {
   ============================================================ */
 
   useEffect(() => {
-    const handleClickOutside = (
-      event: MouseEvent
-    ) => {
-      const target =
-        event.target as Node;
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
 
-      if (
-        playMenuRef.current &&
-        !playMenuRef.current.contains(target)
-      ) {
+      if (playMenuRef.current && !playMenuRef.current.contains(target)) {
         setDesktopPlayOpen(false);
       }
     };
 
-    document.addEventListener(
-      "mousedown",
-      handleClickOutside
-    );
+    document.addEventListener("mousedown", handleClickOutside);
 
     return () => {
-      document.removeEventListener(
-        "mousedown",
-        handleClickOutside
-      );
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -433,9 +374,7 @@ export default function PublicLayout() {
      PLAY LOGIN REDIRECT
   ============================================================ */
 
-  const handlePlay = (
-    destination: string
-  ) => {
+  const handlePlay = (destination: string) => {
     setDesktopPlayOpen(false);
     setMobilePlayOpen(false);
     setMobileMenuOpen(false);
@@ -453,17 +392,13 @@ export default function PublicLayout() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-
       {/* ======================================================
           HEADER
       ======================================================= */}
 
       <header className="sticky top-0 z-50 border-b border-slate-700/80 bg-slate-900/95 backdrop-blur-xl">
-
         <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
-
           <div className="flex h-[64px] items-center justify-between sm:h-[72px]">
-
             {/* ==================================================
                 LOGO
             =================================================== */}
@@ -493,33 +428,25 @@ export default function PublicLayout() {
             =================================================== */}
 
             <nav className="hidden items-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 md:flex">
-
               {/* HOME */}
 
               <NavItem
                 to="/"
                 label="Home"
                 active={isActive("/")}
-                icon={
-                  <Home className="h-4 w-4" />
-                }
+                icon={<Home className="h-4 w-4" />}
               />
 
               {/* =================================================
                   DESKTOP PLAY DROPDOWN
               ================================================= */}
 
-              <div
-                ref={playMenuRef}
-                className="relative"
-              >
+              <div ref={playMenuRef} className="relative">
                 <button
                   type="button"
                   onClick={toggleDesktopPlay}
                   aria-haspopup="menu"
-                  aria-expanded={
-                    desktopPlayOpen
-                  }
+                  aria-expanded={desktopPlayOpen}
                   className={`group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
                     isPlayActive
                       ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
@@ -538,9 +465,7 @@ export default function PublicLayout() {
 
                   <ChevronDown
                     className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${
-                      desktopPlayOpen
-                        ? "rotate-180"
-                        : "rotate-0"
+                      desktopPlayOpen ? "rotate-180" : "rotate-0"
                     }`}
                   />
 
@@ -571,11 +496,7 @@ export default function PublicLayout() {
                     <button
                       type="button"
                       role="menuitem"
-                      onClick={() =>
-                        handlePlay(
-                          "/player/play-2d"
-                        )
-                      }
+                      onClick={() => handlePlay("/player/play-2d")}
                       className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200 hover:bg-indigo-500/15"
                     >
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-400 transition-colors group-hover:bg-indigo-500/25">
@@ -598,11 +519,7 @@ export default function PublicLayout() {
                     <button
                       type="button"
                       role="menuitem"
-                      onClick={() =>
-                        handlePlay(
-                          "/player/play-3d"
-                        )
-                      }
+                      onClick={() => handlePlay("/player/play-3d")}
                       className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200 hover:bg-violet-500/15"
                     >
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 transition-colors group-hover:bg-violet-500/25">
@@ -628,12 +545,8 @@ export default function PublicLayout() {
               <NavItem
                 to="/results-history"
                 label="Results History"
-                active={isActive(
-                  "/results-history"
-                )}
-                icon={
-                  <BarChart3 className="h-4 w-4" />
-                }
+                active={isActive("/results-history")}
+                icon={<BarChart3 className="h-4 w-4" />}
               />
 
               {/* ABOUT */}
@@ -642,9 +555,7 @@ export default function PublicLayout() {
                 to="/about"
                 label="About"
                 active={isActive("/about")}
-                icon={
-                  <Info className="h-4 w-4" />
-                }
+                icon={<Info className="h-4 w-4" />}
               />
             </nav>
 
@@ -653,7 +564,6 @@ export default function PublicLayout() {
             =================================================== */}
 
             <div className="hidden items-center gap-2 md:flex">
-
               {/* LOGIN */}
 
               <Link
@@ -670,7 +580,6 @@ export default function PublicLayout() {
                 className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-900/30 transition-all duration-200 hover:-translate-y-0.5 hover:from-indigo-500 hover:to-violet-500 hover:shadow-lg hover:shadow-indigo-900/40"
               >
                 <Sparkles className="h-4 w-4" />
-
                 Register
               </Link>
             </div>
@@ -687,14 +596,8 @@ export default function PublicLayout() {
                   ? "border-indigo-500 bg-indigo-500/20 text-indigo-300"
                   : "border-slate-700 bg-slate-800 text-slate-300 hover:border-indigo-500 hover:bg-indigo-500/20 hover:text-white"
               }`}
-              aria-label={
-                mobileMenuOpen
-                  ? "Close menu"
-                  : "Open menu"
-              }
-              aria-expanded={
-                mobileMenuOpen
-              }
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileMenuOpen}
             >
               {mobileMenuOpen ? (
                 <X className="h-[18px] w-[18px]" />
@@ -716,9 +619,7 @@ export default function PublicLayout() {
             }`}
           >
             <div className="rounded-xl border border-slate-700 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20">
-
               <nav className="space-y-0.5">
-
                 {/* HOME */}
 
                 <NavItem
@@ -727,22 +628,17 @@ export default function PublicLayout() {
                   active={isActive("/")}
                   onClick={closeMobileMenu}
                   mobile
-                  icon={
-                    <Home className="h-[17px] w-[17px]" />
-                  }
+                  icon={<Home className="h-[17px] w-[17px]" />}
                 />
 
                 {/* MOBILE PLAY */}
 
                 <div className="rounded-lg bg-slate-900/80 p-1">
-
                   <button
                     type="button"
                     onClick={toggleMobilePlay}
                     aria-haspopup="menu"
-                    aria-expanded={
-                      mobilePlayOpen
-                    }
+                    aria-expanded={mobilePlayOpen}
                     className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-all ${
                       isPlayActive
                         ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm"
@@ -757,9 +653,7 @@ export default function PublicLayout() {
 
                     <ChevronDown
                       className={`h-4 w-4 transition-transform duration-200 ${
-                        mobilePlayOpen
-                          ? "rotate-180"
-                          : "rotate-0"
+                        mobilePlayOpen ? "rotate-180" : "rotate-0"
                       }`}
                     />
                   </button>
@@ -776,11 +670,7 @@ export default function PublicLayout() {
                       <button
                         type="button"
                         role="menuitem"
-                        onClick={() =>
-                          handlePlay(
-                            "/player/play-2d"
-                          )
-                        }
+                        onClick={() => handlePlay("/player/play-2d")}
                         className="group flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all hover:bg-indigo-500/15"
                       >
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-400">
@@ -803,11 +693,7 @@ export default function PublicLayout() {
                       <button
                         type="button"
                         role="menuitem"
-                        onClick={() =>
-                          handlePlay(
-                            "/player/play-3d"
-                          )
-                        }
+                        onClick={() => handlePlay("/player/play-3d")}
                         className="group flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all hover:bg-violet-500/15"
                       >
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400">
@@ -833,14 +719,10 @@ export default function PublicLayout() {
                 <NavItem
                   to="/results-history"
                   label="Results History"
-                  active={isActive(
-                    "/results-history"
-                  )}
+                  active={isActive("/results-history")}
                   onClick={closeMobileMenu}
                   mobile
-                  icon={
-                    <BarChart3 className="h-[17px] w-[17px]" />
-                  }
+                  icon={<BarChart3 className="h-[17px] w-[17px]" />}
                 />
 
                 {/* ABOUT */}
@@ -851,16 +733,13 @@ export default function PublicLayout() {
                   active={isActive("/about")}
                   onClick={closeMobileMenu}
                   mobile
-                  icon={
-                    <Info className="h-[17px] w-[17px]" />
-                  }
+                  icon={<Info className="h-[17px] w-[17px]" />}
                 />
               </nav>
 
               {/* MOBILE AUTH */}
 
               <div className="mt-1.5 grid grid-cols-2 gap-1.5 border-t border-slate-700 pt-2">
-
                 {/* LOGIN */}
 
                 <Link
@@ -879,7 +758,6 @@ export default function PublicLayout() {
                   className="flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-2.5 text-[13px] font-semibold text-white shadow-sm shadow-indigo-900/30 transition-all hover:from-indigo-500 hover:to-violet-500"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
-
                   Register
                 </Link>
               </div>
@@ -900,51 +778,37 @@ export default function PublicLayout() {
           FOOTER
       ======================================================== */}
 
-      <footer className="mt-12 bg-slate-950 text-slate-400 sm:mt-16">
-
+      <footer className="bg-slate-950 text-slate-400 sm:mt-16">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
-
           <div className="grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-10">
-
             {/* ABOUT */}
 
             <div>
-              <Link
-                to="/"
-                className="mb-4 inline-flex items-center gap-2"
-              >
+              <Link to="/" className="mb-4 inline-flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-white">
                   <Ticket className="h-4 w-4" />
                 </div>
 
                 <div>
-                  <span className="font-extrabold text-white">
-                    Lottery
-                  </span>
+                  <span className="font-extrabold text-white">Lottery</span>
 
-                  <span className="font-extrabold text-indigo-400">
-                    Play
-                  </span>
+                  <span className="font-extrabold text-indigo-400">Play</span>
                 </div>
               </Link>
 
               <p className="max-w-md text-sm leading-6 text-slate-400">
-                Welcome to our 2D and 3D Lottery Management
-                System. Check the latest results, explore result
-                history, and manage your lottery account with
-                ease.
+                Welcome to our 2D and 3D Lottery Management System. Check the
+                latest results, explore result history, and manage your lottery
+                account with ease.
               </p>
             </div>
 
             {/* QUICK LINKS */}
 
             <div>
-              <h3 className="mb-4 font-bold text-white">
-                Quick Links
-              </h3>
+              <h3 className="mb-4 font-bold text-white">Quick Links</h3>
 
               <div className="space-y-3 text-sm">
-
                 <Link
                   to="/"
                   className="block transition-colors hover:text-indigo-400"
@@ -978,31 +842,21 @@ export default function PublicLayout() {
             {/* CONTACT */}
 
             <div>
-              <h3 className="mb-4 font-bold text-white">
-                Contact
-              </h3>
+              <h3 className="mb-4 font-bold text-white">Contact</h3>
 
               <div className="space-y-3 text-sm">
-
                 <p>
-                  <span className="text-slate-500">
-                    Phone:
-                  </span>{" "}
-                  09 123456789
+                  <span className="text-slate-500">Phone:</span> 09 123456789
                 </p>
 
                 <p>
-                  <span className="text-slate-500">
-                    Email:
-                  </span>{" "}
+                  <span className="text-slate-500">Email:</span>{" "}
                   admin@lottery.com
                 </p>
 
                 <p>
-                  <span className="text-slate-500">
-                    Location:
-                  </span>{" "}
-                  Yangon, Myanmar
+                  <span className="text-slate-500">Location:</span> Yangon,
+                  Myanmar
                 </p>
               </div>
             </div>
@@ -1011,20 +865,14 @@ export default function PublicLayout() {
           {/* FOOTER BOTTOM */}
 
           <div className="mt-8 flex flex-col gap-3 border-t border-slate-800 pt-5 text-center text-sm text-slate-500 md:mt-10 md:flex-row md:items-center md:justify-between md:pt-6 md:text-left">
-
             <p>
-              © {new Date().getFullYear()} LotteryPlay. All
-              rights reserved.
+              © {new Date().getFullYear()} LotteryPlay. All rights reserved.
             </p>
 
             <div className="flex items-center justify-center gap-1 text-xs">
-
               <span>Powered by</span>
 
-              <span className="font-semibold text-indigo-400">
-                LotteryPlay
-              </span>
-
+              <span className="font-semibold text-indigo-400">LotteryPlay</span>
             </div>
           </div>
         </div>
@@ -1052,7 +900,6 @@ export default function PublicLayout() {
             : "pointer-events-none translate-y-5 opacity-0"
         } transition-all duration-300`}
       >
-
         <button
           type="button"
           onClick={handlePublicBack}
@@ -1095,7 +942,6 @@ export default function PublicLayout() {
             focus:ring-offset-slate-50
           "
         >
-
           {/* ==================================================
               ARROW ICON
           =================================================== */}
@@ -1121,20 +967,14 @@ export default function PublicLayout() {
               group-hover:bg-white/20
             "
           >
-            <ArrowLeft
-              className="h-4 w-4"
-              strokeWidth={2.75}
-            />
+            <ArrowLeft className="h-4 w-4" strokeWidth={2.75} />
           </span>
 
           {/* ==================================================
               TEXT
           =================================================== */}
 
-          <span className="pr-1 tracking-wide">
-            Back
-          </span>
-
+          <span className="pr-1 tracking-wide">Back</span>
         </button>
       </div>
     </div>
