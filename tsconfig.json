@@ -7,5 +7,10 @@
     "types": ["node"],
     "skipLibCheck": true
   },
-  "include": ["drizzle.config.ts", "db/**/*.ts"]
+  "include": [
+    "drizzle.config.ts",
+    "db/**/*.ts",
+    "netlify/functions/**/*.ts",
+    "netlify/utils/**/*.ts"
+  ]
 }
