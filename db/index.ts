@@ -20,6 +20,16 @@ import * as relations from "./relations";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+
+  ssl: {
+    rejectUnauthorized: false,
+  },
+
+  max: 5,
+
+  idleTimeoutMillis: 30_000,
+
+  connectionTimeoutMillis: 10_000,
 });
 
 export const db = drizzle(pool, {
