@@ -1,110 +1,94 @@
 import type { Handler } from "@netlify/functions";
+
 import { eq } from "drizzle-orm";
 
-import { db } from "../../../db";
 import { users } from "../../../db/schema/users";
 
+import { db } from "../utils/db";
+
 import {
-  getTokenFromCookie,
+  getCookie,
+  jsonResponse,
+  toAuthUser,
   verifyToken,
 } from "../utils/auth";
 
-function response(
-  statusCode: number,
-  data: unknown,
-) {
-  return {
-    statusCode,
+const COOKIE_NAME = "lottery_auth";
 
-    headers: {
-      "Content-Type":
-        "application/json",
-    },
-
-    body: JSON.stringify(data),
-  };
-}
-
-export const handler: Handler = async (
-  event,
-) => {
+export const handler: Handler = async (event) => {
   if (event.httpMethod !== "GET") {
-    return response(405, {
-      success: false,
-      message: "Method not allowed",
-    });
+    return jsonResponse(
+      405,
+      {
+        success: false,
+
+        message: "Method not allowed",
+      },
+      {
+        Allow: "GET",
+      },
+    );
   }
 
   try {
-    const cookie =
-      event.headers.cookie ??
-      event.headers.Cookie;
-
-    const token =
-      getTokenFromCookie(cookie);
+    const token = getCookie(event, COOKIE_NAME);
 
     if (!token) {
-      return response(401, {
+      return jsonResponse(401, {
         success: false,
+
         message: "Not authenticated",
       });
     }
 
-    const authUser =
-      await verifyToken(token);
+    let payload;
 
-    const user =
-      await db.query.users.findFirst({
-        where: eq(
-          users.id,
-          authUser.id,
-        ),
+    try {
+      payload = await verifyToken(token);
+    } catch {
+      return jsonResponse(401, {
+        success: false,
+
+        message: "Session expired or invalid",
       });
+    }
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, payload.userId),
+    });
 
     if (!user) {
-      return response(401, {
+      return jsonResponse(401, {
         success: false,
-        message:
-          "User no longer exists",
+
+        message: "User account no longer exists",
       });
     }
 
     if (user.status !== "ACTIVE") {
-      return response(403, {
+      return jsonResponse(403, {
         success: false,
-        message:
-          "Your account is not active",
+
+        message: "Your account is not active",
       });
     }
 
-    return response(200, {
+    return jsonResponse(200, {
       success: true,
 
+      message: "Authenticated",
+
       data: {
-        user: {
-          id: user.id,
-          username:
-            user.username,
-          fullName:
-            user.fullName,
-          phone: user.phone,
-          role: user.role,
-          status: user.status,
-          isVerified:
-            user.isVerified,
-        },
+        user: toAuthUser(user),
       },
     });
   } catch (error) {
-    console.error(
-      "Me error:",
-      error,
-    );
+    console.error("ME ERROR:", error);
 
-    return response(401, {
+    return jsonResponse(500, {
       success: false,
-      message:
-        "Invalid authentication",
+
+      message: "Unable to get current user",
     });
   }
 };

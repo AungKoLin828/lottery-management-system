@@ -1,36 +1,31 @@
-import type {
-  Handler,
-  HandlerEvent,
-  HandlerResponse,
-} from "@netlify/functions";
+import type { Handler } from "@netlify/functions";
 
-import { clearAuthCookie } from "../utils/auth";
+import { clearAuthCookie, jsonResponse } from "../utils/auth";
 
-export const handler: Handler = async (
-  event: HandlerEvent
-): Promise<HandlerResponse> => {
+export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") {
-    return {
-      statusCode: 405,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    return jsonResponse(
+      405,
+      {
         success: false,
+
         message: "Method not allowed",
-      }),
-    };
+      },
+      {
+        Allow: "POST",
+      },
+    );
   }
 
-  return {
-    statusCode: 200,
-    headers: {
-      "Content-Type": "application/json",
+  return jsonResponse(
+    200,
+    {
+      success: true,
+
+      message: "Logged out successfully",
+    },
+    {
       "Set-Cookie": clearAuthCookie(),
     },
-    body: JSON.stringify({
-      success: true,
-      message: "Logged out successfully",
-    }),
-  };
+  );
 };

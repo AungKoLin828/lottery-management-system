@@ -1,65 +1,58 @@
 import type { Handler } from "@netlify/functions";
-import bcrypt from "bcryptjs";
+
 import { eq } from "drizzle-orm";
 
-import { db } from "../../../db";
+import bcrypt from "bcryptjs";
+
 import { users } from "../../../db/schema/users";
 
+import { db } from "../utils/db";
+
 import {
+  createAuthCookie,
   createToken,
-  getAuthCookie,
+  jsonResponse,
+  parseBody,
+  toAuthUser,
 } from "../utils/auth";
 
-function response(
-  statusCode: number,
-  data: unknown,
-  headers: Record<string, string> = {},
-) {
-  return {
-    statusCode,
+interface LoginBody {
+  phone?: string;
 
-    headers: {
-      "Content-Type": "application/json",
-
-      ...headers,
-    },
-
-    body: JSON.stringify(data),
-  };
+  password?: string;
 }
 
 function normalizePhone(phone: string): string {
-  return phone
-    .trim()
-    .replace(/[\s()-]/g, "");
+  return phone.trim().replace(/\s+/g, "");
 }
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") {
-    return response(405, {
-      success: false,
-      message: "Method not allowed",
-    });
+    return jsonResponse(
+      405,
+      {
+        success: false,
+
+        message: "Method not allowed",
+      },
+      {
+        Allow: "POST",
+      },
+    );
   }
 
   try {
-    const body = JSON.parse(
-      event.body ?? "{}",
-    );
+    const body = parseBody<LoginBody>(event);
 
-    const phone = normalizePhone(
-      String(body.phone ?? ""),
-    );
+    const phone = normalizePhone(body.phone ?? "");
 
-    const password = String(
-      body.password ?? "",
-    );
+    const password = body.password ?? "";
 
     if (!phone || !password) {
-      return response(400, {
+      return jsonResponse(400, {
         success: false,
-        message:
-          "Phone and password are required",
+
+        message: "Phone number and password are required",
       });
     }
 
@@ -67,57 +60,50 @@ export const handler: Handler = async (event) => {
       where: eq(users.phone, phone),
     });
 
-    /*
-     * Don't reveal whether the phone exists.
-     */
     if (!user) {
-      return response(401, {
+      return jsonResponse(401, {
         success: false,
-        message: "Invalid phone or password",
+
+        message: "Invalid phone number or password",
+      });
+    }
+
+    const passwordValid = await bcrypt.compare(password, user.passwordHash);
+
+    if (!passwordValid) {
+      return jsonResponse(401, {
+        success: false,
+
+        message: "Invalid phone number or password",
       });
     }
 
     if (user.status !== "ACTIVE") {
-      return response(403, {
+      return jsonResponse(403, {
         success: false,
+
         message:
-          "Your account is not active",
+          user.status === "SUSPENDED"
+            ? "Your account has been suspended"
+            : "Your account is inactive",
       });
     }
 
-    const passwordValid =
-      await bcrypt.compare(
-        password,
-        user.passwordHash,
-      );
-
-    if (!passwordValid) {
-      return response(401, {
-        success: false,
-        message: "Invalid phone or password",
-      });
-    }
-
-    /*
-     * Create authentication token.
-     */
-    const token = await createToken({
-      id: user.id,
-      role: user.role,
-    });
-
-    /*
-     * Update last login.
-     */
-    await db
+    const [updatedUser] = await db
       .update(users)
       .set({
         lastLoginAt: new Date(),
+
         updatedAt: new Date(),
       })
-      .where(eq(users.id, user.id));
+      .where(eq(users.id, user.id))
+      .returning();
 
-    return response(
+    const currentUser = updatedUser ?? user;
+
+    const token = await createToken(currentUser);
+
+    return jsonResponse(
       200,
       {
         success: true,
@@ -125,31 +111,20 @@ export const handler: Handler = async (event) => {
         message: "Login successful",
 
         data: {
-          user: {
-            id: user.id,
-            username: user.username,
-            fullName: user.fullName,
-            phone: user.phone,
-            role: user.role,
-            status: user.status,
-            isVerified: user.isVerified,
-          },
+          user: toAuthUser(currentUser),
         },
       },
       {
-        "Set-Cookie":
-          getAuthCookie(token),
+        "Set-Cookie": createAuthCookie(token),
       },
     );
   } catch (error) {
-    console.error(
-      "Login error:",
-      error,
-    );
+    console.error("LOGIN ERROR:", error);
 
-    return response(500, {
+    return jsonResponse(500, {
       success: false,
-      message: "Unable to login",
+
+      message: "Login failed",
     });
   }
 };

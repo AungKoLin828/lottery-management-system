@@ -1,263 +1,174 @@
 import type { Handler } from "@netlify/functions";
-import bcrypt from "bcryptjs";
+
 import { eq } from "drizzle-orm";
 
-import { db } from "../../../db";
+import bcrypt from "bcryptjs";
+
 import { users } from "../../../db/schema/users";
 
+import { db } from "../utils/db";
+
 import {
+  createAuthCookie,
   createToken,
-  getAuthCookie,
+  jsonResponse,
+  parseBody,
+  toAuthUser,
 } from "../utils/auth";
 
-function response(
-  statusCode: number,
-  data: unknown,
-  headers: Record<string, string> = {},
-) {
-  return {
-    statusCode,
+interface RegisterBody {
+  name?: string;
 
-    headers: {
-      "Content-Type": "application/json",
+  phone?: string;
 
-      ...headers,
-    },
+  password?: string;
 
-    body: JSON.stringify(data),
-  };
+  confirmPassword?: string;
 }
 
-function normalizePhone(
-  phone: string,
-): string {
-  return phone
-    .trim()
-    .replace(/[\s()-]/g, "");
+function normalizePhone(phone: string): string {
+  return phone.trim().replace(/\s+/g, "");
 }
 
 function generateUsername(): string {
-  return (
-    "player_" +
-    crypto
-      .randomUUID()
-      .replace(/-/g, "")
-      .slice(0, 12)
-  );
+  const random = crypto.randomUUID().replace(/-/g, "").substring(0, 10);
+
+  return `player_${random}`;
 }
 
-export const handler: Handler = async (
-  event,
-) => {
+export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") {
-    return response(405, {
-      success: false,
-      message: "Method not allowed",
-    });
+    return jsonResponse(
+      405,
+      {
+        success: false,
+
+        message: "Method not allowed",
+      },
+      {
+        Allow: "POST",
+      },
+    );
   }
 
   try {
-    const body = JSON.parse(
-      event.body ?? "{}",
-    );
+    const body = parseBody<RegisterBody>(event);
 
-    const fullName = String(
-      body.name ?? "",
-    ).trim();
+    const name = body.name?.trim() ?? "";
 
-    const phone = normalizePhone(
-      String(body.phone ?? ""),
-    );
+    const phone = normalizePhone(body.phone ?? "");
 
-    const password = String(
-      body.password ?? "",
-    );
+    const password = body.password ?? "";
 
-    const confirmPassword = String(
-      body.confirmPassword ?? "",
-    );
+    const confirmPassword = body.confirmPassword ?? "";
 
-    /*
-     * Validate name.
-     */
-    if (!fullName) {
-      return response(400, {
+    if (!name) {
+      return jsonResponse(400, {
         success: false,
+
         message: "Full name is required",
       });
     }
 
-    if (fullName.length > 150) {
-      return response(400, {
+    if (name.length < 2) {
+      return jsonResponse(400, {
         success: false,
-        message:
-          "Full name is too long",
+
+        message: "Full name must be at least 2 characters",
       });
     }
 
-    /*
-     * Validate phone.
-     */
     if (!phone) {
-      return response(400, {
+      return jsonResponse(400, {
         success: false,
-        message:
-          "Phone number is required",
+
+        message: "Phone number is required",
       });
     }
 
-    if (!/^\+?[0-9]{8,15}$/.test(phone)) {
-      return response(400, {
+    if (password.length < 6) {
+      return jsonResponse(400, {
         success: false,
-        message:
-          "Invalid phone number",
+
+        message: "Password must be at least 6 characters",
       });
     }
 
-    /*
-     * Validate password.
-     */
-    if (password.length < 8) {
-      return response(400, {
+    if (password !== confirmPassword) {
+      return jsonResponse(400, {
         success: false,
-        message:
-          "Password must contain at least 8 characters",
+
+        message: "Passwords do not match",
       });
     }
 
-    if (password.length > 100) {
-      return response(400, {
-        success: false,
-        message:
-          "Password is too long",
-      });
-    }
-
-    if (
-      password !==
-      confirmPassword
-    ) {
-      return response(400, {
-        success: false,
-        message:
-          "Passwords do not match",
-      });
-    }
-
-    /*
-     * Check duplicate phone.
-     */
-    const existingUser =
-      await db.query.users.findFirst({
-        where: eq(
-          users.phone,
-          phone,
-        ),
-      });
+    const existingUser = await db.query.users.findFirst({
+      where: eq(users.phone, phone),
+    });
 
     if (existingUser) {
-      return response(409, {
+      return jsonResponse(409, {
         success: false,
-        message:
-          "Phone number is already registered",
+
+        message: "An account with this phone number already exists",
       });
     }
 
-    /*
-     * Hash password.
-     *
-     * NEVER save the plain password.
-     */
-    const passwordHash =
-      await bcrypt.hash(
-        password,
-        12,
-      );
+    const passwordHash = await bcrypt.hash(password, 12);
 
-    const username =
-      generateUsername();
+    const username = generateUsername();
 
-    /*
-     * Create player.
-     */
-    const [user] =
-      await db
-        .insert(users)
-        .values({
-          username,
+    const [user] = await db
+      .insert(users)
+      .values({
+        username,
 
-          fullName,
+        phone,
 
-          phone,
+        fullName: name,
 
-          passwordHash,
+        passwordHash,
 
-          role: "PLAYER",
+        role: "PLAYER",
 
-          status: "ACTIVE",
+        status: "ACTIVE",
 
-          /*
-           * For now false.
-           *
-           * Change to true after OTP verification.
-           */
-          isVerified: false,
-        })
-        .returning({
-          id: users.id,
-          username: users.username,
-          fullName: users.fullName,
-          phone: users.phone,
-          role: users.role,
-          status: users.status,
-          isVerified:
-            users.isVerified,
-        });
+        isVerified: false,
+      })
+      .returning();
 
     if (!user) {
-      return response(500, {
+      return jsonResponse(500, {
         success: false,
-        message:
-          "Unable to create account",
+
+        message: "Unable to create account",
       });
     }
 
-    /*
-     * Automatically login after registration.
-     */
-    const token =
-      await createToken({
-        id: user.id,
-        role: user.role,
-      });
+    const token = await createToken(user);
 
-    return response(
+    return jsonResponse(
       201,
       {
         success: true,
 
-        message:
-          "Account created successfully",
+        message: "Account created successfully",
 
         data: {
-          user,
+          user: toAuthUser(user),
         },
       },
       {
-        "Set-Cookie":
-          getAuthCookie(token),
+        "Set-Cookie": createAuthCookie(token),
       },
     );
   } catch (error) {
-    console.error(
-      "Register error:",
-      error,
-    );
+    console.error("REGISTER ERROR:", error);
 
-    return response(500, {
+    return jsonResponse(500, {
       success: false,
-      message:
-        "Unable to create account",
+
+      message: "Unable to create account",
     });
   }
 };

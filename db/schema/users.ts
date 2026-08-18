@@ -7,10 +7,7 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 
-export const userRoleEnum = pgEnum("user_role", [
-  "ADMIN",
-  "PLAYER",
-]);
+export const userRoleEnum = pgEnum("user_role", ["ADMIN", "PLAYER"]);
 
 export const userStatusEnum = pgEnum("user_status", [
   "ACTIVE",
@@ -19,9 +16,7 @@ export const userStatusEnum = pgEnum("user_status", [
 ]);
 
 export const users = pgTable("users", {
-  id: uuid("id")
-    .defaultRandom()
-    .primaryKey(),
+  id: uuid("id").defaultRandom().primaryKey(),
 
   /*
    * Automatically generated for players.
@@ -55,20 +50,14 @@ export const users = pgTable("users", {
     .notNull()
     .unique(),
 
-  role: userRoleEnum("role")
-    .notNull()
-    .default("PLAYER"),
+  role: userRoleEnum("role").notNull().default("PLAYER"),
 
-  status: userStatusEnum("status")
-    .notNull()
-    .default("ACTIVE"),
+  status: userStatusEnum("status").notNull().default("ACTIVE"),
 
   /*
    * false until phone verification is completed.
    */
-  isVerified: boolean("is_verified")
-    .notNull()
-    .default(false),
+  isVerified: boolean("is_verified").notNull().default(false),
 
   lastLoginAt: timestamp("last_login_at", {
     withTimezone: true,
