@@ -2,16 +2,17 @@ import type { PaymentMethod } from "@/types/settings";
 
 /*
  * ============================================================
- * TEMPORARY PLAYER WALLET SETTINGS
+ * PLAYER WALLET PAYMENT METHODS
  * ============================================================
  *
- * Later these values should come from:
+ * qrCode:
+ *   - Can contain a public image path
+ *   - Example: "/payment-qr/kbzpay.png"
+ *   - Or an external image URL
  *
- * Admin Settings
- *      ↓
- * API / Netlify Function
- *      ↓
- * Player Deposit / Withdraw
+ * accountNumber:
+ *   - Phone number for KBZPay / WavePay / AYA Pay
+ *   - Bank account number for bank transfer
  *
  */
 
@@ -21,7 +22,8 @@ export const walletPaymentMethods: PaymentMethod[] = [
     name: "KBZPay",
     type: "Both",
     enabled: true,
-    qrCode: "",
+    logo: "/payment-logos/kbzpay.png",
+    qrCode: "/payment-qr/kbzpay.png",
     accountName: "Lottery Admin",
     accountNumber: "09123456789",
     bankName: "",
@@ -34,7 +36,8 @@ export const walletPaymentMethods: PaymentMethod[] = [
     name: "WavePay",
     type: "Deposit",
     enabled: true,
-    qrCode: "",
+    logo: "/payment-logos/wavepay.png",
+    qrCode: "/payment-qr/wavepay.png",
     accountName: "Lottery Admin",
     accountNumber: "09987654321",
     bankName: "",
@@ -47,7 +50,8 @@ export const walletPaymentMethods: PaymentMethod[] = [
     name: "AYA Pay",
     type: "Both",
     enabled: false,
-    qrCode: "",
+    logo: "/payment-logos/ayapay.png",
+    qrCode: "/payment-qr/ayapay.png",
     accountName: "Lottery Admin",
     accountNumber: "09777777777",
     bankName: "",
@@ -60,6 +64,7 @@ export const walletPaymentMethods: PaymentMethod[] = [
     name: "Bank Transfer",
     type: "Withdraw",
     enabled: true,
+    logo: "/payment-logos/bank.png",
     qrCode: "",
     accountName: "Lottery Company",
     accountNumber: "1234567890",
@@ -69,23 +74,45 @@ export const walletPaymentMethods: PaymentMethod[] = [
   },
 ];
 
+/*
+ * ============================================================
+ * DEPOSIT SETTINGS
+ * ============================================================
+ */
+
 export const depositSettings = {
   minimumDeposit: 1000,
+
   maximumDeposit: 1000000,
+
   dailyDepositLimit: 5000000,
+
   processingTime: "5-15 minutes",
 
   autoApproval: false,
+
   manualApproval: true,
 
+  /*
+   * Payment methods allowed for deposit.
+   */
   allowedPaymentMethods: [1, 2, 3],
 
-  depositNote: "Please make sure your transaction number is correct.",
+  depositNote:
+    "Please send the exact amount to the selected payment account and enter the last 6 digits of your transaction number correctly.",
 };
+
+/*
+ * ============================================================
+ * WITHDRAW SETTINGS
+ * ============================================================
+ */
 
 export const withdrawSettings = {
   minimumWithdraw: 5000,
+
   maximumWithdraw: 500000,
+
   dailyWithdrawLimit: 1000000,
 
   approvalRequired: true,

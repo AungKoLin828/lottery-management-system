@@ -1,22 +1,38 @@
+/* ============================================================
+   GENERAL SETTINGS
+============================================================ */
+
 export interface GeneralSettings {
   systemName: string;
+
   currency: string;
+
   timeZone: string;
+
   language: string;
 
   logo: string;
+
   favicon: string;
 
   contactPhone: string;
+
   contactEmail: string;
+
   address: string;
 
   facebook: string;
+
   telegram: string;
+
   viber: string;
 
   announcement: string;
 }
+
+/* ============================================================
+   PAYMENT METHOD
+============================================================ */
 
 export type PaymentMethodType = "Deposit" | "Withdraw" | "Both";
 
@@ -29,6 +45,25 @@ export interface PaymentMethod {
 
   enabled: boolean;
 
+  /*
+   * Payment method logo
+   *
+   * Example:
+   * /payment-logos/kbzpay.png
+   * /payment-logos/wavepay.png
+   * /payment-logos/ayapay.png
+   *
+   * Optional so existing payment methods
+   * are not affected.
+   */
+  logo?: string;
+
+  /*
+   * Payment QR code
+   *
+   * Example:
+   * /payment-qr/kbzpay.png
+   */
   qrCode: string;
 
   accountName: string;
@@ -41,6 +76,10 @@ export interface PaymentMethod {
 
   displayOrder: number;
 }
+
+/* ============================================================
+   DEPOSIT SETTINGS
+============================================================ */
 
 export interface DepositSettings {
   minimumDeposit: number;
@@ -60,6 +99,10 @@ export interface DepositSettings {
   processingTime: string;
 }
 
+/* ============================================================
+   WITHDRAW SETTINGS
+============================================================ */
+
 export interface WithdrawSettings {
   minimumWithdraw: number;
 
@@ -77,6 +120,10 @@ export interface WithdrawSettings {
 
   autoWithdraw: boolean;
 }
+
+/* ============================================================
+   MAINTENANCE SETTINGS
+============================================================ */
 
 export interface MaintenanceSettings {
   maintenanceMode: boolean;
