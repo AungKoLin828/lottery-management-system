@@ -1,7 +1,9 @@
 /**
- * Myanmar phone number utilities
+ * ============================================================
+ * MYANMAR PHONE NUMBER UTILITIES
+ * ============================================================
  *
- * Supported input examples:
+ * Supported input:
  *
  * 09xxxxxxxxx
  * 09 xxx xxx xxx
@@ -9,10 +11,18 @@
  * 959xxxxxxxxx
  * +959xxxxxxxxx
  * +95 9 xxx xxx xxx
+ * 00959123456789
  *
  * Output:
  *
  * +959xxxxxxxxx
+ *
+ * Example:
+ *
+ * 09123456789
+ *      ↓
+ * +959123456789
+ * ============================================================
  */
 
 const MYANMAR_COUNTRY_CODE = "95";
@@ -20,8 +30,7 @@ const MYANMAR_COUNTRY_CODE = "95";
 /**
  * Myanmar mobile prefixes.
  *
- * These are used as a numbering-format validation,
- * not as a guaranteed current operator lookup.
+ * These are used for numbering-format validation.
  */
 const MYANMAR_MOBILE_PREFIXES = [
   "20",
@@ -107,19 +116,36 @@ const MYANMAR_MOBILE_PREFIXES = [
 ];
 
 /**
- * Remove spaces, brackets, hyphens and other
- * common formatting characters.
+ * ============================================================
+ * CLEAN PHONE
+ * ============================================================
+ *
+ * Removes common formatting characters.
+ *
+ * Example:
+ *
+ * "09 123-456-789"
+ *      ↓
+ * "09123456789"
  */
 function cleanPhone(phone: string): string {
   return phone.trim().replace(/[\s\-().]/g, "");
 }
 
 /**
- * Convert Myanmar phone number to E.164 format.
+ * ============================================================
+ * NORMALIZE MYANMAR PHONE
+ * ============================================================
+ *
+ * Converts supported Myanmar phone formats to E.164.
  *
  * Examples:
  *
  * 09123456789
+ *      ↓
+ * +959123456789
+ *
+ * 09 123 456 789
  *      ↓
  * +959123456789
  *
@@ -130,50 +156,82 @@ function cleanPhone(phone: string): string {
  * +959123456789
  *      ↓
  * +959123456789
+ *
+ * 00959123456789
+ *      ↓
+ * +959123456789
  */
 export function normalizeMyanmarPhone(phone: string): string {
   let value = cleanPhone(phone);
 
-  // Convert international dialing prefix 00
-  // 00959123456789 → +959123456789
+  if (!value) {
+    return "";
+  }
+
+  /**
+   * International dialing prefix:
+   *
+   * 00959123456789
+   * ↓
+   * +959123456789
+   */
   if (value.startsWith("00")) {
     value = `+${value.substring(2)}`;
   }
 
-  // Remove leading +
+  /**
+   * Remove + temporarily.
+   */
   const withoutPlus = value.startsWith("+") ? value.substring(1) : value;
 
-  // Local Myanmar format:
-  // 09123456789 → 959123456789
+  /**
+   * Myanmar local format:
+   *
+   * 09123456789
+   *
+   * Remove the first 0 and add 95:
+   *
+   * 09 123456789
+   * ↓
+   * 959123456789
+   */
   if (withoutPlus.startsWith("09")) {
     return `+${MYANMAR_COUNTRY_CODE}${withoutPlus.substring(1)}`;
   }
 
-  // Myanmar international format without +
-  // 959123456789 → +959123456789
+  /**
+   * Myanmar international format without +:
+   *
+   * 959123456789
+   * ↓
+   * +959123456789
+   */
   if (withoutPlus.startsWith("959")) {
     return `+${withoutPlus}`;
   }
 
-  // Already +95 but invalid local mobile prefix.
+  /**
+   * Already starts with 95.
+   *
+   * We return it in E.164 format.
+   */
   if (withoutPlus.startsWith("95")) {
     return `+${withoutPlus}`;
   }
 
+  /**
+   * Unsupported format.
+   *
+   * Return cleaned value so validation can
+   * show the correct error.
+   */
   return value;
 }
 
 /**
- * Check whether the number is a Myanmar number.
- */
-export function isMyanmarPhone(phone: string): boolean {
-  const normalized = normalizeMyanmarPhone(phone);
-
-  return normalized.startsWith("+95");
-}
-
-/**
- * Get the mobile number after +95.
+ * ============================================================
+ * GET SUBSCRIBER NUMBER
+ * ============================================================
  *
  * +959123456789
  *       ↓
@@ -190,17 +248,30 @@ function getMyanmarSubscriberNumber(phone: string): string {
 }
 
 /**
- * Check Myanmar mobile prefix.
+ * ============================================================
+ * MYANMAR PHONE CHECK
+ * ============================================================
+ */
+export function isMyanmarPhone(phone: string): boolean {
+  const normalized = normalizeMyanmarPhone(phone);
+
+  return normalized.startsWith("+95");
+}
+
+/**
+ * ============================================================
+ * MOBILE PREFIX VALIDATION
+ * ============================================================
  *
- * For a number:
+ * Example:
  *
  * +959123456789
  *
- * subscriber part:
+ * Subscriber:
  *
  * 9123456789
  *
- * mobile prefix:
+ * Prefix:
  *
  * 91
  */
@@ -217,11 +288,19 @@ export function hasValidMyanmarMobilePrefix(phone: string): boolean {
 }
 
 /**
- * Validate Myanmar mobile number length.
+ * ============================================================
+ * PHONE LENGTH VALIDATION
+ * ============================================================
  *
- * Myanmar mobile numbers after +95 normally
- * start with 9 and contain 9 or 10 digits
- * depending on the numbering range.
+ * After +95:
+ *
+ * +959123456789
+ *     ↑
+ * subscriber = 9123456789
+ *
+ * Supported length:
+ *
+ * 9 or 10 digits
  */
 export function hasValidMyanmarPhoneLength(phone: string): boolean {
   const subscriber = getMyanmarSubscriberNumber(phone);
@@ -234,13 +313,18 @@ export function hasValidMyanmarPhoneLength(phone: string): boolean {
 }
 
 /**
- * Validate the complete Myanmar phone number.
+ * ============================================================
+ * COMPLETE VALIDATION
+ * ============================================================
  */
 export function validateMyanmarPhone(phone: string): {
   valid: boolean;
   normalized: string;
   message: string;
 } {
+  /**
+   * Empty input
+   */
   if (!phone.trim()) {
     return {
       valid: false,
@@ -249,9 +333,14 @@ export function validateMyanmarPhone(phone: string): {
     };
   }
 
+  /**
+   * Normalize first.
+   */
   const normalized = normalizeMyanmarPhone(phone);
 
-  // Must be +95
+  /**
+   * Must be +95.
+   */
   if (!normalized.startsWith("+95")) {
     return {
       valid: false,
@@ -260,7 +349,11 @@ export function validateMyanmarPhone(phone: string): {
     };
   }
 
-  // Must be +959
+  /**
+   * Must be a Myanmar mobile number.
+   *
+   * +959...
+   */
   if (!normalized.startsWith("+959")) {
     return {
       valid: false,
@@ -269,7 +362,9 @@ export function validateMyanmarPhone(phone: string): {
     };
   }
 
-  // Only digits after +
+  /**
+   * Only digits after +.
+   */
   if (!/^\+95\d+$/.test(normalized)) {
     return {
       valid: false,
@@ -278,7 +373,9 @@ export function validateMyanmarPhone(phone: string): {
     };
   }
 
-  // Length
+  /**
+   * Validate subscriber length.
+   */
   if (!hasValidMyanmarPhoneLength(normalized)) {
     return {
       valid: false,
@@ -287,7 +384,9 @@ export function validateMyanmarPhone(phone: string): {
     };
   }
 
-  // Prefix
+  /**
+   * Validate mobile prefix.
+   */
   if (!hasValidMyanmarMobilePrefix(normalized)) {
     return {
       valid: false,

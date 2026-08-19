@@ -134,7 +134,7 @@ export default function Register() {
         form.confirmPassword,
       );
 
-      navigate("/player/dashboard", {
+      navigate("/player", {
         replace: true,
       });
     } catch (error) {

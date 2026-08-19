@@ -11,21 +11,26 @@ import {
 import Input from "@/components/common/Input";
 import Button from "@/components/common/Button";
 
+import { validateMyanmarPhone } from "@/utils/myanmarPhone";
+
 /* ============================================================
    TYPES
 ============================================================ */
 
+interface LoginUser {
+  id: string | number;
+  phone?: string;
+  name?: string;
+  role?: string;
+  status?: string;
+}
+
 interface LoginResponse {
   success: boolean;
   message?: string;
+
   data?: {
-    user?: {
-      id: string | number;
-      phone?: string;
-      name?: string;
-      role?: string;
-      status?: string;
-    };
+    user?: LoginUser;
   };
 }
 
@@ -51,19 +56,37 @@ export default function Login() {
 
     setError("");
 
-    const normalizedPhone = phone.trim();
-    const normalizedPassword = password;
+    /* ==========================================================
+       PHONE VALIDATION + NORMALIZATION
+    ========================================================== */
 
-    /* ----------------------------------------------------------
-       CLIENT VALIDATION
-    ---------------------------------------------------------- */
+    const phoneResult = validateMyanmarPhone(phone);
 
-    if (!normalizedPhone) {
-      setError("Please enter your phone number.");
+    if (!phoneResult.valid) {
+      setError(phoneResult.message);
       return;
     }
 
-    if (!normalizedPassword) {
+    /**
+     * This is the normalized E.164 phone number.
+     *
+     * Example:
+     *
+     * User enters:
+     *
+     * 09123456789
+     *
+     * Backend receives:
+     *
+     * +959123456789
+     */
+    const normalizedPhone = phoneResult.normalized;
+
+    /* ==========================================================
+       PASSWORD VALIDATION
+    ========================================================== */
+
+    if (!password.trim()) {
       setError("Please enter your password.");
       return;
     }
@@ -71,9 +94,9 @@ export default function Login() {
     setLoading(true);
 
     try {
-      /* --------------------------------------------------------
+      /* ========================================================
          LOGIN REQUEST
-      -------------------------------------------------------- */
+      ======================================================== */
 
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -82,17 +105,23 @@ export default function Login() {
           "Content-Type": "application/json",
         },
 
+        /**
+         * Important:
+         *
+         * Allows the browser to receive/store
+         * the authentication cookie.
+         */
         credentials: "include",
 
         body: JSON.stringify({
           phone: normalizedPhone,
-          password: normalizedPassword,
+          password,
         }),
       });
 
-      /* --------------------------------------------------------
+      /* ========================================================
          PARSE RESPONSE
-      -------------------------------------------------------- */
+      ======================================================== */
 
       let data: LoginResponse;
 
@@ -100,12 +129,13 @@ export default function Login() {
         data = (await response.json()) as LoginResponse;
       } catch {
         setError("Invalid response from server. Please try again.");
+
         return;
       }
 
-      /* --------------------------------------------------------
+      /* ========================================================
          LOGIN ERROR
-      -------------------------------------------------------- */
+      ======================================================== */
 
       if (!response.ok || !data.success) {
         setError(data.message || "Invalid phone number or password.");
@@ -113,9 +143,9 @@ export default function Login() {
         return;
       }
 
-      /* --------------------------------------------------------
-         GET AUTHENTICATED USER
-      -------------------------------------------------------- */
+      /* ========================================================
+         AUTHENTICATED USER
+      ======================================================== */
 
       const loggedInUser = data.data?.user;
 
@@ -127,13 +157,17 @@ export default function Login() {
 
       console.log("Login successful:", loggedInUser);
 
-      /* --------------------------------------------------------
-         ROLE-BASED REDIRECT
-      -------------------------------------------------------- */
+      /* ========================================================
+         ROLE
+      ======================================================== */
 
       const role = String(loggedInUser.role ?? "")
         .trim()
         .toUpperCase();
+
+      /* ========================================================
+         ROLE-BASED REDIRECT
+      ======================================================== */
 
       switch (role) {
         /* ======================================================
@@ -144,6 +178,7 @@ export default function Login() {
           navigate("/player", {
             replace: true,
           });
+
           break;
 
         /* ======================================================
@@ -154,6 +189,7 @@ export default function Login() {
           navigate("/admin", {
             replace: true,
           });
+
           break;
 
         /* ======================================================
@@ -166,6 +202,7 @@ export default function Login() {
           setError(
             "Your account role is not supported. Please contact support.",
           );
+
           break;
       }
     } catch (error) {
@@ -201,9 +238,7 @@ export default function Login() {
 
       <div className="relative z-10 w-full max-w-[430px]">
         <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-300/30">
-          {/* =================================================
-              TOP GRADIENT
-          ================================================== */}
+          {/* TOP GRADIENT */}
 
           <div className="h-1 bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-600" />
 
