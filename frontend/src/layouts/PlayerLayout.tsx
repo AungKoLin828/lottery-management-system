@@ -1,9 +1,4 @@
-import {
-  NavLink,
-  Outlet,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import {
   LayoutDashboard,
@@ -23,11 +18,7 @@ import {
   Bell,
 } from "lucide-react";
 
-import {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 
 import NotificationBell from "@/components/common/notification/NotificationBell";
 
@@ -94,10 +85,7 @@ const moreNavigation = [
 ============================================================ */
 
 function isPlayerPath(path: string) {
-  return (
-    path === "/player" ||
-    path.startsWith("/player/")
-  );
+  return path === "/player" || path.startsWith("/player/");
 }
 
 /* ============================================================
@@ -112,71 +100,53 @@ export default function PlayerLayout() {
      DESKTOP DROPDOWN STATE
   ============================================================ */
 
-  const [playMenuOpen, setPlayMenuOpen] =
-    useState(false);
+  const [playMenuOpen, setPlayMenuOpen] = useState(false);
 
-  const [moreMenuOpen, setMoreMenuOpen] =
-    useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
 
-  const [profileMenuOpen, setProfileMenuOpen] =
-    useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   /* ============================================================
      MOBILE STATE
   ============================================================ */
 
-  const [mobileMenuOpen, setMobileMenuOpen] =
-    useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const [mobilePlayOpen, setMobilePlayOpen] =
-    useState(false);
+  const [mobilePlayOpen, setMobilePlayOpen] = useState(false);
 
   /* ============================================================
      MOBILE BACK BUTTON
   ============================================================ */
 
-  const [showBackButton, setShowBackButton] =
-    useState(false);
+  const [showBackButton, setShowBackButton] = useState(false);
 
   /* ============================================================
      REFS
   ============================================================ */
 
-  const profileMenuRef =
-    useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
 
-  const playMenuRef =
-    useRef<HTMLDivElement>(null);
+  const playMenuRef = useRef<HTMLDivElement>(null);
 
-  const moreMenuRef =
-    useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   /* ============================================================
      PLAYER HISTORY STORAGE KEY
   ============================================================ */
 
-  const PLAYER_HISTORY_KEY =
-    "lottery_player_navigation_history";
+  const PLAYER_HISTORY_KEY = "lottery_player_navigation_history";
 
   /* ============================================================
      ACTIVE ROUTES
   ============================================================ */
 
   const isPlayActive =
-    location.pathname.startsWith(
-      "/player/play-2d",
-    ) ||
-    location.pathname.startsWith(
-      "/player/play-3d",
-    );
+    location.pathname.startsWith("/player/play-2d") ||
+    location.pathname.startsWith("/player/play-3d");
 
   const isMoreActive =
-    location.pathname.startsWith(
-      "/player/results-history",
-    ) ||
-    location.pathname.startsWith(
-      "/player/contact",
-    );
+    location.pathname.startsWith("/player/results-history") ||
+    location.pathname.startsWith("/player/contact");
 
   /* ============================================================
      CLOSE EVERYTHING
@@ -292,10 +262,7 @@ export default function PlayerLayout() {
     }
 
     try {
-      const stored =
-        sessionStorage.getItem(
-          PLAYER_HISTORY_KEY,
-        );
+      const stored = sessionStorage.getItem(PLAYER_HISTORY_KEY);
 
       let history: string[] = [];
 
@@ -306,8 +273,7 @@ export default function PlayerLayout() {
           if (Array.isArray(parsed)) {
             history = parsed.filter(
               (item): item is string =>
-                typeof item === "string" &&
-                isPlayerPath(item),
+                typeof item === "string" && isPlayerPath(item),
             );
           }
         } catch {
@@ -315,8 +281,7 @@ export default function PlayerLayout() {
         }
       }
 
-      const lastRoute =
-        history[history.length - 1];
+      const lastRoute = history[history.length - 1];
 
       if (lastRoute !== location.pathname) {
         history.push(location.pathname);
@@ -326,10 +291,7 @@ export default function PlayerLayout() {
         history = history.slice(-30);
       }
 
-      sessionStorage.setItem(
-        PLAYER_HISTORY_KEY,
-        JSON.stringify(history),
-      );
+      sessionStorage.setItem(PLAYER_HISTORY_KEY, JSON.stringify(history));
     } catch {
       // Ignore sessionStorage errors.
     }
@@ -341,26 +303,17 @@ export default function PlayerLayout() {
 
   useEffect(() => {
     const handleScroll = () => {
-      setShowBackButton(
-        window.scrollY > 120,
-      );
+      setShowBackButton(window.scrollY > 120);
     };
 
     handleScroll();
 
-    window.addEventListener(
-      "scroll",
-      handleScroll,
-      {
-        passive: true,
-      },
-    );
+    window.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
 
     return () => {
-      window.removeEventListener(
-        "scroll",
-        handleScroll,
-      );
+      window.removeEventListener("scroll", handleScroll);
     };
   }, []);
 
@@ -370,10 +323,7 @@ export default function PlayerLayout() {
 
   const handlePlayerBack = () => {
     try {
-      const stored =
-        sessionStorage.getItem(
-          PLAYER_HISTORY_KEY,
-        );
+      const stored = sessionStorage.getItem(PLAYER_HISTORY_KEY);
 
       let history: string[] = [];
 
@@ -384,8 +334,7 @@ export default function PlayerLayout() {
           if (Array.isArray(parsed)) {
             history = parsed.filter(
               (item): item is string =>
-                typeof item === "string" &&
-                isPlayerPath(item),
+                typeof item === "string" && isPlayerPath(item),
             );
           }
         } catch {
@@ -397,30 +346,22 @@ export default function PlayerLayout() {
 
       if (
         history.length > 0 &&
-        history[history.length - 1] ===
-          location.pathname
+        history[history.length - 1] === location.pathname
       ) {
         history.pop();
       }
 
       /* Previous player page */
 
-      const previousPlayerPage =
-        history[history.length - 1];
+      const previousPlayerPage = history[history.length - 1];
 
       /* Save updated history */
 
-      sessionStorage.setItem(
-        PLAYER_HISTORY_KEY,
-        JSON.stringify(history),
-      );
+      sessionStorage.setItem(PLAYER_HISTORY_KEY, JSON.stringify(history));
 
       /* Navigate to previous player page */
 
-      if (
-        previousPlayerPage &&
-        isPlayerPath(previousPlayerPage)
-      ) {
+      if (previousPlayerPage && isPlayerPath(previousPlayerPage)) {
         navigate(previousPlayerPage);
         return;
       }
@@ -451,44 +392,26 @@ export default function PlayerLayout() {
   ============================================================ */
 
   useEffect(() => {
-    const handleClickOutside = (
-      event: MouseEvent,
-    ) => {
-      const target =
-        event.target as Node;
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
 
-      if (
-        profileMenuRef.current &&
-        !profileMenuRef.current.contains(target)
-      ) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
         setProfileMenuOpen(false);
       }
 
-      if (
-        playMenuRef.current &&
-        !playMenuRef.current.contains(target)
-      ) {
+      if (playMenuRef.current && !playMenuRef.current.contains(target)) {
         setPlayMenuOpen(false);
       }
 
-      if (
-        moreMenuRef.current &&
-        !moreMenuRef.current.contains(target)
-      ) {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(target)) {
         setMoreMenuOpen(false);
       }
     };
 
-    document.addEventListener(
-      "mousedown",
-      handleClickOutside,
-    );
+    document.addEventListener("mousedown", handleClickOutside);
 
     return () => {
-      document.removeEventListener(
-        "mousedown",
-        handleClickOutside,
-      );
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -520,11 +443,7 @@ export default function PlayerLayout() {
      DESKTOP NAV CLASS
   ============================================================ */
 
-  const navClass = ({
-    isActive,
-  }: {
-    isActive: boolean;
-  }) =>
+  const navClass = ({ isActive }: { isActive: boolean }) =>
     `group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
       isActive
         ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
@@ -535,10 +454,7 @@ export default function PlayerLayout() {
      PLAY ITEM CLASS
   ============================================================ */
 
-  const playItemClass = (
-    isActive: boolean,
-    is2D: boolean,
-  ) =>
+  const playItemClass = (isActive: boolean, is2D: boolean) =>
     `group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200 ${
       isActive
         ? is2D
@@ -555,15 +471,12 @@ export default function PlayerLayout() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-
       {/* ======================================================
           HEADER
       ======================================================= */}
 
       <header className="sticky top-0 z-50 border-b border-slate-700/80 bg-slate-900/95 backdrop-blur-xl">
-
         <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-
           {/* ==================================================
               LOGO
           =================================================== */}
@@ -579,11 +492,13 @@ export default function PlayerLayout() {
 
             <div className="flex items-center">
               <span className="text-lg font-extrabold tracking-tight text-white">
-                Lottery
+                {/* Lottery */}
+                AB
               </span>
 
               <span className="text-lg font-extrabold tracking-tight text-indigo-400">
-                Play
+                {/* Play */}
+                CD
               </span>
             </div>
           </NavLink>
@@ -593,24 +508,16 @@ export default function PlayerLayout() {
           =================================================== */}
 
           <nav className="hidden items-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 lg:flex">
-
             {/* DASHBOARD */}
 
-            <NavLink
-              to="/player"
-              end
-              className={navClass}
-            >
+            <NavLink to="/player" end className={navClass}>
               <LayoutDashboard size={17} />
               Dashboard
             </NavLink>
 
             {/* PLAY */}
 
-            <div
-              ref={playMenuRef}
-              className="relative"
-            >
+            <div ref={playMenuRef} className="relative">
               <button
                 type="button"
                 onClick={togglePlayMenu}
@@ -625,9 +532,7 @@ export default function PlayerLayout() {
                 <Dice5
                   size={17}
                   className={`transition-all duration-200 ${
-                    playMenuOpen
-                      ? "rotate-6 text-indigo-300"
-                      : ""
+                    playMenuOpen ? "rotate-6 text-indigo-300" : ""
                   }`}
                 />
 
@@ -637,9 +542,7 @@ export default function PlayerLayout() {
                   size={15}
                   strokeWidth={2.5}
                   className={`transition-transform duration-200 ${
-                    playMenuOpen
-                      ? "rotate-180"
-                      : ""
+                    playMenuOpen ? "rotate-180" : ""
                   }`}
                 />
 
@@ -663,81 +566,67 @@ export default function PlayerLayout() {
                     </div>
                   </div>
 
-                  {playNavigation.map(
-                    (item, index) => {
-                      const Icon = item.icon;
-                      const is2D = index === 0;
+                  {playNavigation.map((item, index) => {
+                    const Icon = item.icon;
+                    const is2D = index === 0;
 
-                      return (
-                        <NavLink
-                          key={item.path}
-                          to={item.path}
-                          role="menuitem"
-                          onClick={() => {
-                            setPlayMenuOpen(false);
-                            setMoreMenuOpen(false);
-                            setProfileMenuOpen(false);
-                          }}
-                          className={({ isActive }) =>
-                            playItemClass(
-                              isActive,
-                              is2D,
-                            )
-                          }
+                    return (
+                      <NavLink
+                        key={item.path}
+                        to={item.path}
+                        role="menuitem"
+                        onClick={() => {
+                          setPlayMenuOpen(false);
+                          setMoreMenuOpen(false);
+                          setProfileMenuOpen(false);
+                        }}
+                        className={({ isActive }) =>
+                          playItemClass(isActive, is2D)
+                        }
+                      >
+                        <div
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                            is2D
+                              ? "bg-indigo-500/15 text-indigo-400"
+                              : "bg-violet-500/15 text-violet-400"
+                          }`}
                         >
-                          <div
-                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                              is2D
-                                ? "bg-indigo-500/15 text-indigo-400"
-                                : "bg-violet-500/15 text-violet-400"
-                            }`}
-                          >
-                            <Icon className="h-5 w-5" />
-                          </div>
+                          <Icon className="h-5 w-5" />
+                        </div>
 
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-white">
-                              {item.name}
-                            </p>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-white">
+                            {item.name}
+                          </p>
 
-                            <p className="mt-0.5 text-xs text-slate-400">
-                              {item.description}
-                            </p>
-                          </div>
-                        </NavLink>
-                      );
-                    },
-                  )}
+                          <p className="mt-0.5 text-xs text-slate-400">
+                            {item.description}
+                          </p>
+                        </div>
+                      </NavLink>
+                    );
+                  })}
                 </div>
               )}
             </div>
 
             {/* MY TICKETS */}
 
-            <NavLink
-              to="/player/tickets"
-              className={navClass}
-            >
+            <NavLink to="/player/tickets" className={navClass}>
               <Ticket size={17} />
               My Tickets
             </NavLink>
 
             {/* WALLET */}
 
-            <NavLink
-              to="/player/wallet"
-              className={navClass}
-            >
+            <NavLink to="/player/wallet" className={navClass}>
               <WalletCards size={17} />
               Wallet
             </NavLink>
 
             {/* MORE */}
 
-            <div
-              ref={moreMenuRef}
-              className="relative"
-            >
+            <div ref={moreMenuRef} className="relative">
               <button
                 type="button"
                 onClick={toggleMoreMenu}
@@ -755,9 +644,7 @@ export default function PlayerLayout() {
                   size={15}
                   strokeWidth={2.5}
                   className={`transition-transform duration-200 ${
-                    moreMenuOpen
-                      ? "rotate-180"
-                      : ""
+                    moreMenuOpen ? "rotate-180" : ""
                   }`}
                 />
 
@@ -804,7 +691,6 @@ export default function PlayerLayout() {
           =================================================== */}
 
           <div className="flex items-center gap-2">
-
             {/* WALLET */}
 
             <NavLink
@@ -821,9 +707,7 @@ export default function PlayerLayout() {
                   Balance
                 </p>
 
-                <p className="text-sm font-bold text-white">
-                  125,000 MMK
-                </p>
+                <p className="text-sm font-bold text-white">125,000 MMK</p>
               </div>
             </NavLink>
 
@@ -837,10 +721,7 @@ export default function PlayerLayout() {
 
             {/* PROFILE */}
 
-            <div
-              ref={profileMenuRef}
-              className="relative hidden sm:block"
-            >
+            <div ref={profileMenuRef} className="relative hidden sm:block">
               <button
                 type="button"
                 onClick={toggleProfileMenu}
@@ -858,9 +739,7 @@ export default function PlayerLayout() {
                 </div>
 
                 <div className="hidden text-left xl:block">
-                  <p className="text-xs font-bold text-white">
-                    Player
-                  </p>
+                  <p className="text-xs font-bold text-white">Player</p>
 
                   <p className="max-w-[130px] truncate text-[10px] text-slate-400">
                     player@example.com
@@ -870,16 +749,13 @@ export default function PlayerLayout() {
                 <ChevronDown
                   size={15}
                   className={`transition-transform duration-200 ${
-                    profileMenuOpen
-                      ? "rotate-180"
-                      : ""
+                    profileMenuOpen ? "rotate-180" : ""
                   }`}
                 />
               </button>
 
               {profileMenuOpen && (
                 <div className="absolute right-0 top-full z-[100] mt-2 w-60 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 shadow-2xl shadow-slate-950/50">
-
                   <div className="bg-gradient-to-r from-indigo-600/20 to-violet-600/20 px-4 py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white">
@@ -887,9 +763,7 @@ export default function PlayerLayout() {
                       </div>
 
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-white">
-                          Player
-                        </p>
+                        <p className="text-sm font-bold text-white">Player</p>
 
                         <p className="truncate text-xs text-slate-400">
                           player@example.com
@@ -899,7 +773,6 @@ export default function PlayerLayout() {
                   </div>
 
                   <div className="p-2">
-
                     <NavLink
                       to="/player/profile"
                       onClick={closeAllMenus}
@@ -923,7 +796,6 @@ export default function PlayerLayout() {
                       <LogOut size={17} />
                       Logout
                     </button>
-
                   </div>
                 </div>
               )}
@@ -942,9 +814,7 @@ export default function PlayerLayout() {
                   : "border-slate-700 bg-slate-800 text-slate-300 hover:border-indigo-500 hover:bg-indigo-500/20 hover:text-white"
               }`}
               aria-label={
-                mobileMenuOpen
-                  ? "Close navigation"
-                  : "Open navigation"
+                mobileMenuOpen ? "Close navigation" : "Open navigation"
               }
               aria-expanded={mobileMenuOpen}
             >
@@ -963,9 +833,7 @@ export default function PlayerLayout() {
 
         {mobileMenuOpen && (
           <div className="border-t border-slate-700 bg-slate-900 lg:hidden">
-
             <nav className="mx-auto max-w-7xl space-y-1 px-3 py-3 sm:px-5">
-
               {/* =================================================
                   DASHBOARD
               ================================================= */}
@@ -1012,7 +880,6 @@ export default function PlayerLayout() {
                   }`}
                 >
                   <span className="flex items-center gap-2.5">
-
                     <div
                       className={`flex h-8 w-8 items-center justify-center rounded-lg ${
                         isPlayActive
@@ -1030,9 +897,7 @@ export default function PlayerLayout() {
 
                       <span
                         className={`block text-[10px] leading-tight ${
-                          isPlayActive
-                            ? "text-indigo-100"
-                            : "text-slate-500"
+                          isPlayActive ? "text-indigo-100" : "text-slate-500"
                         }`}
                       >
                         Choose your lottery
@@ -1044,16 +909,13 @@ export default function PlayerLayout() {
                     size={17}
                     strokeWidth={2.5}
                     className={`shrink-0 transition-transform duration-200 ${
-                      mobilePlayOpen
-                        ? "rotate-180"
-                        : ""
+                      mobilePlayOpen ? "rotate-180" : ""
                     }`}
                   />
                 </button>
 
                 {mobilePlayOpen && (
                   <div className="mt-1 space-y-1 border-t border-slate-700 pt-1">
-
                     {/* 2D */}
 
                     <NavLink
@@ -1109,7 +971,6 @@ export default function PlayerLayout() {
                         </p>
                       </div>
                     </NavLink>
-
                   </div>
                 )}
               </div>
@@ -1167,7 +1028,6 @@ export default function PlayerLayout() {
               ================================================= */}
 
               <div className="mt-2 border-t border-slate-700 pt-2">
-
                 {/* RESULTS + CONTACT */}
 
                 {moreNavigation.map((item) => {
@@ -1200,7 +1060,6 @@ export default function PlayerLayout() {
                 ================================================= */}
 
                 <div className="relative mt-1">
-
                   {/* Notification row background */}
 
                   <div
@@ -1224,7 +1083,6 @@ export default function PlayerLayout() {
                       hover:text-white
                     "
                   >
-
                     {/* CUSTOM MOBILE ICON */}
 
                     <span
@@ -1244,10 +1102,7 @@ export default function PlayerLayout() {
                         shadow-indigo-950/30
                       "
                     >
-                      <Bell
-                        className="h-4 w-4"
-                        strokeWidth={2.5}
-                      />
+                      <Bell className="h-4 w-4" strokeWidth={2.5} />
                     </span>
 
                     {/* LABEL */}
@@ -1284,9 +1139,7 @@ export default function PlayerLayout() {
                     >
                       <NotificationBell role="PLAYER" />
                     </div>
-
                   </div>
-
                 </div>
 
                 {/* =================================================
@@ -1344,7 +1197,6 @@ export default function PlayerLayout() {
 
                   <span>Logout</span>
                 </button>
-
               </div>
             </nav>
           </div>
@@ -1425,15 +1277,10 @@ export default function PlayerLayout() {
               group-hover:bg-white/20
             "
           >
-            <ArrowLeft
-              className="h-4 w-4"
-              strokeWidth={2.75}
-            />
+            <ArrowLeft className="h-4 w-4" strokeWidth={2.75} />
           </span>
 
-          <span className="pr-1 tracking-wide">
-            Back
-          </span>
+          <span className="pr-1 tracking-wide">Back</span>
         </button>
       </div>
 

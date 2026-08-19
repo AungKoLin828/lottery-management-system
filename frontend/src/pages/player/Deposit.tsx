@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownToLine,
   Check,
@@ -25,24 +25,30 @@ import { notifyAdminDepositRequest } from "@/services/notificationService";
 
 export default function Deposit() {
   /* ============================================================
-     DEFAULT DEPOSIT AMOUNTS
+     AMOUNT
   ============================================================ */
 
-  const presetAmounts = [5000, 10000, 50000, 100000];
+  const presetAmounts = useMemo(() => {
+    return [5000, 10000, 50000, 100000].filter(
+      (value) =>
+        value >= depositSettings.minimumDeposit &&
+        value <= depositSettings.maximumDeposit,
+    );
+  }, []);
 
-  const defaultDepositAmount = presetAmounts.find(
-    (value) =>
-      value >= depositSettings.minimumDeposit &&
-      value <= depositSettings.maximumDeposit,
-  );
+  /*
+   * Default selected amount:
+   * Select the first available preset automatically.
+   */
+  const [amount, setAmount] = useState(() => {
+    const firstPreset = [5000, 10000, 50000, 100000].find(
+      (value) =>
+        value >= depositSettings.minimumDeposit &&
+        value <= depositSettings.maximumDeposit,
+    );
 
-  /* ============================================================
-     FORM STATE
-  ============================================================ */
-
-  const [amount, setAmount] = useState(
-    defaultDepositAmount ? String(defaultDepositAmount) : "",
-  );
+    return firstPreset ? String(firstPreset) : "";
+  });
 
   const [paymentMethodId, setPaymentMethodId] = useState<number | null>(null);
 
@@ -101,45 +107,41 @@ export default function Deposit() {
 
   /* ============================================================
      PAYMENT PHONE / ACCOUNT NUMBER
+     
+     Supports:
+     - phoneNumber
+     - accountNumber
+     - phone
   ============================================================ */
 
-  const paymentNumber =
-    selectedMethod &&
-    (
-      selectedMethod as typeof selectedMethod & {
-        phoneNumber?: string;
-        accountNumber?: string;
-        phone?: string;
-      }
-    ).phoneNumber
-      ? (
-          selectedMethod as typeof selectedMethod & {
-            phoneNumber?: string;
-          }
-        ).phoneNumber
-      : selectedMethod &&
-          (
-            selectedMethod as typeof selectedMethod & {
-              accountNumber?: string;
-            }
-          ).accountNumber
-        ? (
-            selectedMethod as typeof selectedMethod & {
-              accountNumber?: string;
-            }
-          ).accountNumber
-        : selectedMethod &&
-            (
-              selectedMethod as typeof selectedMethod & {
-                phone?: string;
-              }
-            ).phone
-          ? (
-              selectedMethod as typeof selectedMethod & {
-                phone?: string;
-              }
-            ).phone
-          : "";
+  const paymentNumber = useMemo(() => {
+    if (!selectedMethod) {
+      return "";
+    }
+
+    const method = selectedMethod as typeof selectedMethod & {
+      phoneNumber?: string;
+      accountNumber?: string;
+      phone?: string;
+    };
+
+    return method.phoneNumber || method.accountNumber || method.phone || "";
+  }, [selectedMethod]);
+
+  /* ============================================================
+     MOBILE CHECK
+     
+     Used only for scanner behavior.
+     CSS md:hidden also controls visibility.
+  ============================================================ */
+
+  const isMobileDevice = () => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return window.matchMedia("(max-width: 767px)").matches;
+  };
 
   /* ============================================================
      COPY PAYMENT NUMBER
@@ -150,6 +152,8 @@ export default function Deposit() {
       return;
     }
 
+    setError("");
+
     try {
       await navigator.clipboard.writeText(paymentNumber);
 
@@ -159,7 +163,34 @@ export default function Deposit() {
         setCopied(false);
       }, 2000);
     } catch {
-      setError("Unable to copy the payment number.");
+      /*
+       * Fallback for browsers where Clipboard API is unavailable.
+       */
+      try {
+        const textArea = document.createElement("textarea");
+
+        textArea.value = paymentNumber;
+
+        textArea.style.position = "fixed";
+        textArea.style.opacity = "0";
+
+        document.body.appendChild(textArea);
+
+        textArea.focus();
+        textArea.select();
+
+        document.execCommand("copy");
+
+        document.body.removeChild(textArea);
+
+        setCopied(true);
+
+        window.setTimeout(() => {
+          setCopied(false);
+        }, 2000);
+      } catch {
+        setError("Unable to copy the payment number.");
+      }
     }
   };
 
@@ -171,10 +202,6 @@ export default function Deposit() {
     if (!selectedMethod?.qrCode) {
       return;
     }
-
-    const fileName = `${selectedMethod.name
-      .replace(/\s+/g, "-")
-      .toLowerCase()}-qr`;
 
     try {
       const response = await fetch(selectedMethod.qrCode);
@@ -191,7 +218,9 @@ export default function Deposit() {
 
       link.href = url;
 
-      link.download = `${fileName}.png`;
+      link.download = `${selectedMethod.name
+        .replace(/\s+/g, "-")
+        .toLowerCase()}-qr.png`;
 
       document.body.appendChild(link);
 
@@ -201,6 +230,9 @@ export default function Deposit() {
 
       URL.revokeObjectURL(url);
     } catch {
+      /*
+       * Fallback for external QR URLs.
+       */
       const link = document.createElement("a");
 
       link.href = selectedMethod.qrCode;
@@ -209,7 +241,9 @@ export default function Deposit() {
 
       link.rel = "noopener noreferrer";
 
-      link.download = fileName;
+      link.download = `${selectedMethod.name
+        .replace(/\s+/g, "-")
+        .toLowerCase()}-qr`;
 
       document.body.appendChild(link);
 
@@ -239,6 +273,8 @@ export default function Deposit() {
     }
 
     if (videoRef.current) {
+      videoRef.current.pause();
+
       videoRef.current.srcObject = null;
     }
 
@@ -246,7 +282,28 @@ export default function Deposit() {
   };
 
   /* ============================================================
-     START QR SCANNER
+     CLEANUP CAMERA WHEN COMPONENT UNMOUNTS
+  ============================================================ */
+
+  useEffect(() => {
+    return () => {
+      if (scanAnimationRef.current !== null) {
+        cancelAnimationFrame(scanAnimationRef.current);
+      }
+
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => {
+          track.stop();
+        });
+      }
+    };
+  }, []);
+
+  /* ============================================================
+     QR SCANNER
+     
+     IMPORTANT:
+     This function can only start on mobile screen sizes.
   ============================================================ */
 
   const startQrScanner = async () => {
@@ -254,14 +311,28 @@ export default function Deposit() {
 
     setScanResult("");
 
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setScanError("Camera scanning is not supported by this browser.");
-
-      setScannerOpen(true);
+    /*
+     * Do not allow QR scanning on desktop.
+     */
+    if (!isMobileDevice()) {
+      setScanError("QR scanning is available on mobile devices only.");
 
       return;
     }
 
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setScannerOpen(true);
+
+      setScanError(
+        "Camera scanning is not supported by this browser. Please use a supported mobile browser.",
+      );
+
+      return;
+    }
+
+    /*
+     * BarcodeDetector is supported by many modern Chromium browsers.
+     */
     const BarcodeDetectorClass = (
       window as Window & {
         BarcodeDetector?: new (options?: { formats?: string[] }) => {
@@ -273,11 +344,11 @@ export default function Deposit() {
     ).BarcodeDetector;
 
     if (!BarcodeDetectorClass) {
-      setScanError(
-        "QR scanning is not supported by this browser. Please use a supported Chrome or Edge browser.",
-      );
-
       setScannerOpen(true);
+
+      setScanError(
+        "QR scanning is not supported by this browser. Please use Chrome or Edge on a supported mobile device.",
+      );
 
       return;
     }
@@ -296,12 +367,15 @@ export default function Deposit() {
 
       setScannerOpen(true);
 
+      /*
+       * Wait until React renders the video element.
+       */
       window.setTimeout(() => {
-        if (!videoRef.current) {
+        if (!videoRef.current || !streamRef.current) {
           return;
         }
 
-        videoRef.current.srcObject = stream;
+        videoRef.current.srcObject = streamRef.current;
 
         videoRef.current
           .play()
@@ -328,7 +402,9 @@ export default function Deposit() {
                   return;
                 }
               } catch {
-                // Continue scanning.
+                /*
+                 * Continue scanning.
+                 */
               }
 
               scanAnimationRef.current = requestAnimationFrame(scan);
@@ -338,6 +414,10 @@ export default function Deposit() {
           })
           .catch(() => {
             setScanError("Unable to start the camera.");
+
+            stopQrScanner();
+
+            setScannerOpen(true);
           });
       }, 150);
     } catch (cameraError) {
@@ -362,6 +442,10 @@ export default function Deposit() {
 
     const numericAmount = Number(amount);
 
+    /* ----------------------------------------------------------
+       AMOUNT VALIDATION
+    ---------------------------------------------------------- */
+
     if (!numericAmount || numericAmount <= 0) {
       setError("Please enter a valid deposit amount.");
 
@@ -384,11 +468,19 @@ export default function Deposit() {
       return;
     }
 
+    /* ----------------------------------------------------------
+       PAYMENT METHOD VALIDATION
+    ---------------------------------------------------------- */
+
     if (!paymentMethodId || !selectedMethod) {
       setError("Please select a payment method.");
 
       return;
     }
+
+    /* ----------------------------------------------------------
+       TRANSACTION NUMBER
+    ---------------------------------------------------------- */
 
     if (!transactionNumber.trim()) {
       setError("Transaction number is required.");
@@ -401,6 +493,10 @@ export default function Deposit() {
 
       return;
     }
+
+    /* ----------------------------------------------------------
+       CREATE DEPOSIT
+    ---------------------------------------------------------- */
 
     const depositId = `DEP-${Date.now()}`;
 
@@ -425,6 +521,10 @@ export default function Deposit() {
 
       createdAt: new Date().toISOString(),
     });
+
+    /* ----------------------------------------------------------
+       NOTIFY ADMIN
+    ---------------------------------------------------------- */
 
     notifyAdminDepositRequest({
       depositId: request.id,
@@ -542,6 +642,10 @@ export default function Deposit() {
                     setCopied(false);
 
                     setScanResult("");
+
+                    if (scannerOpen) {
+                      stopQrScanner();
+                    }
                   }}
                   className={`relative flex min-h-[92px] items-center gap-4 rounded-xl border p-4 text-left transition-all ${
                     selected
@@ -614,9 +718,9 @@ export default function Deposit() {
             })}
           </div>
 
-          {/* ========================================================
+          {/* ======================================================
               SELECTED PAYMENT DETAILS
-          ======================================================== */}
+          ====================================================== */}
 
           {selectedMethod && (
             <div className="mt-4 overflow-hidden rounded-xl border border-indigo-100 bg-indigo-50">
@@ -647,7 +751,7 @@ export default function Deposit() {
               </div>
 
               {/* ==================================================
-                  PAYMENT NUMBER
+                  PAYMENT PHONE / ACCOUNT NUMBER
               ================================================== */}
 
               {paymentNumber && (
@@ -703,6 +807,8 @@ export default function Deposit() {
                     Payment QR Code
                   </div>
 
+                  {/* QR IMAGE */}
+
                   <div className="flex h-52 w-52 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
                     <img
                       src={selectedMethod.qrCode}
@@ -711,9 +817,19 @@ export default function Deposit() {
                     />
                   </div>
 
-                  {/* QR ACTIONS */}
+                  {/* ==================================================
+                      QR ACTIONS
+
+                      Download = Desktop + Mobile
+                      Scan = MOBILE ONLY
+                  ================================================== */}
 
                   <div className="mt-4 flex flex-wrap justify-center gap-2">
+                    {/* DOWNLOAD QR
+                        
+                        Available on desktop and mobile.
+                    */}
+
                     <button
                       type="button"
                       onClick={handleDownloadQr}
@@ -723,19 +839,26 @@ export default function Deposit() {
                       Download QR
                     </button>
 
+                    {/* ==================================================
+                        SCAN QR
+
+                        IMPORTANT:
+                        md:hidden = only mobile/tablet.
+                    ================================================== */}
+
                     <button
                       type="button"
                       onClick={startQrScanner}
-                      className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                      className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 md:hidden"
                     >
                       <ScanLine className="h-4 w-4" />
                       Scan QR
                     </button>
                   </div>
 
-                  <p className="mt-3 text-center text-xs text-slate-500">
+                  <p className="mt-3 max-w-md text-center text-xs text-slate-500">
                     Scan the QR code to make your payment, or download it for
-                    use on another device.
+                    use in another device.
                   </p>
                 </div>
               )}
@@ -758,9 +881,7 @@ export default function Deposit() {
                 </div>
               )}
 
-              {/* ==================================================
-                  PAYMENT INSTRUCTION
-              ================================================== */}
+              {/* PAYMENT INSTRUCTION */}
 
               <div className="border-t border-indigo-100 px-4 py-3">
                 <p className="text-xs leading-5 text-slate-500">
@@ -781,14 +902,15 @@ export default function Deposit() {
             Deposit Amount
           </label>
 
-          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {presetAmounts
-              .filter(
-                (value) =>
-                  value >= depositSettings.minimumDeposit &&
-                  value <= depositSettings.maximumDeposit,
-              )
-              .map((value) => {
+          {/* ======================================================
+              PRESET AMOUNTS
+
+              First valid amount is selected by default.
+          ====================================================== */}
+
+          {presetAmounts.length > 0 && (
+            <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {presetAmounts.map((value) => {
                 const selected = amount === String(value);
 
                 return (
@@ -805,7 +927,11 @@ export default function Deposit() {
                       name="depositAmount"
                       value={value}
                       checked={selected}
-                      onChange={() => setAmount(String(value))}
+                      onChange={() => {
+                        setAmount(String(value));
+
+                        setError("");
+                      }}
                       className="h-4 w-4 accent-indigo-600"
                     />
 
@@ -815,7 +941,8 @@ export default function Deposit() {
                   </label>
                 );
               })}
-          </div>
+            </div>
+          )}
 
           {/* CUSTOM AMOUNT */}
 
@@ -824,7 +951,11 @@ export default function Deposit() {
             min={depositSettings.minimumDeposit}
             max={depositSettings.maximumDeposit}
             value={amount}
-            onChange={(event) => setAmount(event.target.value)}
+            onChange={(event) => {
+              setAmount(event.target.value);
+
+              setError("");
+            }}
             placeholder="Enter custom amount"
             className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
           />
@@ -853,6 +984,8 @@ export default function Deposit() {
               const value = event.target.value.replace(/\D/g, "").slice(0, 6);
 
               setTransactionNumber(value);
+
+              setError("");
             }}
             placeholder="Enter last 6 digits"
             className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
@@ -864,8 +997,7 @@ export default function Deposit() {
             </p>
 
             <p className="text-xs font-medium text-slate-400">
-              {transactionNumber.length}
-              /6
+              {transactionNumber.length}/6
             </p>
           </div>
         </div>
@@ -929,13 +1061,17 @@ export default function Deposit() {
       </form>
 
       {/* ==========================================================
-          QR SCANNER MODAL
+          MOBILE QR SCANNER MODAL
+
+          md:hidden = modal only exists visually on mobile/tablet.
       ========================================================== */}
 
       {scannerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 md:hidden">
           <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
-            {/* MODAL HEADER */}
+            {/* ==================================================
+                MODAL HEADER
+            ================================================== */}
 
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
               <div className="flex items-center gap-3">
@@ -963,7 +1099,9 @@ export default function Deposit() {
               </button>
             </div>
 
-            {/* CAMERA */}
+            {/* ==================================================
+                CAMERA
+            ================================================== */}
 
             <div className="relative aspect-square w-full overflow-hidden bg-slate-950">
               <video
@@ -973,6 +1111,8 @@ export default function Deposit() {
                 autoPlay
                 className="h-full w-full object-cover"
               />
+
+              {/* SCAN FRAME */}
 
               {!scanError && (
                 <>
@@ -996,6 +1136,8 @@ export default function Deposit() {
                 </>
               )}
 
+              {/* SCAN ERROR */}
+
               {scanError && (
                 <div className="absolute inset-0 flex items-center justify-center p-6">
                   <div className="rounded-2xl bg-white p-5 text-center shadow-lg">
@@ -1015,7 +1157,9 @@ export default function Deposit() {
               )}
             </div>
 
-            {/* MODAL FOOTER */}
+            {/* ==================================================
+                MODAL FOOTER
+            ================================================== */}
 
             <div className="flex justify-end gap-2 px-5 py-4">
               <button
@@ -1032,7 +1176,9 @@ export default function Deposit() {
                   onClick={() => {
                     stopQrScanner();
 
-                    startQrScanner();
+                    window.setTimeout(() => {
+                      startQrScanner();
+                    }, 100);
                   }}
                   className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
                 >

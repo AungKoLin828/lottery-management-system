@@ -11,7 +11,7 @@ import type { PaymentMethod } from "@/types/settings";
  *   - Or an external image URL
  *
  * accountNumber:
- *   - Phone number for KBZPay / WavePay / AYA Pay
+ *   - Phone number for KPay / WavePay / AYA Pay
  *   - Bank account number for bank transfer
  *
  */
@@ -34,7 +34,12 @@ export const walletPaymentMethods: PaymentMethod[] = [
   {
     id: 2,
     name: "WavePay",
-    type: "Deposit",
+    /*
+     * Changed from "Deposit" to "Both"
+     * so WavePay can be used for both
+     * deposit and withdrawal.
+     */
+    type: "Both",
     enabled: true,
     logo: "/payment-logos/wavepay.png",
     qrCode: "/payment-qr/wavepay.png",
@@ -95,6 +100,10 @@ export const depositSettings = {
 
   /*
    * Payment methods allowed for deposit.
+   *
+   * 1 = KBZPay
+   * 2 = WavePay
+   * 3 = AYA Pay
    */
   allowedPaymentMethods: [1, 2, 3],
 
@@ -117,7 +126,16 @@ export const withdrawSettings = {
 
   approvalRequired: true,
 
-  allowedPaymentMethods: [1, 4],
+  /*
+   * Payment methods allowed for withdrawal.
+   *
+   * 1 = KBZPay
+   * 2 = WavePay
+   *
+   * Bank Transfer (4) is intentionally removed
+   * from the player withdrawal methods.
+   */
+  allowedPaymentMethods: [1, 2],
 
   withdrawFee: 0,
 
