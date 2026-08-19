@@ -1,11 +1,8 @@
 import type { Handler } from "@netlify/functions";
-
 import { eq } from "drizzle-orm";
-
 import bcrypt from "bcryptjs";
 
 import { users } from "../../../db/schema/users";
-
 import { db } from "../utils/db";
 
 import {
@@ -18,7 +15,6 @@ import {
 
 interface LoginBody {
   phone?: string;
-
   password?: string;
 }
 
@@ -32,7 +28,6 @@ export const handler: Handler = async (event) => {
       405,
       {
         success: false,
-
         message: "Method not allowed",
       },
       {
@@ -45,13 +40,11 @@ export const handler: Handler = async (event) => {
     const body = parseBody<LoginBody>(event);
 
     const phone = normalizePhone(body.phone ?? "");
-
     const password = body.password ?? "";
 
     if (!phone || !password) {
       return jsonResponse(400, {
         success: false,
-
         message: "Phone number and password are required",
       });
     }
@@ -63,7 +56,6 @@ export const handler: Handler = async (event) => {
     if (!user) {
       return jsonResponse(401, {
         success: false,
-
         message: "Invalid phone number or password",
       });
     }
@@ -73,7 +65,6 @@ export const handler: Handler = async (event) => {
     if (!passwordValid) {
       return jsonResponse(401, {
         success: false,
-
         message: "Invalid phone number or password",
       });
     }
@@ -81,7 +72,6 @@ export const handler: Handler = async (event) => {
     if (user.status !== "ACTIVE") {
       return jsonResponse(403, {
         success: false,
-
         message:
           user.status === "SUSPENDED"
             ? "Your account has been suspended"
@@ -93,7 +83,6 @@ export const handler: Handler = async (event) => {
       .update(users)
       .set({
         lastLoginAt: new Date(),
-
         updatedAt: new Date(),
       })
       .where(eq(users.id, user.id))
@@ -103,15 +92,15 @@ export const handler: Handler = async (event) => {
 
     const token = await createToken(currentUser);
 
+    const authUser = toAuthUser(currentUser);
+
     return jsonResponse(
       200,
       {
         success: true,
-
         message: "Login successful",
-
         data: {
-          user: toAuthUser(currentUser),
+          user: authUser,
         },
       },
       {
@@ -123,7 +112,6 @@ export const handler: Handler = async (event) => {
 
     return jsonResponse(500, {
       success: false,
-
       message: "Login failed",
     });
   }
