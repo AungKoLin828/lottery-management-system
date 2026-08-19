@@ -2,19 +2,27 @@ import { Check, Trash2, Wallet, Info } from "lucide-react";
 
 import type { Notification } from "@/services/notificationService";
 
+/* ============================================================
+   TYPES
+============================================================ */
+
 interface NotificationItemProps {
   notification: Notification;
+
   onRead: (notificationId: number) => void;
+
   onDelete: (notificationId: number) => void;
 }
+
+/* ============================================================
+   ICON
+============================================================ */
 
 function getNotificationIcon(type: Notification["type"]) {
   switch (type) {
     case "DEPOSIT_REQUEST":
     case "DEPOSIT_APPROVED":
     case "DEPOSIT_REJECTED":
-      return <Wallet size={18} />;
-
     case "WITHDRAW_REQUEST":
     case "WITHDRAW_APPROVED":
     case "WITHDRAW_REJECTED":
@@ -26,6 +34,10 @@ function getNotificationIcon(type: Notification["type"]) {
   }
 }
 
+/* ============================================================
+   COMPONENT
+============================================================ */
+
 export default function NotificationItem({
   notification,
   onRead,
@@ -33,29 +45,54 @@ export default function NotificationItem({
 }: NotificationItemProps) {
   return (
     <div
-      className={`flex items-start gap-4 border-b border-slate-100 p-5 transition last:border-b-0 ${
-        notification.read ? "bg-white" : "bg-indigo-50/40"
-      }`}
+      className={`
+        flex
+        items-start
+        gap-4
+        border-b
+        border-slate-100
+        p-5
+        transition
+        last:border-b-0
+        ${notification.read ? "bg-white" : "bg-indigo-50/40"}
+      `}
     >
-      {/* Icon */}
+      {/* ======================================================
+          ICON
+      ====================================================== */}
+
       <div
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-          notification.read
-            ? "bg-slate-100 text-slate-500"
-            : "bg-indigo-100 text-indigo-600"
-        }`}
+        className={`
+          flex
+          h-10
+          w-10
+          shrink-0
+          items-center
+          justify-center
+          rounded-xl
+          ${
+            notification.read
+              ? "bg-slate-100 text-slate-500"
+              : "bg-indigo-100 text-indigo-600"
+          }
+        `}
       >
         {getNotificationIcon(notification.type)}
       </div>
 
-      {/* Content */}
+      {/* ======================================================
+          CONTENT
+      ====================================================== */}
+
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <h3
-              className={`text-sm font-semibold ${
-                notification.read ? "text-slate-700" : "text-slate-900"
-              }`}
+              className={`
+                text-sm
+                font-semibold
+                ${notification.read ? "text-slate-700" : "text-slate-900"}
+              `}
             >
               {notification.title}
             </h3>
@@ -65,31 +102,70 @@ export default function NotificationItem({
             </p>
           </div>
 
+          {/* Unread dot */}
+
           {!notification.read && (
-            <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-indigo-600" />
+            <span
+              className="
+                mt-1
+                h-2.5
+                w-2.5
+                shrink-0
+                rounded-full
+                bg-indigo-600
+              "
+            />
           )}
         </div>
 
+        {/* ====================================================
+            ACTIONS
+        ==================================================== */}
+
         <div className="mt-3 flex flex-wrap items-center gap-3">
+          {/* Date */}
+
           <span className="text-xs text-slate-400">
             {new Date(notification.createdAt).toLocaleString()}
           </span>
+
+          {/* Mark as read */}
 
           {!notification.read && (
             <button
               type="button"
               onClick={() => onRead(notification.id)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 transition hover:text-indigo-700"
+              className="
+                inline-flex
+                items-center
+                gap-1.5
+                text-xs
+                font-semibold
+                text-indigo-600
+                transition
+                hover:text-indigo-700
+              "
             >
               <Check size={14} />
               Mark as read
             </button>
           )}
 
+          {/* Delete */}
+
           <button
             type="button"
             onClick={() => onDelete(notification.id)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-500 transition hover:text-red-600"
+            className="
+              inline-flex
+              items-center
+              gap-1.5
+              text-xs
+              font-semibold
+              text-red-500
+              transition
+              hover:text-red-600
+            "
           >
             <Trash2 size={14} />
             Delete

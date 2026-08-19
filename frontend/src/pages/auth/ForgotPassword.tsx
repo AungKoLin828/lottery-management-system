@@ -9,7 +9,6 @@ import {
   LockKeyhole,
   Phone,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 
 import Input from "@/components/common/Input";
@@ -237,28 +236,6 @@ export default function ForgotPassword() {
       setError("Unable to connect to server. Please try again.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  /* ==========================================================
-     GO BACK
-  ========================================================== */
-
-  const handleBack = () => {
-    setError("");
-    setSuccess("");
-
-    if (step === "OTP") {
-      setStep("PHONE");
-      setOtp("");
-      return;
-    }
-
-    if (step === "PASSWORD") {
-      setStep("OTP");
-      setPassword("");
-      setConfirmPassword("");
-      return;
     }
   };
 

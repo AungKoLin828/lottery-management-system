@@ -26,23 +26,23 @@ import NotificationBell from "@/components/common/notification/NotificationBell"
    MAIN NAVIGATION
 ============================================================ */
 
-const navigation = [
-  {
-    name: "Dashboard",
-    path: "/player",
-    icon: LayoutDashboard,
-  },
-  {
-    name: "My Tickets",
-    path: "/player/tickets",
-    icon: Ticket,
-  },
-  {
-    name: "Wallet",
-    path: "/player/wallet",
-    icon: WalletCards,
-  },
-];
+// const navigation = [
+//   {
+//     name: "Dashboard",
+//     path: "/player",
+//     icon: LayoutDashboard,
+//   },
+//   {
+//     name: "My Tickets",
+//     path: "/player/tickets",
+//     icon: Ticket,
+//   },
+//   {
+//     name: "Wallet",
+//     path: "/player/wallet",
+//     icon: WalletCards,
+//   },
+// ];
 
 /* ============================================================
    PLAY NAVIGATION

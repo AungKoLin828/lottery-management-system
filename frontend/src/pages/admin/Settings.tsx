@@ -327,16 +327,6 @@ export default function Settings() {
     setShowPaymentModal(true);
   };
 
-  const handlePaymentFormChange = (
-    field: keyof PaymentMethod,
-    value: string | number | boolean,
-  ) => {
-    setPaymentForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
   const savePaymentMethod = () => {
     if (!paymentForm.name.trim()) {
       alert("Payment method name is required.");
@@ -411,28 +401,6 @@ export default function Settings() {
           : method,
       ),
     );
-  };
-
-  const handleQRCode = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-
-    if (!file) {
-      return;
-    }
-
-    /*
-     * Mock upload.
-     *
-     * Later replace this with an API upload
-     * to Cloudinary/S3/etc.
-     */
-
-    const previewUrl = URL.createObjectURL(file);
-
-    setPaymentForm((prev) => ({
-      ...prev,
-      qrCode: previewUrl,
-    }));
   };
 
   const savePaymentMethods = () => {
