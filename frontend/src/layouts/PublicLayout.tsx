@@ -414,11 +414,13 @@ export default function PublicLayout() {
 
               <div className="flex items-center">
                 <span className="text-base font-extrabold tracking-tight text-white sm:text-lg">
-                  Lottery
+                  {/* Lottery */}
+                  AB
                 </span>
 
                 <span className="text-base font-extrabold tracking-tight text-indigo-400 sm:text-lg">
-                  Play
+                  {/* Play */}
+                  CD
                 </span>
               </div>
             </Link>
