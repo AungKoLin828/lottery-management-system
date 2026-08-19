@@ -419,24 +419,19 @@ export default function PlayerLayout() {
      LOGOUT
   ============================================================ */
 
-  const handleLogout = () => {
-    closeAllMenus();
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
 
-    /*
-      Replace this with your real logout logic.
+      window.location.href = "/login";
+    } catch (error) {
+      console.error("Logout error:", error);
 
-      Example:
-
-      localStorage.removeItem("token");
-
-      sessionStorage.removeItem(
-        PLAYER_HISTORY_KEY,
-      );
-
-      navigate("/login");
-    */
-
-    console.log("Logout");
+      window.location.href = "/login";
+    }
   };
 
   /* ============================================================
