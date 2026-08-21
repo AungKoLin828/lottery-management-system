@@ -43,21 +43,58 @@ type WalletData = {
   transactions: WalletTransaction[];
 };
 
-type WalletResponse = {
+/* ============================================================
+   DASHBOARD API RESPONSE
+============================================================ */
+
+type DashboardResponse = {
+  success: boolean;
+  message?: string;
+
+  user?: unknown;
+
+  stats?: {
+    walletBalance?: number | string | null;
+    totalTickets?: number | string | null;
+    totalDeposit?: number | string | null;
+    totalWithdraw?: number | string | null;
+  };
+
+  latestDraw?: unknown;
+
+  winners?: unknown[];
+
+  data?: {
+    user?: unknown;
+
+    stats?: {
+      walletBalance?: number | string | null;
+      totalTickets?: number | string | null;
+      totalDeposit?: number | string | null;
+      totalWithdraw?: number | string | null;
+    };
+
+    latestDraw?: unknown;
+
+    winners?: unknown[];
+  };
+};
+
+/* ============================================================
+   TRANSACTION API RESPONSE
+============================================================ */
+
+type TransactionsResponse = {
   success: boolean;
   message?: string;
 
   data?: {
-    balance?: number;
-    recentDeposits?: number;
-    recentWithdrawals?: number;
-    transactions?: WalletTransaction[];
+    transactions?: unknown[];
   };
 
-  balance?: number;
-  recentDeposits?: number;
-  recentWithdrawals?: number;
-  transactions?: WalletTransaction[];
+  transactions?: unknown[];
+
+  count?: number;
 };
 
 /* ============================================================
@@ -68,25 +105,32 @@ const formatAmount = (amount: number | string | null | undefined) => {
   return Number(amount || 0).toLocaleString("en-US");
 };
 
+/* ============================================================
+   DATE
+============================================================ */
+
 const formatDate = (value: string | Date | null | undefined): string => {
   if (!value) {
     return "-";
   }
 
-  const date = new Date(value);
+  const date = value instanceof Date ? value : new Date(value);
 
   if (Number.isNaN(date.getTime())) {
     return String(value);
   }
 
-  return date.toLocaleString("en-US", {
+  return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     hour12: true,
-  });
+    timeZone: "Asia/Yangon",
+  })
+    .format(date)
+    .replace(",", " ·");
 };
 
 /* ============================================================
@@ -146,7 +190,9 @@ const StatusBadge = ({ status }: { status: string }) => {
 ============================================================ */
 
 function normalizeTransactionType(value: unknown): TransactionType {
-  const type = String(value ?? "").toUpperCase();
+  const type = String(value ?? "")
+    .trim()
+    .toUpperCase();
 
   if (type === "WITHDRAW" || type === "WITHDRAWAL" || type === "WITHDRAWALS") {
     return "Withdraw";
@@ -160,12 +206,15 @@ function normalizeTransactionType(value: unknown): TransactionType {
 ============================================================ */
 
 function normalizeTransactionStatus(value: unknown): TransactionStatus {
-  const status = String(value ?? "").toUpperCase();
+  const status = String(value ?? "")
+    .trim()
+    .toUpperCase();
 
   switch (status) {
     case "COMPLETED":
     case "SUCCESS":
     case "APPROVED":
+    case "SUCCEEDED":
       return "Completed";
 
     case "PENDING":
@@ -176,6 +225,7 @@ function normalizeTransactionStatus(value: unknown): TransactionStatus {
       return "Rejected";
 
     case "CANCELLED":
+    case "CANCELED":
       return "Cancelled";
 
     case "FAILED":
@@ -215,7 +265,7 @@ function normalizeTransaction(transaction: any): WalletTransaction {
       transaction.paymentMethod ??
       transaction.method ??
       transaction.provider ??
-      "-",
+      "Wallet",
 
     reference:
       transaction.reference ??
@@ -241,14 +291,152 @@ function normalizeTransaction(transaction: any): WalletTransaction {
 }
 
 /* ============================================================
+   GET DASHBOARD STATS
+============================================================ */
+
+async function loadDashboardStats(): Promise<{
+  balance: number;
+  recentDeposits: number;
+  recentWithdrawals: number;
+}> {
+  const response = await fetch("/api/player/dashboard", {
+    method: "GET",
+
+    credentials: "include",
+
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  const contentType = response.headers.get("content-type") || "";
+
+  if (!contentType.toLowerCase().includes("application/json")) {
+    await response.text();
+
+    throw new Error(
+      response.status === 404
+        ? "Dashboard API endpoint was not found"
+        : "Dashboard API returned an invalid response",
+    );
+  }
+
+  const result = (await response.json()) as DashboardResponse;
+
+  console.log("Wallet dashboard API response:", result);
+
+  if (!response.ok || !result.success) {
+    throw new Error(result.message || "Failed to load wallet balance");
+  }
+
+  /*
+   * Support:
+   *
+   * {
+   *   success: true,
+   *   stats: {...}
+   * }
+   *
+   * AND:
+   *
+   * {
+   *   success: true,
+   *   data: {
+   *     stats: {...}
+   *   }
+   * }
+   */
+
+  const stats = result.data?.stats ?? result.stats;
+
+  if (!stats) {
+    throw new Error("Wallet balance data is unavailable");
+  }
+
+  return {
+    balance: Number(stats.walletBalance ?? 0),
+
+    recentDeposits: Number(stats.totalDeposit ?? 0),
+
+    recentWithdrawals: Number(stats.totalWithdraw ?? 0),
+  };
+}
+
+/* ============================================================
+   GET TRANSACTIONS
+============================================================ */
+
+async function loadTransactions(): Promise<WalletTransaction[]> {
+  const response = await fetch("/api/player/transactions?limit=20", {
+    method: "GET",
+
+    credentials: "include",
+
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  const contentType = response.headers.get("content-type") || "";
+
+  if (!contentType.toLowerCase().includes("application/json")) {
+    await response.text();
+
+    throw new Error(
+      response.status === 404
+        ? "Transaction API endpoint was not found"
+        : "Transaction API returned an invalid response",
+    );
+  }
+
+  const result = (await response.json()) as TransactionsResponse;
+
+  console.log("Wallet transactions API response:", result);
+
+  if (!response.ok || !result.success) {
+    throw new Error(result.message || "Failed to load transactions");
+  }
+
+  /*
+   * Support:
+   *
+   * {
+   *   success: true,
+   *   transactions: []
+   * }
+   *
+   * AND:
+   *
+   * {
+   *   success: true,
+   *   data: {
+   *     transactions: []
+   *   }
+   * }
+   */
+
+  const rawTransactions =
+    result.data?.transactions ?? result.transactions ?? [];
+
+  if (!Array.isArray(rawTransactions)) {
+    return [];
+  }
+
+  return rawTransactions.map(normalizeTransaction);
+}
+
+/* ============================================================
    PAGE
 ============================================================ */
 
 export default function Wallet() {
   const [wallet, setWallet] = useState<WalletData>({
     balance: 0,
+
     recentDeposits: 0,
+
     recentWithdrawals: 0,
+
     transactions: [],
   });
 
@@ -257,88 +445,49 @@ export default function Wallet() {
   const [error, setError] = useState("");
 
   /* ==========================================================
-     LOAD WALLET / TRANSACTIONS
+     LOAD WALLET
+     
+     IMPORTANT:
+     
+     Balance comes from:
+       /api/player/dashboard
+     
+     Transactions come from:
+       /api/player/transactions
   ========================================================== */
 
   const loadWallet = useCallback(async () => {
     try {
       setLoading(true);
+
       setError("");
 
-      const response = await fetch("/api/player/transactions", {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          Accept: "application/json",
-        },
-      });
+      /*
+       * Load both APIs together.
+       *
+       * Dashboard:
+       * - wallet balance
+       * - total deposit
+       * - total withdraw
+       *
+       * Transactions:
+       * - transaction history
+       */
 
-      const contentType = response.headers.get("content-type") || "";
+      const [dashboardData, transactionData] = await Promise.all([
+        loadDashboardStats(),
 
-      if (!contentType.toLowerCase().includes("application/json")) {
-        const text = await response.text();
-
-        console.error("Wallet API returned non-JSON response:", {
-          status: response.status,
-          contentType,
-          body: text.substring(0, 500),
-        });
-
-        throw new Error(
-          response.status === 404
-            ? "Wallet transaction API endpoint was not found"
-            : "Wallet API returned an invalid response",
-        );
-      }
-
-      const result = (await response.json()) as WalletResponse;
-
-      console.log("Wallet transaction API response:", result);
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Failed to load wallet transactions");
-      }
-
-      /* ======================================================
-         SUPPORT BOTH:
-
-         {
-           success: true,
-           data: {
-             balance,
-             recentDeposits,
-             recentWithdrawals,
-             transactions
-           }
-         }
-
-         AND:
-
-         {
-           success: true,
-           balance,
-           recentDeposits,
-           recentWithdrawals,
-           transactions
-         }
-      ====================================================== */
-
-      const source = result.data ?? result;
-
-      const rawTransactions = Array.isArray(source.transactions)
-        ? source.transactions
-        : [];
-
-      const transactions = rawTransactions.map(normalizeTransaction);
+        loadTransactions(),
+      ]);
 
       setWallet({
-        balance: Number(source.balance ?? 0),
+        balance: dashboardData.balance,
 
-        recentDeposits: Number(source.recentDeposits ?? 0),
+        recentDeposits: dashboardData.recentDeposits,
 
-        recentWithdrawals: Number(source.recentWithdrawals ?? 0),
+        recentWithdrawals: dashboardData.recentWithdrawals,
 
-        transactions,
+        transactions: transactionData,
       });
     } catch (err) {
       console.error("Wallet loading error:", err);
@@ -377,6 +526,7 @@ export default function Wallet() {
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
             <div className="h-24 animate-pulse rounded-2xl bg-slate-200" />
+
             <div className="h-24 animate-pulse rounded-2xl bg-slate-200" />
           </div>
         </div>
@@ -617,8 +767,11 @@ export default function Wallet() {
 
         <div className="hidden grid-cols-[minmax(0,1fr)_150px_120px_110px] border-b border-slate-100 bg-slate-50/70 px-5 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-400 md:grid">
           <span>Transaction</span>
+
           <span>Amount</span>
+
           <span>Reference</span>
+
           <span className="text-right">Status</span>
         </div>
 
