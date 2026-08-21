@@ -3,8 +3,10 @@
   publish = "frontend/dist"
   command = "npm run build"
 
+
 [functions]
   directory = "netlify/functions"
+
 
 [dev]
   command = "npm run dev --prefix frontend"
@@ -20,46 +22,68 @@
   from = "/api/auth/register"
   to = "/.netlify/functions/auth-register"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/api/auth/login"
   to = "/.netlify/functions/auth-login"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/api/auth/me"
   to = "/.netlify/functions/auth-me"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/api/auth/logout"
   to = "/.netlify/functions/auth-logout"
   status = 200
+  force = true
+
+
+# ============================================================
+# ADMIN USER BALANCE API
+#
+# IMPORTANT:
+# This route MUST come before the generic user/:userId route.
+# ============================================================
+
+[[redirects]]
+  from = "/api/admin/users/:userId/balance"
+  to = "/.netlify/functions/admin-user-balance?userId=:userId"
+  status = 200
+  force = true
+
 
 # ============================================================
 # ADMIN USERS API
 # ============================================================
 
+# GET /api/admin/users
+# POST /api/admin/users
 [[redirects]]
   from = "/api/admin/users"
   to = "/.netlify/functions/admin-users"
   status = 200
   force = true
 
+
+# GET /api/admin/users/:userId
+# PUT /api/admin/users/:userId
+# PATCH /api/admin/users/:userId
 [[redirects]]
-  from = "/api/admin/users/*"
-  to = "/.netlify/functions/admin-users"
+  from = "/api/admin/users/:userId"
+  to = "/.netlify/functions/admin-users?userId=:userId"
   status = 200
   force = true
 
-[[redirects]]
-  from = "/api/admin/users/*/balance"
-  to = "/.netlify/functions/admin-user-balance"
-  status = 200
-  force = true
 
 # ============================================================
 # FRONTEND SPA ROUTING
+#
+# Keep this LAST.
 # ============================================================
 
 [[redirects]]
