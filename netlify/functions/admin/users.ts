@@ -4,7 +4,7 @@ import type {
   HandlerResponse,
 } from "@netlify/functions";
 
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, count, desc, eq, ilike, ne, or } from "drizzle-orm";
 import { hash } from "bcryptjs";
 
 import { db } from "../../../db";
@@ -26,10 +26,12 @@ type UserStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED";
 function json(statusCode: number, body: unknown): HandlerResponse {
   return {
     statusCode,
+
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-store",
     },
+
     body: JSON.stringify(body),
   };
 }
@@ -56,6 +58,20 @@ function getBody(event: HandlerEvent): Record<string, unknown> {
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+/* ============================================================
+   INTEGER
+============================================================ */
+
+function positiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return fallback;
+  }
+
+  return parsed;
 }
 
 /* ============================================================
@@ -87,12 +103,6 @@ function getUserId(event: HandlerEvent): string | null {
 
   const parts = event.path.split("/").filter(Boolean);
 
-  /*
-   * Example:
-   *
-   * /api/admin/users/UUID
-   */
-
   if (parts.length > 0 && parts[parts.length - 1] !== "users") {
     return parts[parts.length - 1];
   }
@@ -104,7 +114,7 @@ function getUserId(event: HandlerEvent): string | null {
    FORMAT USER
 ============================================================ */
 
-function formatUser(user: {
+function formatUser(row: {
   id: string;
   username: string;
   fullName: string | null;
@@ -117,25 +127,25 @@ function formatUser(user: {
   balance: string | null;
 }) {
   return {
-    id: user.id,
+    id: row.id,
 
-    username: user.username,
+    username: row.username,
 
-    fullName: user.fullName,
+    fullName: row.fullName,
 
-    phone: user.phone,
+    phone: row.phone,
 
-    email: user.email,
+    email: row.email,
 
-    role: user.role,
+    role: row.role,
 
-    status: user.status,
+    status: row.status,
 
-    isVerified: user.isVerified,
+    isVerified: row.isVerified,
 
-    balance: Number(user.balance ?? "0"),
+    balance: Number(row.balance ?? "0"),
 
-    createdAt: user.createdAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
@@ -143,7 +153,72 @@ function formatUser(user: {
    GET USERS
 ============================================================ */
 
-async function getUsers() {
+async function getUsers(event: HandlerEvent) {
+  const params = event.queryStringParameters ?? {};
+
+  const page = Math.min(positiveInteger(params.page, 1), 1000000);
+
+  const requestedPageSize = positiveInteger(params.pageSize, 10);
+
+  const pageSize = Math.min(requestedPageSize, 100);
+
+  const search = stringValue(params.search);
+
+  const roleParam = stringValue(params.role);
+
+  const statusParam = stringValue(params.status);
+
+  const offset = (page - 1) * pageSize;
+
+  /* ----------------------------------------------------------
+     CONDITIONS
+  ---------------------------------------------------------- */
+
+  const conditions = [];
+
+  if (search) {
+    const searchPattern = `%${search}%`;
+
+    conditions.push(
+      or(
+        ilike(users.username, searchPattern),
+
+        ilike(users.fullName, searchPattern),
+
+        ilike(users.phone, searchPattern),
+
+        ilike(users.email, searchPattern),
+      ),
+    );
+  }
+
+  if (isRole(roleParam)) {
+    conditions.push(eq(users.role, roleParam));
+  }
+
+  if (isStatus(statusParam)) {
+    conditions.push(eq(users.status, statusParam));
+  }
+
+  const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+
+  /* ----------------------------------------------------------
+     COUNT
+  ---------------------------------------------------------- */
+
+  const countResult = await db
+    .select({
+      count: count(),
+    })
+    .from(users)
+    .where(whereCondition);
+
+  const total = Number(countResult[0]?.count ?? 0);
+
+  /* ----------------------------------------------------------
+     USERS
+  ---------------------------------------------------------- */
+
   const rows = await db
     .select({
       id: users.id,
@@ -168,9 +243,12 @@ async function getUsers() {
     })
     .from(users)
     .leftJoin(wallets, eq(wallets.userId, users.id))
-    .orderBy(desc(users.createdAt));
+    .where(whereCondition)
+    .orderBy(desc(users.createdAt))
+    .limit(pageSize)
+    .offset(offset);
 
-  return rows.map((row) =>
+  const formattedUsers = rows.map((row) =>
     formatUser({
       id: row.id,
 
@@ -193,6 +271,30 @@ async function getUsers() {
       balance: row.balance,
     }),
   );
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  return json(200, {
+    success: true,
+
+    data: {
+      users: formattedUsers,
+
+      pagination: {
+        page,
+
+        pageSize,
+
+        total,
+
+        totalPages,
+
+        hasPreviousPage: page > 1,
+
+        hasNextPage: page < totalPages,
+      },
+    },
+  });
 }
 
 /* ============================================================
@@ -213,10 +315,6 @@ async function createUser(event: HandlerEvent) {
   const password = stringValue(body.password);
 
   const role = body.role;
-
-  /* ----------------------------------------------------------
-     VALIDATION
-  ---------------------------------------------------------- */
 
   if (!username) {
     return json(400, {
@@ -315,13 +413,13 @@ async function createUser(event: HandlerEvent) {
   }
 
   /* ----------------------------------------------------------
-     PASSWORD HASH
+     PASSWORD
   ---------------------------------------------------------- */
 
   const passwordHash = await hash(password, 12);
 
   /* ----------------------------------------------------------
-     CREATE USER
+     INSERT
   ---------------------------------------------------------- */
 
   const inserted = await db
@@ -341,10 +439,6 @@ async function createUser(event: HandlerEvent) {
 
       status: "ACTIVE",
 
-      /*
-       * Admin created accounts
-       * are already verified.
-       */
       isVerified: true,
     })
     .returning({
@@ -377,7 +471,7 @@ async function createUser(event: HandlerEvent) {
   }
 
   /* ----------------------------------------------------------
-     CREATE WALLET
+     WALLET
   ---------------------------------------------------------- */
 
   await db.insert(wallets).values({
@@ -465,10 +559,6 @@ async function updateUser(event: HandlerEvent, userId: string) {
     });
   }
 
-  /* ----------------------------------------------------------
-     CHECK USER
-  ---------------------------------------------------------- */
-
   const existing = await db
     .select({
       id: users.id,
@@ -483,10 +573,6 @@ async function updateUser(event: HandlerEvent, userId: string) {
       message: "User not found.",
     });
   }
-
-  /* ----------------------------------------------------------
-     USERNAME CONFLICT
-  ---------------------------------------------------------- */
 
   const usernameConflict = await db
     .select({
@@ -509,10 +595,6 @@ async function updateUser(event: HandlerEvent, userId: string) {
     });
   }
 
-  /* ----------------------------------------------------------
-     PHONE CONFLICT
-  ---------------------------------------------------------- */
-
   const phoneConflict = await db
     .select({
       id: users.id,
@@ -533,10 +615,6 @@ async function updateUser(event: HandlerEvent, userId: string) {
       message: "Phone number is already registered.",
     });
   }
-
-  /* ----------------------------------------------------------
-     EMAIL CONFLICT
-  ---------------------------------------------------------- */
 
   const normalizedEmail = email || null;
 
@@ -562,10 +640,6 @@ async function updateUser(event: HandlerEvent, userId: string) {
       });
     }
   }
-
-  /* ----------------------------------------------------------
-     UPDATE VALUES
-  ---------------------------------------------------------- */
 
   const updateValues: {
     username: string;
@@ -595,10 +669,6 @@ async function updateUser(event: HandlerEvent, userId: string) {
     updatedAt: new Date(),
   };
 
-  /* ----------------------------------------------------------
-     PASSWORD
-  ---------------------------------------------------------- */
-
   if (password) {
     if (password.length < 8) {
       return json(400, {
@@ -609,10 +679,6 @@ async function updateUser(event: HandlerEvent, userId: string) {
 
     updateValues.passwordHash = await hash(password, 12);
   }
-
-  /* ----------------------------------------------------------
-     UPDATE
-  ---------------------------------------------------------- */
 
   await db.update(users).set(updateValues).where(eq(users.id, userId));
 
@@ -678,33 +744,19 @@ export const handler: Handler = async (event) => {
   try {
     console.log(`[admin-users] ${event.httpMethod} ${event.path}`);
 
-    /* ------------------------------------------------------
-         GET
-      ------------------------------------------------------ */
+    /* GET */
 
     if (event.httpMethod === "GET") {
-      const data = await getUsers();
-
-      return json(200, {
-        success: true,
-
-        data: {
-          users: data,
-        },
-      });
+      return await getUsers(event);
     }
 
-    /* ------------------------------------------------------
-         POST
-      ------------------------------------------------------ */
+    /* POST */
 
     if (event.httpMethod === "POST") {
       return await createUser(event);
     }
 
-    /* ------------------------------------------------------
-         USER ID
-      ------------------------------------------------------ */
+    /* USER ID */
 
     const userId = getUserId(event);
 
@@ -715,25 +767,17 @@ export const handler: Handler = async (event) => {
       });
     }
 
-    /* ------------------------------------------------------
-         PUT
-      ------------------------------------------------------ */
+    /* PUT */
 
     if (event.httpMethod === "PUT") {
       return await updateUser(event, userId);
     }
 
-    /* ------------------------------------------------------
-         PATCH
-      ------------------------------------------------------ */
+    /* PATCH */
 
     if (event.httpMethod === "PATCH") {
       return await updateStatus(event, userId);
     }
-
-    /* ------------------------------------------------------
-         DELETE NOT USED
-      ------------------------------------------------------ */
 
     return json(405, {
       success: false,
