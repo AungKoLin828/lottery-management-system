@@ -30,57 +30,17 @@ type WalletBalanceResponse = {
   success?: boolean;
   message?: string;
 
-  /*
-   * Direct balance response
-   *
-   * {
-   *   success: true,
-   *   balance: 125000
-   * }
-   */
   balance?: number | string | null;
 
-  /*
-   * Direct wallet response
-   *
-   * {
-   *   success: true,
-   *   wallet: {
-   *     balance: 125000
-   *   }
-   * }
-   */
   wallet?: {
     balance?: number | string | null;
   } | null;
 
-  /*
-   * Dashboard response
-   *
-   * {
-   *   success: true,
-   *   stats: {
-   *     walletBalance: 125000
-   *   }
-   * }
-   */
   stats?: {
     walletBalance?: number | string | null;
     balance?: number | string | null;
   } | null;
 
-  /*
-   * Nested dashboard response
-   *
-   * {
-   *   success: true,
-   *   data: {
-   *     stats: {
-   *       walletBalance: 125000
-   *     }
-   *   }
-   * }
-   */
   data?: {
     balance?: number | string | null;
 
@@ -93,11 +53,6 @@ type WalletBalanceResponse = {
       balance?: number | string | null;
     } | null;
 
-    /*
-     * Also support:
-     *
-     * data.wallet.balance
-     */
     [key: string]: unknown;
   } | null;
 };
@@ -297,92 +252,17 @@ export default function PlayerLayout() {
 
       /* ========================================================
          GET BALANCE
-
-         IMPORTANT:
-         Your /api/player/dashboard endpoint returns the balance
-         from:
-
-           stats.walletBalance
-
-         or:
-
-           data.stats.walletBalance
-
-         The previous PlayerLayout did not check these fields.
-
-         We now support all existing response structures.
       ======================================================== */
 
       const balance =
-        /*
-         * PRIMARY DASHBOARD RESPONSE
-         *
-         * {
-         *   stats: {
-         *     walletBalance: 125000
-         *   }
-         * }
-         */
         result.data?.stats?.walletBalance ??
-        /*
-         * {
-         *   stats: {
-         *     balance: 125000
-         *   }
-         * }
-         */
         result.data?.stats?.balance ??
-        /*
-         * {
-         *   data: {
-         *     balance: 125000
-         *   }
-         * }
-         */
         result.data?.balance ??
-        /*
-         * {
-         *   data: {
-         *     wallet: {
-         *       balance: 125000
-         *     }
-         *   }
-         * }
-         */
         result.data?.wallet?.balance ??
-        /*
-         * {
-         *   stats: {
-         *     walletBalance: 125000
-         *   }
-         * }
-         */
         result.stats?.walletBalance ??
-        /*
-         * {
-         *   stats: {
-         *     balance: 125000
-         *   }
-         * }
-         */
         result.stats?.balance ??
-        /*
-         * {
-         *   balance: 125000
-         * }
-         */
         result.balance ??
-        /*
-         * {
-         *   wallet: {
-         *     balance: 125000
-         *   }
-         * }
-         */
         result.wallet?.balance ??
-        /*
-         * Final fallback
-         */
         0;
 
       const numericBalance = Number(balance);
@@ -780,7 +660,7 @@ export default function PlayerLayout() {
       ======================================================= */}
 
       <header className="sticky top-0 z-50 border-b border-slate-700/80 bg-slate-900/95 backdrop-blur-xl">
-        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-[72px] max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
           {/* LOGO */}
 
           <NavLink
@@ -803,9 +683,11 @@ export default function PlayerLayout() {
             </div>
           </NavLink>
 
-          {/* DESKTOP NAVIGATION */}
+          {/* ==================================================
+              DESKTOP NAVIGATION
+          =================================================== */}
 
-          <nav className="hidden items-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 lg:flex">
+          <nav className="hidden min-w-0 shrink items-center overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 lg:flex">
             {/* DASHBOARD */}
 
             <NavLink to="/player" end className={navClass}>
@@ -815,7 +697,7 @@ export default function PlayerLayout() {
 
             {/* PLAY */}
 
-            <div ref={playMenuRef} className="relative">
+            <div ref={playMenuRef} className="relative shrink-0">
               <button
                 type="button"
                 onClick={togglePlayMenu}
@@ -921,7 +803,7 @@ export default function PlayerLayout() {
             <NavLink
               to="/player/wallet"
               className={({ isActive }) =>
-                `group flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                `group flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
                   isActive
                     ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
                     : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
@@ -932,10 +814,8 @@ export default function PlayerLayout() {
 
               <span>Wallet</span>
 
-              {/* DESKTOP NAV WALLET BALANCE */}
-
               <span
-                className="ml-0.5 rounded-lg bg-emerald-500/10 px-2 py-1 text-[10px] font-bold leading-none text-emerald-400 ring-1 ring-emerald-500/10"
+                className="ml-0.5 shrink-0 whitespace-nowrap rounded-lg bg-emerald-500/10 px-2 py-1 text-[10px] font-bold leading-none text-emerald-400 ring-1 ring-emerald-500/10"
                 title="Wallet balance"
               >
                 {formattedWalletBalance} MMK
@@ -944,7 +824,7 @@ export default function PlayerLayout() {
 
             {/* MORE */}
 
-            <div ref={moreMenuRef} className="relative">
+            <div ref={moreMenuRef} className="relative shrink-0">
               <button
                 type="button"
                 onClick={toggleMoreMenu}
@@ -1004,26 +884,43 @@ export default function PlayerLayout() {
             </div>
           </nav>
 
-          {/* RIGHT SIDE */}
+          {/* ==================================================
+              RIGHT SIDE
+          =================================================== */}
 
-          <div className="flex items-center gap-2">
-            {/* WALLET */}
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {/* EXISTING BALANCE */}
 
             <NavLink
               to="/player/wallet"
               onClick={closeAllMenus}
-              className="hidden items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 transition-all hover:border-emerald-400/30 hover:bg-emerald-500/15 sm:flex"
+              className="
+                hidden
+                shrink-0
+                items-center
+                gap-2
+                whitespace-nowrap
+                rounded-xl
+                border
+                border-emerald-500/20
+                bg-emerald-500/10
+                px-3
+                py-2
+                transition-all
+                hover:border-emerald-400/30
+                hover:bg-emerald-500/15
+              "
             >
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-800 text-emerald-400">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-emerald-400">
                 <WalletCards size={16} />
               </div>
 
-              <div className="leading-tight">
+              <div className="min-w-0 shrink-0 leading-tight">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/70">
                   Balance
                 </p>
 
-                <p className="text-sm font-bold text-white">
+                <p className="whitespace-nowrap text-sm font-bold text-white">
                   {formattedWalletBalance} MMK
                 </p>
               </div>
@@ -1031,13 +928,16 @@ export default function PlayerLayout() {
 
             {/* DESKTOP NOTIFICATIONS */}
 
-            <div className="hidden rounded-xl sm:block">
+            <div className="hidden shrink-0 rounded-xl sm:block">
               <NotificationBell role="PLAYER" />
             </div>
 
             {/* PROFILE */}
 
-            <div ref={profileMenuRef} className="relative hidden sm:block">
+            <div
+              ref={profileMenuRef}
+              className="relative hidden shrink-0 sm:block"
+            >
               <button
                 type="button"
                 onClick={toggleProfileMenu}
@@ -1050,11 +950,11 @@ export default function PlayerLayout() {
                     : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
                 }`}
               >
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white">
                   AK
                 </div>
 
-                <div className="hidden text-left xl:block">
+                <div className="hidden min-w-0 text-left xl:block">
                   <p className="text-xs font-bold text-white">Player</p>
 
                   <p className="max-w-[130px] truncate text-[10px] text-slate-400">
@@ -1064,7 +964,7 @@ export default function PlayerLayout() {
 
                 <ChevronDown
                   size={15}
-                  className={`transition-transform duration-200 ${
+                  className={`shrink-0 transition-transform duration-200 ${
                     profileMenuOpen ? "rotate-180" : ""
                   }`}
                 />
@@ -1074,7 +974,7 @@ export default function PlayerLayout() {
                 <div className="absolute right-0 top-full z-[100] mt-2 w-60 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 shadow-2xl shadow-slate-950/50">
                   <div className="bg-gradient-to-r from-indigo-600/20 to-violet-600/20 px-4 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white">
                         AK
                       </div>
 
@@ -1122,7 +1022,7 @@ export default function PlayerLayout() {
             <button
               type="button"
               onClick={toggleMobileMenu}
-              className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 lg:hidden ${
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-all duration-200 lg:hidden ${
                 mobileMenuOpen
                   ? "border-indigo-500 bg-indigo-500/20 text-indigo-300"
                   : "border-slate-700 bg-slate-800 text-slate-300 hover:border-indigo-500 hover:bg-indigo-500/20 hover:text-white"
@@ -1141,7 +1041,9 @@ export default function PlayerLayout() {
           </div>
         </div>
 
-        {/* MOBILE NAVIGATION */}
+        {/* ====================================================
+            MOBILE NAVIGATION
+        ===================================================== */}
 
         {mobileMenuOpen && (
           <div className="border-t border-slate-700 bg-slate-900 lg:hidden">
