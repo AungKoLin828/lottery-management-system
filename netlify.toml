@@ -45,3 +45,15 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+  [[redirects]]
+  from = "/api/admin/users"
+  to = "/.netlify/functions/admin-users"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/admin/users/*"
+  to = "/.netlify/functions/admin-users"
+  status = 200
+  force = true

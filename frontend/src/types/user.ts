@@ -1,19 +1,25 @@
+export type UserRole = "ADMIN" | "PLAYER";
+
+export type UserStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED";
+
 export interface User {
-  id: number;
+  id: string;
 
   username: string;
 
-  fullName: string;
+  fullName: string | null;
 
   phone: string;
 
-  email?: string;
+  email: string | null;
 
-  role: "ADMIN" | "PLAYER";
+  role: UserRole;
 
-  status: "ACTIVE" | "INACTIVE";
+  status: UserStatus;
 
   balance: number;
+
+  isVerified: boolean;
 
   createdAt: string;
 }
