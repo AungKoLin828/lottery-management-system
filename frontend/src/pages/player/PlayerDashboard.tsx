@@ -64,7 +64,7 @@ type DashboardData = {
 /* ============================================================
    API RESPONSE
 
-   Current backend response:
+   Backend currently returns:
 
    {
      success: true,
@@ -73,18 +73,6 @@ type DashboardData = {
      latestDraw: null,
      winners: []
    }
-
-   Also support a wrapped response:
-
-   {
-     success: true,
-     data: {
-       user: {...},
-       stats: {...},
-       latestDraw: null,
-       winners: []
-     }
-   }
 ============================================================ */
 
 type DashboardResponse = {
@@ -92,11 +80,12 @@ type DashboardResponse = {
   message?: string;
 
   user?: DashboardUser;
-  stats?: DashboardStats;
-  latestDraw?: LatestDraw | null;
-  winners?: Winner[];
 
-  data?: DashboardData;
+  stats?: DashboardStats;
+
+  latestDraw?: LatestDraw | null;
+
+  winners?: Winner[];
 };
 
 /* ============================================================
@@ -104,7 +93,13 @@ type DashboardResponse = {
 ============================================================ */
 
 function formatMoney(value: number | string | null | undefined): string {
-  return Number(value || 0).toLocaleString("en-US", {
+  const amount = Number(value ?? 0);
+
+  if (!Number.isFinite(amount)) {
+    return "0";
+  }
+
+  return amount.toLocaleString("en-US", {
     maximumFractionDigits: 2,
   });
 }
@@ -137,38 +132,36 @@ export default function Dashboard() {
         headers: {
           Accept: "application/json",
         },
+
+        cache: "no-store",
       });
 
       /* ======================================================
-         RESPONSE CONTENT TYPE
+         CONTENT TYPE
       ====================================================== */
 
       const contentType = response.headers.get("content-type") || "";
-
-      /*
-       * If Netlify returns index.html instead of JSON,
-       * response.json() would throw:
-       *
-       * Unexpected token '<', "<!doctype "... is not valid JSON
-       *
-       * Give a useful error instead.
-       */
 
       if (!contentType.toLowerCase().includes("application/json")) {
         const text = await response.text();
 
         console.error("Dashboard API returned non-JSON response:", {
           status: response.status,
+          statusText: response.statusText,
           contentType,
           body: text.substring(0, 500),
         });
 
-        throw new Error(
-          response.status === 404
-            ? "Dashboard API endpoint was not found"
-            : "Dashboard API returned an invalid response",
-        );
+        if (response.status === 404) {
+          throw new Error("Dashboard API endpoint was not found");
+        }
+
+        throw new Error("Dashboard API returned an invalid response");
       }
+
+      /* ======================================================
+         PARSE JSON
+      ====================================================== */
 
       const result = (await response.json()) as DashboardResponse;
 
@@ -183,78 +176,76 @@ export default function Dashboard() {
       }
 
       /* ======================================================
-         NORMALIZE RESPONSE
-         
-         Supports both:
-         
-         1. Current backend:
-            {
-              success,
-              user,
-              stats,
-              latestDraw,
-              winners
-            }
-
-         2. Wrapped backend:
-            {
-              success,
-              data: {
-                user,
-                stats,
-                latestDraw,
-                winners
-              }
-            }
+         VALIDATE USER
       ====================================================== */
 
-      const dashboardData: DashboardData | null =
-        result.data ??
-        (result.user && result.stats
-          ? {
-              user: result.user,
+      if (!result.user) {
+        console.error("Dashboard response does not contain user:", result);
 
-              stats: result.stats,
-
-              latestDraw: result.latestDraw ?? null,
-
-              winners: Array.isArray(result.winners) ? result.winners : [],
-            }
-          : null);
-
-      /* ======================================================
-         VALIDATE DASHBOARD DATA
-      ====================================================== */
-
-      if (!dashboardData) {
-        throw new Error("Dashboard data is unavailable");
+        throw new Error("Dashboard user data is unavailable");
       }
 
       /* ======================================================
-         NORMALIZE OPTIONAL ARRAYS / VALUES
+         VALIDATE STATS
       ====================================================== */
 
-      setData({
-        user: dashboardData.user,
+      if (!result.stats) {
+        console.error("Dashboard response does not contain stats:", result);
 
-        stats: {
-          walletBalance: Number(dashboardData.stats?.walletBalance ?? 0),
+        throw new Error("Dashboard statistics are unavailable");
+      }
 
-          totalTickets: Number(dashboardData.stats?.totalTickets ?? 0),
+      /* ======================================================
+         NORMALIZE DATA
+      ====================================================== */
 
-          totalDeposit: Number(dashboardData.stats?.totalDeposit ?? 0),
+      const normalizedData: DashboardData = {
+        user: {
+          id: result.user.id,
 
-          totalWithdraw: Number(dashboardData.stats?.totalWithdraw ?? 0),
+          username: result.user.username,
+
+          fullName: result.user.fullName ?? null,
+
+          phone: result.user.phone,
+
+          role: result.user.role,
+
+          status: result.user.status,
+
+          isVerified: result.user.isVerified,
         },
 
-        latestDraw: dashboardData.latestDraw ?? null,
+        stats: {
+          walletBalance: Number(result.stats.walletBalance ?? 0),
 
-        winners: Array.isArray(dashboardData.winners)
-          ? dashboardData.winners
+          totalTickets: Number(result.stats.totalTickets ?? 0),
+
+          totalDeposit: Number(result.stats.totalDeposit ?? 0),
+
+          totalWithdraw: Number(result.stats.totalWithdraw ?? 0),
+        },
+
+        latestDraw: result.latestDraw ?? null,
+
+        winners: Array.isArray(result.winners)
+          ? result.winners.map((winner) => ({
+              ...winner,
+
+              prize: Number(winner.prize ?? 0),
+            }))
           : [],
-      });
+      };
+
+      /* ======================================================
+         SET DATA
+      ====================================================== */
+
+      setData(normalizedData);
     } catch (err) {
       console.error("Dashboard loading error:", err);
+
+      setData(null);
 
       setError(err instanceof Error ? err.message : "Failed to load dashboard");
     } finally {
@@ -262,9 +253,9 @@ export default function Dashboard() {
     }
   }, []);
 
-  /* ============================================================
+  /* ==========================================================
      INITIAL LOAD
-  ============================================================ */
+  ========================================================== */
 
   useEffect(() => {
     void loadDashboard();
@@ -285,37 +276,57 @@ export default function Dashboard() {
     return [
       {
         title: "Wallet Balance",
+
         value: formatMoney(values.walletBalance),
+
         unit: "MMK",
+
         icon: WalletCards,
+
         iconBg: "bg-emerald-100",
+
         iconColor: "text-emerald-600",
       },
 
       {
         title: "Total Tickets",
-        value: values.totalTickets.toLocaleString("en-US"),
+
+        value: Number(values.totalTickets || 0).toLocaleString("en-US"),
+
         unit: "Tickets",
+
         icon: Ticket,
+
         iconBg: "bg-indigo-100",
+
         iconColor: "text-indigo-600",
       },
 
       {
         title: "Total Deposit",
+
         value: formatMoney(values.totalDeposit),
+
         unit: "MMK",
+
         icon: ArrowDownToLine,
+
         iconBg: "bg-blue-100",
+
         iconColor: "text-blue-600",
       },
 
       {
         title: "Total Withdraw",
+
         value: formatMoney(values.totalWithdraw),
+
         unit: "MMK",
+
         icon: ArrowUpFromLine,
+
         iconBg: "bg-amber-100",
+
         iconColor: "text-amber-600",
       },
     ];
@@ -504,7 +515,9 @@ export default function Dashboard() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          {/* 2D */}
+          {/* ==================================================
+              2D
+          ================================================== */}
 
           <Link
             to="/player/play-2d"
@@ -549,7 +562,9 @@ export default function Dashboard() {
             </div>
           </Link>
 
-          {/* 3D */}
+          {/* ==================================================
+              3D
+          ================================================== */}
 
           <Link
             to="/player/play-3d"
