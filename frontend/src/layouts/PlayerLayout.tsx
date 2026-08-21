@@ -169,7 +169,7 @@ export default function PlayerLayout() {
 
   const loadWalletBalance = useCallback(async () => {
     try {
-      const response = await fetch("/api/player/transactions", {
+      const response = await fetch("/api/player/dashboard", {
         method: "GET",
         credentials: "include",
         headers: {
