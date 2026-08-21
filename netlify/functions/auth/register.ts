@@ -8,6 +8,8 @@ import crypto from "node:crypto";
 
 import { users } from "../../../db/schema/users";
 
+import { wallets } from "../../../db/schema/wallets";
+
 import { db } from "../utils/db";
 
 import {
@@ -52,34 +54,52 @@ interface RegisterBody {
 function normalizeMyanmarPhone(phone: string): string {
   let value = phone.trim().replace(/[\s\-().]/g, "");
 
-  // 00959xxxxxxxxx
+  /*
+   * 00959xxxxxxxxx
+   *
+   * becomes
+   *
+   * +959xxxxxxxxx
+   */
   if (value.startsWith("00")) {
     value = `+${value.substring(2)}`;
   }
 
-  // Remove + temporarily
+  /*
+   * Remove + temporarily.
+   */
   const withoutPlus = value.startsWith("+") ? value.substring(1) : value;
 
-  // Local Myanmar format
-  //
-  // 09123456789
-  //
-  // becomes
-  //
-  // +959123456789
+  /*
+   * Local Myanmar format
+   *
+   * 09123456789
+   *
+   * becomes
+   *
+   * +959123456789
+   */
   if (withoutPlus.startsWith("09")) {
     return `+95${withoutPlus.substring(1)}`;
   }
 
-  // International format without +
-  //
-  // 959123456789
+  /*
+   * International format without +
+   *
+   * 959123456789
+   *
+   * becomes
+   *
+   * +959123456789
+   */
   if (withoutPlus.startsWith("959")) {
     return `+${withoutPlus}`;
   }
 
-  // Keep +95 so validation can reject
-  // invalid Myanmar numbers correctly.
+  /*
+   * Keep +95 so validation can reject
+   * invalid Myanmar numbers correctly.
+   */
   if (withoutPlus.startsWith("95")) {
     return `+${withoutPlus}`;
   }
@@ -101,6 +121,7 @@ function normalizeMyanmarPhone(phone: string): string {
  * NOTE:
  *
  * This does NOT verify ownership of the phone number.
+ *
  * No OTP or external verification service is used.
  */
 function validateMyanmarPhone(phone: string): {
@@ -198,7 +219,6 @@ function validateMyanmarPhone(phone: string): {
     "27",
     "28",
     "29",
-
     "30",
     "31",
     "32",
@@ -209,7 +229,6 @@ function validateMyanmarPhone(phone: string): {
     "37",
     "38",
     "39",
-
     "40",
     "41",
     "42",
@@ -220,7 +239,6 @@ function validateMyanmarPhone(phone: string): {
     "47",
     "48",
     "49",
-
     "50",
     "51",
     "52",
@@ -231,7 +249,6 @@ function validateMyanmarPhone(phone: string): {
     "57",
     "58",
     "59",
-
     "60",
     "61",
     "62",
@@ -242,7 +259,6 @@ function validateMyanmarPhone(phone: string): {
     "67",
     "68",
     "69",
-
     "70",
     "71",
     "72",
@@ -253,7 +269,6 @@ function validateMyanmarPhone(phone: string): {
     "77",
     "78",
     "79",
-
     "80",
     "81",
     "82",
@@ -264,7 +279,6 @@ function validateMyanmarPhone(phone: string): {
     "87",
     "88",
     "89",
-
     "90",
     "91",
     "92",
@@ -381,6 +395,7 @@ export const handler: Handler = async (event) => {
      *
      * +959123456789
      */
+
     const phone = phoneResult.normalized;
 
     /* ======================================================
@@ -436,53 +451,114 @@ export const handler: Handler = async (event) => {
     const username = generateUsername();
 
     /* ======================================================
-         CREATE USER
+         CREATE USER + WALLET
+         
+         IMPORTANT:
+         
+         Both operations are inside one transaction.
+         
+         If wallet creation fails:
+         
+         User creation is also rolled back.
       ====================================================== */
 
-    const [user] = await db
-      .insert(users)
-      .values({
-        username,
+    const result = await db.transaction(async (tx) => {
+      /* ==================================================
+               CREATE USER
+            ================================================== */
 
-        phone,
+      const [user] = await tx
+        .insert(users)
+        .values({
+          username,
 
-        fullName: name,
+          phone,
 
-        passwordHash,
+          fullName: name,
 
-        role: "PLAYER",
+          passwordHash,
 
-        status: "ACTIVE",
+          role: "PLAYER",
 
-        /**
-         * No OTP.
-         * No SMS.
-         * No Viber.
-         * No Telegram.
-         *
-         * This means the phone number has
-         * only passed format validation.
-         */
-        isVerified: false,
-      })
-      .returning();
+          status: "ACTIVE",
 
-    /* ======================================================
-         DATABASE INSERT FAILURE
-      ====================================================== */
+          /**
+           * No OTP.
+           * No SMS.
+           * No Viber.
+           * No Telegram.
+           *
+           * This means the phone number has
+           * only passed format validation.
+           */
+          isVerified: false,
+        })
+        .returning();
 
-    if (!user) {
-      return jsonResponse(500, {
-        success: false,
-        message: "Unable to create account",
-      });
-    }
+      /* ==================================================
+               DATABASE INSERT FAILURE
+            ================================================== */
+
+      if (!user) {
+        throw new Error("Unable to create account");
+      }
+
+      /* ==================================================
+               CREATE PLAYER WALLET
+            ================================================== */
+
+      const [wallet] = await tx
+        .insert(wallets)
+        .values({
+          userId: user.id,
+
+          /*
+           * New player's wallet always starts at zero.
+           */
+          balance: "0",
+
+          totalDeposit: "0",
+
+          totalWithdraw: "0",
+
+          totalBet: "0",
+
+          totalWin: "0",
+        })
+        .returning({
+          id: wallets.id,
+
+          balance: wallets.balance,
+
+          totalDeposit: wallets.totalDeposit,
+
+          totalWithdraw: wallets.totalWithdraw,
+
+          totalBet: wallets.totalBet,
+
+          totalWin: wallets.totalWin,
+        });
+
+      /* ==================================================
+               WALLET INSERT FAILURE
+            ================================================== */
+
+      if (!wallet) {
+        throw new Error("Unable to create wallet");
+      }
+
+      return {
+        user,
+
+        wallet,
+      };
+    });
 
     /* ======================================================
          CREATE JWT
       ====================================================== */
 
-    const token = await createToken(user);
+    const token = await createToken(result.user);
 
     /* ======================================================
          RESPONSE
@@ -496,7 +572,27 @@ export const handler: Handler = async (event) => {
         message: "Account created successfully",
 
         data: {
-          user: toAuthUser(user),
+          user: toAuthUser(result.user),
+
+          /*
+           * Wallet is returned as additional data.
+           *
+           * Existing frontend code that only reads
+           * data.user will continue to work.
+           */
+          wallet: {
+            id: result.wallet.id,
+
+            balance: Number(result.wallet.balance),
+
+            totalDeposit: Number(result.wallet.totalDeposit),
+
+            totalWithdraw: Number(result.wallet.totalWithdraw),
+
+            totalBet: Number(result.wallet.totalBet),
+
+            totalWin: Number(result.wallet.totalWin),
+          },
         },
       },
       {
@@ -505,6 +601,30 @@ export const handler: Handler = async (event) => {
     );
   } catch (error) {
     console.error("REGISTER ERROR:", error);
+
+    /*
+     * PostgreSQL unique constraint.
+     *
+     * This protects against duplicate phone/username
+     * requests that happen at nearly the same time.
+     */
+    if (error && typeof error === "object" && "code" in error) {
+      const code = String(
+        (
+          error as {
+            code?: unknown;
+          }
+        ).code,
+      );
+
+      if (code === "23505") {
+        return jsonResponse(409, {
+          success: false,
+          message:
+            "An account with this phone number or username already exists",
+        });
+      }
+    }
 
     return jsonResponse(500, {
       success: false,
