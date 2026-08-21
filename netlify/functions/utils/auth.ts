@@ -6,6 +6,8 @@ import type { InferSelectModel } from "drizzle-orm";
 
 import { users } from "../../../db/schema/users";
 
+import bcrypt from "bcryptjs";
+
 export type DbUser = InferSelectModel<typeof users>;
 
 export interface AuthUser {
@@ -176,4 +178,29 @@ export function parseBody<T>(event: HandlerEvent): T {
   } catch {
     throw new Error("Invalid JSON request");
   }
+}
+
+const PASSWORD_SALT_ROUNDS = 12;
+
+export async function hashPassword(password: string): Promise<string> {
+  if (!password) {
+    throw new Error("Password is required");
+  }
+
+  if (password.length < 8) {
+    throw new Error("Password must be at least 8 characters");
+  }
+
+  return bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
+}
+
+export async function verifyPassword(
+  password: string,
+  passwordHash: string,
+): Promise<boolean> {
+  if (!password || !passwordHash) {
+    return false;
+  }
+
+  return bcrypt.compare(password, passwordHash);
 }

@@ -9,7 +9,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "netlify:dev": "netlify dev"
+    "netlify:dev": "netlify dev",
+    "db:seed:admin": "tsx scripts/seed-admin.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

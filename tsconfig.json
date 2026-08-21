@@ -11,6 +11,7 @@
     "drizzle.config.ts",
     "db/**/*.ts",
     "netlify/functions/**/*.ts",
-    "netlify/utils/**/*.ts"
+    "netlify/utils/**/*.ts",
+    "scripts/*.ts"
   ]
 }

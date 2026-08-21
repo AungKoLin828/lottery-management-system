@@ -20,10 +20,10 @@ function getPool(): Pool {
 
       idleTimeoutMillis: 30_000,
 
-      connectionTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 15_000,
 
       ssl:
-        process.env.NODE_ENV === "production"
+        process.env.DATABASE_SSL === "true"
           ? {
               rejectUnauthorized: false,
             }
