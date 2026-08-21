@@ -32,6 +32,7 @@ type WalletBalanceResponse = {
 
   data?: {
     balance?: number | string | null;
+
     wallet?: {
       balance?: number | string | null;
     } | null;
@@ -818,9 +819,30 @@ export default function PlayerLayout() {
 
             {/* WALLET */}
 
-            <NavLink to="/player/wallet" className={navClass}>
+            <NavLink
+              to="/player/wallet"
+              className={({ isActive }) =>
+                `group flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                  isActive
+                    ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
+                    : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
+                }`
+              }
+            >
               <WalletCards size={17} />
-              Wallet
+
+              <span>Wallet</span>
+
+              {/* ==================================================
+                  DESKTOP NAV WALLET BALANCE
+                  ================================================== */}
+
+              <span
+                className="ml-0.5 rounded-lg bg-emerald-500/10 px-2 py-1 text-[10px] font-bold leading-none text-emerald-400 ring-1 ring-emerald-500/10"
+                title="Wallet balance"
+              >
+                {formattedWalletBalance} MMK
+              </span>
             </NavLink>
 
             {/* MORE */}
