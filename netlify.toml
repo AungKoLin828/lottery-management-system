@@ -36,17 +36,11 @@
   to = "/.netlify/functions/auth-logout"
   status = 200
 
-
 # ============================================================
-# FRONTEND SPA ROUTING
+# ADMIN USERS API
 # ============================================================
 
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
-  [[redirects]]
   from = "/api/admin/users"
   to = "/.netlify/functions/admin-users"
   status = 200
@@ -57,3 +51,12 @@
   to = "/.netlify/functions/admin-users"
   status = 200
   force = true
+
+# ============================================================
+# FRONTEND SPA ROUTING
+# ============================================================
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

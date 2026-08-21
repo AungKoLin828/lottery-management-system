@@ -23,7 +23,7 @@ type UserStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED";
    RESPONSE
 ============================================================ */
 
-function jsonResponse(statusCode: number, body: unknown): HandlerResponse {
+function json(statusCode: number, body: unknown): HandlerResponse {
   return {
     statusCode,
     headers: {
@@ -38,7 +38,7 @@ function jsonResponse(statusCode: number, body: unknown): HandlerResponse {
    BODY
 ============================================================ */
 
-function parseBody(event: HandlerEvent): Record<string, unknown> {
+function getBody(event: HandlerEvent): Record<string, unknown> {
   if (!event.body) {
     return {};
   }
@@ -62,7 +62,7 @@ function stringValue(value: unknown): string {
    ROLE
 ============================================================ */
 
-function isValidRole(value: unknown): value is UserRole {
+function isRole(value: unknown): value is UserRole {
   return value === "ADMIN" || value === "PLAYER";
 }
 
@@ -70,7 +70,7 @@ function isValidRole(value: unknown): value is UserRole {
    STATUS
 ============================================================ */
 
-function isValidStatus(value: unknown): value is UserStatus {
+function isStatus(value: unknown): value is UserStatus {
   return value === "ACTIVE" || value === "INACTIVE" || value === "SUSPENDED";
 }
 
@@ -79,38 +79,22 @@ function isValidStatus(value: unknown): value is UserStatus {
 ============================================================ */
 
 function getUserId(event: HandlerEvent): string | null {
-  /*
-   * Supports:
-   *
-   * /api/admin/users/:id
-   *
-   * and:
-   *
-   * /api/admin/users?id=UUID
-   */
-
   const queryId = event.queryStringParameters?.id;
 
   if (queryId) {
     return queryId;
   }
 
-  const pathParts = event.path.split("/").filter(Boolean);
+  const parts = event.path.split("/").filter(Boolean);
 
   /*
-   * Netlify can expose the path as:
+   * Example:
    *
    * /api/admin/users/UUID
-   *
-   * or:
-   *
-   * /.netlify/functions/admin-users/UUID
-   *
-   * We therefore use the last path segment.
    */
 
-  if (pathParts.length > 3) {
-    return pathParts[pathParts.length - 1];
+  if (parts.length > 0 && parts[parts.length - 1] !== "users") {
+    return parts[parts.length - 1];
   }
 
   return null;
@@ -159,7 +143,7 @@ function formatUser(user: {
    GET USERS
 ============================================================ */
 
-async function listUsers() {
+async function getUsers() {
   const rows = await db
     .select({
       id: users.id,
@@ -186,27 +170,27 @@ async function listUsers() {
     .leftJoin(wallets, eq(wallets.userId, users.id))
     .orderBy(desc(users.createdAt));
 
-  return rows.map((user) =>
+  return rows.map((row) =>
     formatUser({
-      id: user.id,
+      id: row.id,
 
-      username: user.username,
+      username: row.username,
 
-      fullName: user.fullName,
+      fullName: row.fullName,
 
-      phone: user.phone,
+      phone: row.phone,
 
-      email: user.email,
+      email: row.email,
 
-      role: user.role,
+      role: row.role,
 
-      status: user.status,
+      status: row.status,
 
-      isVerified: user.isVerified,
+      isVerified: row.isVerified,
 
-      createdAt: user.createdAt,
+      createdAt: row.createdAt,
 
-      balance: user.balance,
+      balance: row.balance,
     }),
   );
 }
@@ -216,7 +200,7 @@ async function listUsers() {
 ============================================================ */
 
 async function createUser(event: HandlerEvent) {
-  const body = parseBody(event);
+  const body = getBody(event);
 
   const username = stringValue(body.username);
 
@@ -235,42 +219,42 @@ async function createUser(event: HandlerEvent) {
   ---------------------------------------------------------- */
 
   if (!username) {
-    return jsonResponse(400, {
+    return json(400, {
       success: false,
       message: "Username is required.",
     });
   }
 
   if (!phone) {
-    return jsonResponse(400, {
+    return json(400, {
       success: false,
       message: "Phone number is required.",
     });
   }
 
   if (!password) {
-    return jsonResponse(400, {
+    return json(400, {
       success: false,
       message: "Password is required.",
     });
   }
 
   if (password.length < 8) {
-    return jsonResponse(400, {
+    return json(400, {
       success: false,
       message: "Password must be at least 8 characters.",
     });
   }
 
-  if (!isValidRole(role)) {
-    return jsonResponse(400, {
+  if (!isRole(role)) {
+    return json(400, {
       success: false,
       message: "Invalid role.",
     });
   }
 
   /* ----------------------------------------------------------
-     USERNAME DUPLICATE
+     DUPLICATE USERNAME
   ---------------------------------------------------------- */
 
   const usernameExists = await db
@@ -281,15 +265,15 @@ async function createUser(event: HandlerEvent) {
     .where(eq(users.username, username))
     .limit(1);
 
-  if (usernameExists.length > 0) {
-    return jsonResponse(409, {
+  if (usernameExists.length) {
+    return json(409, {
       success: false,
       message: "Username is already in use.",
     });
   }
 
   /* ----------------------------------------------------------
-     PHONE DUPLICATE
+     DUPLICATE PHONE
   ---------------------------------------------------------- */
 
   const phoneExists = await db
@@ -300,15 +284,15 @@ async function createUser(event: HandlerEvent) {
     .where(eq(users.phone, phone))
     .limit(1);
 
-  if (phoneExists.length > 0) {
-    return jsonResponse(409, {
+  if (phoneExists.length) {
+    return json(409, {
       success: false,
       message: "Phone number is already registered.",
     });
   }
 
   /* ----------------------------------------------------------
-     EMAIL DUPLICATE
+     DUPLICATE EMAIL
   ---------------------------------------------------------- */
 
   const normalizedEmail = email || null;
@@ -322,8 +306,8 @@ async function createUser(event: HandlerEvent) {
       .where(eq(users.email, normalizedEmail))
       .limit(1);
 
-    if (emailExists.length > 0) {
-      return jsonResponse(409, {
+    if (emailExists.length) {
+      return json(409, {
         success: false,
         message: "Email is already in use.",
       });
@@ -331,13 +315,13 @@ async function createUser(event: HandlerEvent) {
   }
 
   /* ----------------------------------------------------------
-     PASSWORD
+     PASSWORD HASH
   ---------------------------------------------------------- */
 
   const passwordHash = await hash(password, 12);
 
   /* ----------------------------------------------------------
-     INSERT USER
+     CREATE USER
   ---------------------------------------------------------- */
 
   const inserted = await db
@@ -358,8 +342,8 @@ async function createUser(event: HandlerEvent) {
       status: "ACTIVE",
 
       /*
-       * Admin-created accounts
-       * are immediately verified.
+       * Admin created accounts
+       * are already verified.
        */
       isVerified: true,
     })
@@ -383,10 +367,10 @@ async function createUser(event: HandlerEvent) {
       createdAt: users.createdAt,
     });
 
-  const createdUser = inserted[0];
+  const newUser = inserted[0];
 
-  if (!createdUser) {
-    return jsonResponse(500, {
+  if (!newUser) {
+    return json(500, {
       success: false,
       message: "Failed to create user.",
     });
@@ -397,7 +381,7 @@ async function createUser(event: HandlerEvent) {
   ---------------------------------------------------------- */
 
   await db.insert(wallets).values({
-    userId: createdUser.id,
+    userId: newUser.id,
 
     balance: "0",
 
@@ -410,32 +394,32 @@ async function createUser(event: HandlerEvent) {
     totalWin: "0",
   });
 
-  return jsonResponse(201, {
+  return json(201, {
     success: true,
 
     message: "User created successfully.",
 
     data: {
       user: {
-        id: createdUser.id,
+        id: newUser.id,
 
-        username: createdUser.username,
+        username: newUser.username,
 
-        fullName: createdUser.fullName,
+        fullName: newUser.fullName,
 
-        phone: createdUser.phone,
+        phone: newUser.phone,
 
-        email: createdUser.email,
+        email: newUser.email,
 
-        role: createdUser.role,
+        role: newUser.role,
 
-        status: createdUser.status,
+        status: newUser.status,
 
-        isVerified: createdUser.isVerified,
+        isVerified: newUser.isVerified,
 
         balance: 0,
 
-        createdAt: createdUser.createdAt.toISOString(),
+        createdAt: newUser.createdAt.toISOString(),
       },
     },
   });
@@ -446,7 +430,7 @@ async function createUser(event: HandlerEvent) {
 ============================================================ */
 
 async function updateUser(event: HandlerEvent, userId: string) {
-  const body = parseBody(event);
+  const body = getBody(event);
 
   const username = stringValue(body.username);
 
@@ -460,33 +444,29 @@ async function updateUser(event: HandlerEvent, userId: string) {
 
   const role = body.role;
 
-  /* ----------------------------------------------------------
-     VALIDATION
-  ---------------------------------------------------------- */
-
   if (!username) {
-    return jsonResponse(400, {
+    return json(400, {
       success: false,
       message: "Username is required.",
     });
   }
 
   if (!phone) {
-    return jsonResponse(400, {
+    return json(400, {
       success: false,
       message: "Phone number is required.",
     });
   }
 
-  if (!isValidRole(role)) {
-    return jsonResponse(400, {
+  if (!isRole(role)) {
+    return json(400, {
       success: false,
       message: "Invalid role.",
     });
   }
 
   /* ----------------------------------------------------------
-     USER EXISTS
+     CHECK USER
   ---------------------------------------------------------- */
 
   const existing = await db
@@ -497,15 +477,15 @@ async function updateUser(event: HandlerEvent, userId: string) {
     .where(eq(users.id, userId))
     .limit(1);
 
-  if (existing.length === 0) {
-    return jsonResponse(404, {
+  if (!existing.length) {
+    return json(404, {
       success: false,
       message: "User not found.",
     });
   }
 
   /* ----------------------------------------------------------
-     USERNAME DUPLICATE
+     USERNAME CONFLICT
   ---------------------------------------------------------- */
 
   const usernameConflict = await db
@@ -523,14 +503,14 @@ async function updateUser(event: HandlerEvent, userId: string) {
     .limit(1);
 
   if (usernameConflict.length) {
-    return jsonResponse(409, {
+    return json(409, {
       success: false,
       message: "Username is already in use.",
     });
   }
 
   /* ----------------------------------------------------------
-     PHONE DUPLICATE
+     PHONE CONFLICT
   ---------------------------------------------------------- */
 
   const phoneConflict = await db
@@ -548,14 +528,14 @@ async function updateUser(event: HandlerEvent, userId: string) {
     .limit(1);
 
   if (phoneConflict.length) {
-    return jsonResponse(409, {
+    return json(409, {
       success: false,
       message: "Phone number is already registered.",
     });
   }
 
   /* ----------------------------------------------------------
-     EMAIL DUPLICATE
+     EMAIL CONFLICT
   ---------------------------------------------------------- */
 
   const normalizedEmail = email || null;
@@ -576,7 +556,7 @@ async function updateUser(event: HandlerEvent, userId: string) {
       .limit(1);
 
     if (emailConflict.length) {
-      return jsonResponse(409, {
+      return json(409, {
         success: false,
         message: "Email is already in use.",
       });
@@ -584,7 +564,7 @@ async function updateUser(event: HandlerEvent, userId: string) {
   }
 
   /* ----------------------------------------------------------
-     UPDATE
+     UPDATE VALUES
   ---------------------------------------------------------- */
 
   const updateValues: {
@@ -621,7 +601,7 @@ async function updateUser(event: HandlerEvent, userId: string) {
 
   if (password) {
     if (password.length < 8) {
-      return jsonResponse(400, {
+      return json(400, {
         success: false,
         message: "Password must be at least 8 characters.",
       });
@@ -631,12 +611,12 @@ async function updateUser(event: HandlerEvent, userId: string) {
   }
 
   /* ----------------------------------------------------------
-     UPDATE DATABASE
+     UPDATE
   ---------------------------------------------------------- */
 
   await db.update(users).set(updateValues).where(eq(users.id, userId));
 
-  return jsonResponse(200, {
+  return json(200, {
     success: true,
 
     message: "User updated successfully.",
@@ -648,12 +628,12 @@ async function updateUser(event: HandlerEvent, userId: string) {
 ============================================================ */
 
 async function updateStatus(event: HandlerEvent, userId: string) {
-  const body = parseBody(event);
+  const body = getBody(event);
 
   const status = body.status;
 
-  if (!isValidStatus(status)) {
-    return jsonResponse(400, {
+  if (!isStatus(status)) {
+    return json(400, {
       success: false,
       message: "Invalid status.",
     });
@@ -667,8 +647,8 @@ async function updateStatus(event: HandlerEvent, userId: string) {
     .where(eq(users.id, userId))
     .limit(1);
 
-  if (existing.length === 0) {
-    return jsonResponse(404, {
+  if (!existing.length) {
+    return json(404, {
       success: false,
       message: "User not found.",
     });
@@ -683,7 +663,7 @@ async function updateStatus(event: HandlerEvent, userId: string) {
     })
     .where(eq(users.id, userId));
 
-  return jsonResponse(200, {
+  return json(200, {
     success: true,
 
     message: "User status updated successfully.",
@@ -696,18 +676,20 @@ async function updateStatus(event: HandlerEvent, userId: string) {
 
 export const handler: Handler = async (event) => {
   try {
+    console.log(`[admin-users] ${event.httpMethod} ${event.path}`);
+
     /* ------------------------------------------------------
          GET
       ------------------------------------------------------ */
 
     if (event.httpMethod === "GET") {
-      const usersData = await listUsers();
+      const data = await getUsers();
 
-      return jsonResponse(200, {
+      return json(200, {
         success: true,
 
         data: {
-          users: usersData,
+          users: data,
         },
       });
     }
@@ -727,7 +709,7 @@ export const handler: Handler = async (event) => {
     const userId = getUserId(event);
 
     if (!userId) {
-      return jsonResponse(400, {
+      return json(400, {
         success: false,
         message: "User ID is required.",
       });
@@ -750,29 +732,29 @@ export const handler: Handler = async (event) => {
     }
 
     /* ------------------------------------------------------
-         METHOD
+         DELETE NOT USED
       ------------------------------------------------------ */
 
-    return jsonResponse(405, {
+    return json(405, {
       success: false,
       message: "Method not allowed.",
     });
   } catch (error) {
-    console.error("Admin users function error:", error);
+    console.error("[admin-users] error:", error);
 
-    const errorMessage = error instanceof Error ? error.message : "";
+    const message = error instanceof Error ? error.message : "";
 
     if (
-      errorMessage.includes("duplicate key") ||
-      errorMessage.includes("unique constraint")
+      message.includes("duplicate key") ||
+      message.includes("unique constraint")
     ) {
-      return jsonResponse(409, {
+      return json(409, {
         success: false,
         message: "Username, phone, or email already exists.",
       });
     }
 
-    return jsonResponse(500, {
+    return json(500, {
       success: false,
       message: "Internal server error.",
     });

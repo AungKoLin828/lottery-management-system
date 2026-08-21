@@ -6,14 +6,14 @@ import Button from "@/components/common/Button";
 import Input from "@/components/common/Input";
 import Modal from "@/components/common/Modal";
 
-interface UsersResponse {
+interface ApiResponse<T = unknown> {
   success: boolean;
-
   message?: string;
+  data?: T;
+}
 
-  data?: {
-    users: User[];
-  };
+interface UsersData {
+  users: User[];
 }
 
 export default function UserManagement() {
@@ -42,7 +42,7 @@ export default function UserManagement() {
   const [role, setRole] = useState<UserRole>("PLAYER");
 
   /* ==========================================================
-     LOAD
+     LOAD USERS
   ========================================================== */
 
   const loadUsers = useCallback(async () => {
@@ -58,28 +58,55 @@ export default function UserManagement() {
         },
       });
 
-      const data = (await response.json()) as UsersResponse;
+      const contentType = response.headers.get("content-type") || "";
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || "Failed to load users.");
+      /*
+       * Prevent:
+       *
+       * Unexpected token '<'
+       *
+       * when Netlify returns
+       * index.html.
+       */
+
+      if (!contentType.includes("application/json")) {
+        const text = await response.text();
+
+        console.error("Expected JSON but received:", text.slice(0, 500));
+
+        throw new Error(
+          `API returned ${response.status} ${response.statusText} instead of JSON.`,
+        );
       }
 
-      setUsers(data.data?.users ?? []);
-    } catch (err) {
-      console.error("Load users error:", err);
+      const result = (await response.json()) as ApiResponse<UsersData>;
 
-      setError(err instanceof Error ? err.message : "Failed to load users.");
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to load users.");
+      }
+
+      setUsers(result.data?.users ?? []);
+    } catch (error) {
+      console.error("Load users error:", error);
+
+      setError(
+        error instanceof Error ? error.message : "Failed to load users.",
+      );
     } finally {
       setLoading(false);
     }
   }, []);
+
+  /* ==========================================================
+     INITIAL LOAD
+  ========================================================== */
 
   useEffect(() => {
     void loadUsers();
   }, [loadUsers]);
 
   /* ==========================================================
-     RESET
+     RESET FORM
   ========================================================== */
 
   const resetForm = () => {
@@ -97,8 +124,11 @@ export default function UserManagement() {
 
   const openCreate = () => {
     setSelectedUser(null);
+
     resetForm();
+
     setError("");
+
     setOpenModal(true);
   };
 
@@ -127,6 +157,22 @@ export default function UserManagement() {
   };
 
   /* ==========================================================
+     CLOSE MODAL
+  ========================================================== */
+
+  const closeModal = () => {
+    if (saving) {
+      return;
+    }
+
+    setOpenModal(false);
+
+    setSelectedUser(null);
+
+    resetForm();
+  };
+
+  /* ==========================================================
      SAVE
   ========================================================== */
 
@@ -145,7 +191,7 @@ export default function UserManagement() {
       return;
     }
 
-    if (!selectedUser && !password) {
+    if (!selectedUser && !password.trim()) {
       setError("Password is required.");
       return;
     }
@@ -158,7 +204,7 @@ export default function UserManagement() {
     setSaving(true);
 
     try {
-      const payload: Record<string, unknown> = {
+      const body: Record<string, unknown> = {
         username: username.trim(),
 
         fullName: fullName.trim(),
@@ -171,7 +217,7 @@ export default function UserManagement() {
       };
 
       if (password.trim()) {
-        payload.password = password.trim();
+        body.password = password.trim();
       }
 
       const url = selectedUser
@@ -189,16 +235,25 @@ export default function UserManagement() {
           Accept: "application/json",
         },
 
-        body: JSON.stringify(payload),
+        body: JSON.stringify(body),
       });
 
-      const data = (await response.json()) as {
-        success: boolean;
-        message?: string;
-      };
+      const contentType = response.headers.get("content-type") || "";
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || "Failed to save user.");
+      if (!contentType.includes("application/json")) {
+        const text = await response.text();
+
+        console.error("Save API returned:", text.slice(0, 500));
+
+        throw new Error(
+          `API returned ${response.status} ${response.statusText} instead of JSON.`,
+        );
+      }
+
+      const result = (await response.json()) as ApiResponse;
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to save user.");
       }
 
       setOpenModal(false);
@@ -208,17 +263,17 @@ export default function UserManagement() {
       resetForm();
 
       await loadUsers();
-    } catch (err) {
-      console.error("Save user error:", err);
+    } catch (error) {
+      console.error("Save user error:", error);
 
-      setError(err instanceof Error ? err.message : "Failed to save user.");
+      setError(error instanceof Error ? error.message : "Failed to save user.");
     } finally {
       setSaving(false);
     }
   };
 
   /* ==========================================================
-     STATUS
+     TOGGLE STATUS
   ========================================================== */
 
   const toggleStatus = async (user: User) => {
@@ -246,44 +301,60 @@ export default function UserManagement() {
         },
       );
 
-      const data = (await response.json()) as {
-        success: boolean;
-        message?: string;
-      };
+      const contentType = response.headers.get("content-type") || "";
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || "Failed to update status.");
+      if (!contentType.includes("application/json")) {
+        const text = await response.text();
+
+        console.error("Status API returned:", text.slice(0, 500));
+
+        throw new Error(
+          `API returned ${response.status} ${response.statusText} instead of JSON.`,
+        );
+      }
+
+      const result = (await response.json()) as ApiResponse;
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to update status.");
       }
 
       await loadUsers();
-    } catch (err) {
-      console.error("Status error:", err);
+    } catch (error) {
+      console.error("Status update error:", error);
 
-      setError(err instanceof Error ? err.message : "Failed to update status.");
+      setError(
+        error instanceof Error ? error.message : "Failed to update status.",
+      );
     }
   };
 
   /* ==========================================================
-     FORMAT
+     BALANCE
   ========================================================== */
 
   const formatBalance = (balance: number) => {
     return `${balance.toLocaleString("en-US", {
+      minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     })} MMK`;
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+  /* ==========================================================
+     DATE
+  ========================================================== */
+
+  const formatDate = (value: string) => {
+    const date = new Date(value);
 
     if (Number.isNaN(date.getTime())) {
       return "-";
     }
 
     return date.toLocaleDateString("en-GB", {
-      year: "numeric",
-      month: "short",
       day: "2-digit",
+      month: "short",
+      year: "numeric",
     });
   };
 
@@ -469,13 +540,7 @@ export default function UserManagement() {
       <Modal
         open={openModal}
         title={selectedUser ? "Edit User" : "Create User"}
-        onClose={() => {
-          if (!saving) {
-            setOpenModal(false);
-            setSelectedUser(null);
-            resetForm();
-          }
-        }}
+        onClose={closeModal}
       >
         <form onSubmit={handleSave} className="space-y-4">
           <Input
@@ -572,11 +637,7 @@ export default function UserManagement() {
               type="button"
               variant="outline"
               disabled={saving}
-              onClick={() => {
-                setOpenModal(false);
-                setSelectedUser(null);
-                resetForm();
-              }}
+              onClick={closeModal}
             >
               Cancel
             </Button>
