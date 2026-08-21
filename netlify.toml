@@ -56,6 +56,19 @@
   status = 200
   force = true
 
+# ============================================================
+# PLAYER DASHBOARD API
+#
+# GET /api/player/dashboard
+#
+# This MUST be before the frontend SPA fallback.
+# ============================================================
+
+[[redirects]]
+  from = "/api/player/dashboard"
+  to = "/.netlify/functions/player-dashboard"
+  status = 200
+  force = true
 
 # ============================================================
 # ADMIN USERS API
