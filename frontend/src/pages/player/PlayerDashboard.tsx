@@ -44,28 +44,58 @@ type Winner = {
   prize: number;
 };
 
+type DashboardUser = {
+  id: string;
+  username: string;
+  fullName: string | null;
+  phone: string;
+  role?: "ADMIN" | "PLAYER";
+  status?: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+  isVerified?: boolean;
+};
+
 type DashboardData = {
-  user: {
-    id: string;
-    username: string;
-    fullName: string | null;
-    phone: string;
-  };
-
+  user: DashboardUser;
   stats: DashboardStats;
-
   latestDraw: LatestDraw | null;
-
   winners: Winner[];
 };
 
 /* ============================================================
    API RESPONSE
+
+   Current backend response:
+
+   {
+     success: true,
+     user: {...},
+     stats: {...},
+     latestDraw: null,
+     winners: []
+   }
+
+   Also support a wrapped response:
+
+   {
+     success: true,
+     data: {
+       user: {...},
+       stats: {...},
+       latestDraw: null,
+       winners: []
+     }
+   }
 ============================================================ */
 
 type DashboardResponse = {
   success: boolean;
   message?: string;
+
+  user?: DashboardUser;
+  stats?: DashboardStats;
+  latestDraw?: LatestDraw | null;
+  winners?: Winner[];
+
   data?: DashboardData;
 };
 
@@ -73,7 +103,7 @@ type DashboardResponse = {
    HELPERS
 ============================================================ */
 
-function formatMoney(value: number): string {
+function formatMoney(value: number | string | null | undefined): string {
   return Number(value || 0).toLocaleString("en-US", {
     maximumFractionDigits: 2,
   });
@@ -90,11 +120,9 @@ export default function Dashboard() {
 
   const [error, setError] = useState("");
 
-  /*
-   * ==========================================================
-   * LOAD DASHBOARD
-   * ==========================================================
-   */
+  /* ==========================================================
+     LOAD DASHBOARD
+  ========================================================== */
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -111,17 +139,120 @@ export default function Dashboard() {
         },
       });
 
+      /* ======================================================
+         RESPONSE CONTENT TYPE
+      ====================================================== */
+
+      const contentType = response.headers.get("content-type") || "";
+
+      /*
+       * If Netlify returns index.html instead of JSON,
+       * response.json() would throw:
+       *
+       * Unexpected token '<', "<!doctype "... is not valid JSON
+       *
+       * Give a useful error instead.
+       */
+
+      if (!contentType.toLowerCase().includes("application/json")) {
+        const text = await response.text();
+
+        console.error("Dashboard API returned non-JSON response:", {
+          status: response.status,
+          contentType,
+          body: text.substring(0, 500),
+        });
+
+        throw new Error(
+          response.status === 404
+            ? "Dashboard API endpoint was not found"
+            : "Dashboard API returned an invalid response",
+        );
+      }
+
       const result = (await response.json()) as DashboardResponse;
+
+      console.log("Dashboard API response:", result);
+
+      /* ======================================================
+         API ERROR
+      ====================================================== */
 
       if (!response.ok || !result.success) {
         throw new Error(result.message || "Failed to load dashboard");
       }
 
-      if (!result.data) {
+      /* ======================================================
+         NORMALIZE RESPONSE
+         
+         Supports both:
+         
+         1. Current backend:
+            {
+              success,
+              user,
+              stats,
+              latestDraw,
+              winners
+            }
+
+         2. Wrapped backend:
+            {
+              success,
+              data: {
+                user,
+                stats,
+                latestDraw,
+                winners
+              }
+            }
+      ====================================================== */
+
+      const dashboardData: DashboardData | null =
+        result.data ??
+        (result.user && result.stats
+          ? {
+              user: result.user,
+
+              stats: result.stats,
+
+              latestDraw: result.latestDraw ?? null,
+
+              winners: Array.isArray(result.winners) ? result.winners : [],
+            }
+          : null);
+
+      /* ======================================================
+         VALIDATE DASHBOARD DATA
+      ====================================================== */
+
+      if (!dashboardData) {
         throw new Error("Dashboard data is unavailable");
       }
 
-      setData(result.data);
+      /* ======================================================
+         NORMALIZE OPTIONAL ARRAYS / VALUES
+      ====================================================== */
+
+      setData({
+        user: dashboardData.user,
+
+        stats: {
+          walletBalance: Number(dashboardData.stats?.walletBalance ?? 0),
+
+          totalTickets: Number(dashboardData.stats?.totalTickets ?? 0),
+
+          totalDeposit: Number(dashboardData.stats?.totalDeposit ?? 0),
+
+          totalWithdraw: Number(dashboardData.stats?.totalWithdraw ?? 0),
+        },
+
+        latestDraw: dashboardData.latestDraw ?? null,
+
+        winners: Array.isArray(dashboardData.winners)
+          ? dashboardData.winners
+          : [],
+      });
     } catch (err) {
       console.error("Dashboard loading error:", err);
 
@@ -131,11 +262,9 @@ export default function Dashboard() {
     }
   }, []);
 
-  /*
-   * ==========================================================
-   * INITIAL LOAD
-   * ==========================================================
-   */
+  /* ============================================================
+     INITIAL LOAD
+  ============================================================ */
 
   useEffect(() => {
     void loadDashboard();
@@ -208,9 +337,7 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {Array.from({
-            length: 4,
-          }).map((_, index) => (
+          {Array.from({ length: 4 }).map((_, index) => (
             <div
               key={index}
               className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
@@ -250,6 +377,10 @@ export default function Dashboard() {
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             Player Dashboard
           </h1>
+
+          <p className="mt-1.5 text-xs text-slate-500 sm:text-sm">
+            Manage your lottery play, tickets and wallet.
+          </p>
         </div>
 
         <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
@@ -276,13 +407,17 @@ export default function Dashboard() {
     );
   }
 
-  /*
-   * At this point data is available.
-   */
+  /* ============================================================
+     DATA
+  ============================================================ */
 
   const latestDraw = data?.latestDraw ?? null;
 
   const winners = data?.winners ?? [];
+
+  /* ============================================================
+     PAGE
+  ============================================================ */
 
   return (
     <div className="space-y-5 pb-6">
