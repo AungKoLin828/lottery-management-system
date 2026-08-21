@@ -136,9 +136,7 @@ export default function PlayerLayout() {
   ============================================================ */
 
   const [playMenuOpen, setPlayMenuOpen] = useState(false);
-
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   /* ============================================================
@@ -146,7 +144,6 @@ export default function PlayerLayout() {
   ============================================================ */
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
   const [mobilePlayOpen, setMobilePlayOpen] = useState(false);
 
   /* ============================================================
@@ -160,9 +157,7 @@ export default function PlayerLayout() {
   ============================================================ */
 
   const profileMenuRef = useRef<HTMLDivElement>(null);
-
   const playMenuRef = useRef<HTMLDivElement>(null);
-
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
   /* ============================================================
@@ -199,17 +194,8 @@ export default function PlayerLayout() {
 
       const contentType = response.headers.get("content-type") || "";
 
-      /*
-       * Read response as text first.
-       *
-       * This prevents response.json() from crashing
-       * when Netlify returns HTML instead of JSON.
-       */
       const rawResponse = await response.text();
 
-      /*
-       * Empty response
-       */
       if (!rawResponse.trim()) {
         console.error("Wallet balance API returned an empty response", {
           status: response.status,
@@ -219,9 +205,6 @@ export default function PlayerLayout() {
         return;
       }
 
-      /*
-       * Parse JSON manually.
-       */
       let result: WalletBalanceResponse;
 
       try {
@@ -237,9 +220,6 @@ export default function PlayerLayout() {
         return;
       }
 
-      /*
-       * API error
-       */
       if (!response.ok || result.success === false) {
         console.error("Failed to load player wallet balance", {
           status: response.status,
@@ -267,9 +247,6 @@ export default function PlayerLayout() {
 
       const numericBalance = Number(balance);
 
-      /*
-       * Invalid balance
-       */
       if (!Number.isFinite(numericBalance)) {
         console.error("Invalid wallet balance returned by API", {
           balance,
@@ -279,15 +256,8 @@ export default function PlayerLayout() {
         return;
       }
 
-      /*
-       * Update wallet balance
-       */
       setWalletBalance(numericBalance);
     } catch (error) {
-      /*
-       * Do not break PlayerLayout if wallet API
-       * temporarily fails.
-       */
       console.error("Wallet balance loading error:", error);
     }
   }, []);
@@ -520,9 +490,6 @@ export default function PlayerLayout() {
         }
       }
 
-      /*
-       * Remove current page
-       */
       if (
         history.length > 0 &&
         history[history.length - 1] === location.pathname
@@ -530,27 +497,15 @@ export default function PlayerLayout() {
         history.pop();
       }
 
-      /*
-       * Previous player page
-       */
       const previousPlayerPage = history[history.length - 1];
 
-      /*
-       * Save updated history
-       */
       sessionStorage.setItem(PLAYER_HISTORY_KEY, JSON.stringify(history));
 
-      /*
-       * Navigate to previous player page
-       */
       if (previousPlayerPage && isPlayerPath(previousPlayerPage)) {
         navigate(previousPlayerPage);
         return;
       }
 
-      /*
-       * Safe fallback
-       */
       navigate("/player");
     } catch {
       navigate("/player");
@@ -622,7 +577,7 @@ export default function PlayerLayout() {
   ============================================================ */
 
   const navClass = ({ isActive }: { isActive: boolean }) =>
-    `group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
+    `group relative flex shrink-0 items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
       isActive
         ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
         : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
@@ -660,8 +615,10 @@ export default function PlayerLayout() {
       ======================================================= */}
 
       <header className="sticky top-0 z-50 border-b border-slate-700/80 bg-slate-900/95 backdrop-blur-xl">
-        <div className="mx-auto flex h-[72px] max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
-          {/* LOGO */}
+        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-2 px-3 sm:px-6 lg:px-8">
+          {/* ==================================================
+              LOGO
+          ================================================== */}
 
           <NavLink
             to="/player"
@@ -685,14 +642,14 @@ export default function PlayerLayout() {
 
           {/* ==================================================
               DESKTOP NAVIGATION
-          =================================================== */}
+          ================================================== */}
 
-          <nav className="hidden min-w-0 shrink items-center overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 lg:flex">
+          <nav className="hidden min-w-0 flex-1 items-center justify-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1 lg:flex">
             {/* DASHBOARD */}
 
             <NavLink to="/player" end className={navClass}>
               <LayoutDashboard size={17} />
-              Dashboard
+              <span>Dashboard</span>
             </NavLink>
 
             {/* PLAY */}
@@ -703,7 +660,7 @@ export default function PlayerLayout() {
                 onClick={togglePlayMenu}
                 aria-haspopup="menu"
                 aria-expanded={playMenuOpen}
-                className={`group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                className={`group relative flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
                   isPlayActive
                     ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
                     : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
@@ -748,7 +705,6 @@ export default function PlayerLayout() {
 
                   {playNavigation.map((item, index) => {
                     const Icon = item.icon;
-
                     const is2D = index === 0;
 
                     return (
@@ -795,15 +751,27 @@ export default function PlayerLayout() {
 
             <NavLink to="/player/tickets" className={navClass}>
               <Ticket size={17} />
-              My Tickets
+              <span>My Tickets</span>
             </NavLink>
 
             {/* WALLET */}
 
+            {/*
+             * IMPORTANT:
+             *
+             * The wallet amount is intentionally NOT duplicated here.
+             *
+             * The existing full Balance display remains on the
+             * RIGHT SIDE of the header.
+             *
+             * This prevents the desktop navigation from becoming
+             * too wide and hiding the existing Balance amount.
+             */}
+
             <NavLink
               to="/player/wallet"
               className={({ isActive }) =>
-                `group flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                `group flex shrink-0 items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
                   isActive
                     ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
                     : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
@@ -813,13 +781,6 @@ export default function PlayerLayout() {
               <WalletCards size={17} />
 
               <span>Wallet</span>
-
-              <span
-                className="ml-0.5 shrink-0 whitespace-nowrap rounded-lg bg-emerald-500/10 px-2 py-1 text-[10px] font-bold leading-none text-emerald-400 ring-1 ring-emerald-500/10"
-                title="Wallet balance"
-              >
-                {formattedWalletBalance} MMK
-              </span>
             </NavLink>
 
             {/* MORE */}
@@ -830,7 +791,7 @@ export default function PlayerLayout() {
                 onClick={toggleMoreMenu}
                 aria-haspopup="menu"
                 aria-expanded={moreMenuOpen}
-                className={`relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                className={`relative flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
                   isMoreActive
                     ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
                     : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
@@ -886,53 +847,47 @@ export default function PlayerLayout() {
 
           {/* ==================================================
               RIGHT SIDE
-          =================================================== */}
+          ================================================== */}
 
-          <div className="ml-auto flex shrink-0 items-center gap-2">
-            {/* EXISTING BALANCE */}
+          <div className="flex shrink-0 items-center gap-2">
+            {/* ==================================================
+                EXISTING BALANCE DISPLAY
+
+                THIS IS THE MAIN DESKTOP BALANCE DISPLAY.
+                It remains unchanged.
+            ================================================== */}
 
             <NavLink
               to="/player/wallet"
               onClick={closeAllMenus}
-              className="
-                hidden
-                shrink-0
-                items-center
-                gap-2
-                whitespace-nowrap
-                rounded-xl
-                border
-                border-emerald-500/20
-                bg-emerald-500/10
-                px-3
-                py-2
-                transition-all
-                hover:border-emerald-400/30
-                hover:bg-emerald-500/15
-              "
+              className="hidden shrink-0 items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 transition-all hover:border-emerald-400/30 hover:bg-emerald-500/15 sm:flex"
             >
               <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-emerald-400">
                 <WalletCards size={16} />
               </div>
 
-              <div className="min-w-0 shrink-0 leading-tight">
+              <div className="whitespace-nowrap leading-tight">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/70">
                   Balance
                 </p>
 
-                <p className="whitespace-nowrap text-sm font-bold text-white">
+                <p className="text-sm font-bold text-white">
                   {formattedWalletBalance} MMK
                 </p>
               </div>
             </NavLink>
 
-            {/* DESKTOP NOTIFICATIONS */}
+            {/* ==================================================
+                DESKTOP NOTIFICATIONS
+            ================================================== */}
 
             <div className="hidden shrink-0 rounded-xl sm:block">
               <NotificationBell role="PLAYER" />
             </div>
 
-            {/* PROFILE */}
+            {/* ==================================================
+                PROFILE
+            ================================================== */}
 
             <div
               ref={profileMenuRef}
@@ -954,7 +909,7 @@ export default function PlayerLayout() {
                   AK
                 </div>
 
-                <div className="hidden min-w-0 text-left xl:block">
+                <div className="hidden text-left xl:block">
                   <p className="text-xs font-bold text-white">Player</p>
 
                   <p className="max-w-[130px] truncate text-[10px] text-slate-400">
@@ -964,7 +919,7 @@ export default function PlayerLayout() {
 
                 <ChevronDown
                   size={15}
-                  className={`shrink-0 transition-transform duration-200 ${
+                  className={`transition-transform duration-200 ${
                     profileMenuOpen ? "rotate-180" : ""
                   }`}
                 />
@@ -974,7 +929,7 @@ export default function PlayerLayout() {
                 <div className="absolute right-0 top-full z-[100] mt-2 w-60 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 shadow-2xl shadow-slate-950/50">
                   <div className="bg-gradient-to-r from-indigo-600/20 to-violet-600/20 px-4 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white">
                         AK
                       </div>
 
@@ -1017,7 +972,9 @@ export default function PlayerLayout() {
               )}
             </div>
 
-            {/* MOBILE MENU BUTTON */}
+            {/* ==================================================
+                MOBILE MENU BUTTON
+            ================================================== */}
 
             <button
               type="button"
@@ -1041,9 +998,9 @@ export default function PlayerLayout() {
           </div>
         </div>
 
-        {/* ====================================================
+        {/* ======================================================
             MOBILE NAVIGATION
-        ===================================================== */}
+        ======================================================= */}
 
         {mobileMenuOpen && (
           <div className="border-t border-slate-700 bg-slate-900 lg:hidden">
