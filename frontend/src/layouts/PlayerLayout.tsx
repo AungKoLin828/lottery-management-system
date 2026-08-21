@@ -32,6 +32,18 @@ type WalletBalanceResponse = {
 
   data?: {
     balance?: number | string | null;
+
+    wallet?: {
+      balance?: number | string | null;
+    };
+
+    data?: {
+      balance?: number | string | null;
+    };
+  };
+
+  wallet?: {
+    balance?: number | string | null;
   };
 
   balance?: number | string | null;
@@ -95,6 +107,76 @@ function formatWalletBalance(
   }
 
   return value.toLocaleString("en-US");
+}
+
+/* ============================================================
+   EXTRACT WALLET BALANCE
+============================================================ */
+
+function extractWalletBalance(result: WalletBalanceResponse): number | null {
+  /*
+   * Supported response formats:
+   *
+   * 1.
+   * {
+   *   success: true,
+   *   balance: 125000
+   * }
+   *
+   * 2.
+   * {
+   *   success: true,
+   *   data: {
+   *     balance: 125000
+   *   }
+   * }
+   *
+   * 3.
+   * {
+   *   success: true,
+   *   wallet: {
+   *     balance: 125000
+   *   }
+   * }
+   *
+   * 4.
+   * {
+   *   success: true,
+   *   data: {
+   *     wallet: {
+   *       balance: 125000
+   *     }
+   *   }
+   *
+   * 5.
+   * {
+   *   success: true,
+   *   data: {
+   *     data: {
+   *       balance: 125000
+   *     }
+   *   }
+   */
+
+  const possibleBalances: Array<number | string | null | undefined> = [
+    result.data?.balance,
+    result.data?.wallet?.balance,
+    result.data?.data?.balance,
+    result.wallet?.balance,
+    result.balance,
+  ];
+
+  for (const balance of possibleBalances) {
+    if (balance !== null && balance !== undefined && balance !== "") {
+      const numericBalance = Number(balance);
+
+      if (Number.isFinite(numericBalance)) {
+        return numericBalance;
+      }
+    }
+  }
+
+  return null;
 }
 
 /* ============================================================
@@ -169,18 +251,34 @@ export default function PlayerLayout() {
 
   const loadWalletBalance = useCallback(async () => {
     try {
-      const response = await fetch("/api/player/dashboard", {
+      /*
+       * IMPORTANT:
+       *
+       * Use the dedicated wallet balance endpoint instead of
+       * /api/player/dashboard.
+       *
+       * Backend function:
+       *
+       * netlify/functions/wallet/balance.ts
+       *
+       * Netlify API route:
+       *
+       * /api/wallet/balance
+       */
+
+      const response = await fetch("/api/wallet/balance", {
         method: "GET",
         credentials: "include",
         headers: {
           Accept: "application/json",
         },
+        cache: "no-store",
       });
 
       const contentType = response.headers.get("content-type") || "";
 
       if (!contentType.toLowerCase().includes("application/json")) {
-        console.error("Player wallet balance API returned non-JSON response", {
+        console.error("Wallet balance API returned non-JSON response", {
           status: response.status,
           contentType,
         });
@@ -190,49 +288,43 @@ export default function PlayerLayout() {
 
       const result = (await response.json()) as WalletBalanceResponse;
 
-      if (!response.ok || result.success === false) {
-        console.error("Failed to load player wallet balance:", result.message);
+      if (!response.ok) {
+        console.error(
+          "Failed to load wallet balance:",
+          result.message || `HTTP ${response.status}`,
+        );
 
         return;
       }
 
-      /*
-       * Supports:
-       *
-       * {
-       *   success: true,
-       *   data: {
-       *     balance: 125000
-       *   }
-       * }
-       *
-       * AND:
-       *
-       * {
-       *   success: true,
-       *   balance: 125000
-       * }
-       */
+      if (result.success === false) {
+        console.error(
+          "Wallet balance API error:",
+          result.message || "Unable to load wallet balance",
+        );
 
-      const balance = result.data?.balance ?? result.balance ?? 0;
+        return;
+      }
 
-      const numericBalance = Number(balance);
+      const numericBalance = extractWalletBalance(result);
 
-      if (Number.isFinite(numericBalance)) {
+      if (numericBalance !== null) {
         setWalletBalance(numericBalance);
+      } else {
+        console.error("Wallet balance was not found in API response:", result);
       }
     } catch (error) {
       /*
-       * Do not break PlayerLayout if the wallet API temporarily fails.
-       * The rest of the player application should continue working.
+       * Do not break PlayerLayout if the wallet API
+       * temporarily fails.
        */
 
-      console.error("Player wallet balance loading error:", error);
+      console.error("Wallet balance loading error:", error);
     }
   }, []);
 
   /* ============================================================
-     LOAD WALLET BALANCE
+     INITIAL WALLET BALANCE
   ============================================================ */
 
   useEffect(() => {
@@ -265,14 +357,12 @@ export default function PlayerLayout() {
     /*
      * Refresh the balance whenever the player moves between pages.
      *
-     * This is useful after:
+     * Useful after:
      *
      * Deposit
      * Withdraw
      * 2D Play
      * 3D Play
-     *
-     * so the header balance stays current.
      */
 
     void loadWalletBalance();
