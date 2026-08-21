@@ -1,26 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
-
-import {
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Edit3,
-  Search,
-  UserCheck,
-  UserX,
-  Users,
-  XCircle,
-} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { User, UserRole, UserStatus } from "@/types/user";
 
 import Button from "@/components/common/Button";
 import Input from "@/components/common/Input";
 import Modal from "@/components/common/Modal";
-
-/* ============================================================
-   TYPES
-============================================================ */
 
 interface ApiResponse<T = unknown> {
   success: boolean;
@@ -30,69 +14,26 @@ interface ApiResponse<T = unknown> {
 
 interface UsersData {
   users: User[];
-
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-    hasPreviousPage: boolean;
-    hasNextPage: boolean;
-  };
 }
 
-/* ============================================================
-   COMPONENT
-============================================================ */
+type BalanceAction = "ADD" | "DEDUCT";
 
 export default function UserManagement() {
-  /* ----------------------------------------------------------
-     USERS
-  ---------------------------------------------------------- */
-
   const [users, setUsers] = useState<User[]>([]);
 
   const [loading, setLoading] = useState(true);
 
   const [saving, setSaving] = useState(false);
 
+  const [balanceSaving, setBalanceSaving] = useState(false);
+
   const [error, setError] = useState("");
-
-  /* ----------------------------------------------------------
-     PAGINATION
-  ---------------------------------------------------------- */
-
-  const [page, setPage] = useState(1);
-
-  const [pageSize, setPageSize] = useState(10);
-
-  const [total, setTotal] = useState(0);
-
-  const [totalPages, setTotalPages] = useState(1);
-
-  /* ----------------------------------------------------------
-     FILTER
-  ---------------------------------------------------------- */
-
-  const [searchInput, setSearchInput] = useState("");
-
-  const [search, setSearch] = useState("");
-
-  const [roleFilter, setRoleFilter] = useState<"" | UserRole>("");
-
-  const [statusFilter, setStatusFilter] = useState<"" | UserStatus>("");
-
-  /* ----------------------------------------------------------
-     MODAL
-  ---------------------------------------------------------- */
 
   const [openModal, setOpenModal] = useState(false);
 
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [openBalanceModal, setOpenBalanceModal] = useState(false);
 
-  /* ----------------------------------------------------------
-     FORM
-  ---------------------------------------------------------- */
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   const [username, setUsername] = useState("");
 
@@ -107,6 +48,38 @@ export default function UserManagement() {
   const [role, setRole] = useState<UserRole>("PLAYER");
 
   /* ==========================================================
+     BALANCE FORM
+  ========================================================== */
+
+  const [balanceAction, setBalanceAction] = useState<BalanceAction>("ADD");
+
+  const [balanceAmount, setBalanceAmount] = useState("");
+
+  const [balanceNote, setBalanceNote] = useState("");
+
+  /* ==========================================================
+     PAGINATION
+  ========================================================== */
+
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  const totalPages = Math.max(1, Math.ceil(users.length / itemsPerPage));
+
+  const paginatedUsers = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+
+    return users.slice(start, start + itemsPerPage);
+  }, [users, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  /* ==========================================================
      LOAD USERS
   ========================================================== */
 
@@ -115,29 +88,9 @@ export default function UserManagement() {
     setError("");
 
     try {
-      const params = new URLSearchParams();
-
-      params.set("page", String(page));
-
-      params.set("pageSize", String(pageSize));
-
-      if (search) {
-        params.set("search", search);
-      }
-
-      if (roleFilter) {
-        params.set("role", roleFilter);
-      }
-
-      if (statusFilter) {
-        params.set("status", statusFilter);
-      }
-
-      const response = await fetch(`/api/admin/users?${params.toString()}`, {
+      const response = await fetch("/api/admin/users", {
         method: "GET",
-
         credentials: "include",
-
         headers: {
           Accept: "application/json",
         },
@@ -162,10 +115,6 @@ export default function UserManagement() {
       }
 
       setUsers(result.data?.users ?? []);
-
-      setTotal(result.data?.pagination.total ?? 0);
-
-      setTotalPages(result.data?.pagination.totalPages ?? 1);
     } catch (error) {
       console.error("Load users error:", error);
 
@@ -175,10 +124,10 @@ export default function UserManagement() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, search, roleFilter, statusFilter]);
+  }, []);
 
   /* ==========================================================
-     INITIAL / FILTER LOAD
+     INITIAL LOAD
   ========================================================== */
 
   useEffect(() => {
@@ -186,45 +135,7 @@ export default function UserManagement() {
   }, [loadUsers]);
 
   /* ==========================================================
-     SEARCH
-  ========================================================== */
-
-  const handleSearch = () => {
-    setPage(1);
-    setSearch(searchInput.trim());
-  };
-
-  const handleSearchKeyDown = (
-    event: React.KeyboardEvent<HTMLInputElement>,
-  ) => {
-    if (event.key === "Enter") {
-      handleSearch();
-    }
-  };
-
-  /* ==========================================================
-     RESET FILTERS
-  ========================================================== */
-
-  const resetFilters = () => {
-    setSearchInput("");
-    setSearch("");
-    setRoleFilter("");
-    setStatusFilter("");
-    setPage(1);
-  };
-
-  /* ==========================================================
-     PAGE SIZE
-  ========================================================== */
-
-  const handlePageSizeChange = (value: number) => {
-    setPageSize(value);
-    setPage(1);
-  };
-
-  /* ==========================================================
-     RESET FORM
+     RESET USER FORM
   ========================================================== */
 
   const resetForm = () => {
@@ -237,7 +148,17 @@ export default function UserManagement() {
   };
 
   /* ==========================================================
-     CREATE
+     RESET BALANCE FORM
+  ========================================================== */
+
+  const resetBalanceForm = () => {
+    setBalanceAction("ADD");
+    setBalanceAmount("");
+    setBalanceNote("");
+  };
+
+  /* ==========================================================
+     CREATE USER
   ========================================================== */
 
   const openCreate = () => {
@@ -251,7 +172,7 @@ export default function UserManagement() {
   };
 
   /* ==========================================================
-     EDIT
+     EDIT USER
   ========================================================== */
 
   const openEdit = (user: User) => {
@@ -275,7 +196,7 @@ export default function UserManagement() {
   };
 
   /* ==========================================================
-     CLOSE MODAL
+     CLOSE USER MODAL
   ========================================================== */
 
   const closeModal = () => {
@@ -291,7 +212,37 @@ export default function UserManagement() {
   };
 
   /* ==========================================================
-     SAVE
+     OPEN BALANCE MODAL
+  ========================================================== */
+
+  const openBalance = (user: User) => {
+    setSelectedUser(user);
+
+    resetBalanceForm();
+
+    setError("");
+
+    setOpenBalanceModal(true);
+  };
+
+  /* ==========================================================
+     CLOSE BALANCE MODAL
+  ========================================================== */
+
+  const closeBalanceModal = () => {
+    if (balanceSaving) {
+      return;
+    }
+
+    setOpenBalanceModal(false);
+
+    setSelectedUser(null);
+
+    resetBalanceForm();
+  };
+
+  /* ==========================================================
+     SAVE USER
   ========================================================== */
 
   const handleSave = async (event: React.FormEvent) => {
@@ -324,13 +275,9 @@ export default function UserManagement() {
     try {
       const body: Record<string, unknown> = {
         username: username.trim(),
-
         fullName: fullName.trim(),
-
         phone: phone.trim(),
-
         email: email.trim(),
-
         role,
       };
 
@@ -344,15 +291,11 @@ export default function UserManagement() {
 
       const response = await fetch(url, {
         method: selectedUser ? "PUT" : "POST",
-
         credentials: "include",
-
         headers: {
           "Content-Type": "application/json",
-
           Accept: "application/json",
         },
-
         body: JSON.stringify(body),
       });
 
@@ -391,6 +334,100 @@ export default function UserManagement() {
   };
 
   /* ==========================================================
+     UPDATE BALANCE
+  ========================================================== */
+
+  const handleBalanceSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    setError("");
+
+    if (!selectedUser) {
+      setError("No user selected.");
+      return;
+    }
+
+    const amount = Number(balanceAmount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Please enter a valid amount greater than 0.");
+      return;
+    }
+
+    if (amount > 1000000000) {
+      setError("Amount is too large.");
+      return;
+    }
+
+    if (balanceAction === "DEDUCT" && amount > selectedUser.balance) {
+      setError(
+        `Insufficient balance. Current balance is ${formatBalance(
+          selectedUser.balance,
+        )}.`,
+      );
+
+      return;
+    }
+
+    setBalanceSaving(true);
+
+    try {
+      const response = await fetch(
+        `/api/admin/users/${encodeURIComponent(selectedUser.id)}/balance`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            amount,
+            type: balanceAction,
+            note: balanceNote.trim(),
+          }),
+        },
+      );
+
+      const contentType = response.headers.get("content-type") || "";
+
+      if (!contentType.includes("application/json")) {
+        const text = await response.text();
+
+        console.error("Balance API returned:", text.slice(0, 500));
+
+        throw new Error(
+          `API returned ${response.status} ${response.statusText} instead of JSON.`,
+        );
+      }
+
+      const result = (await response.json()) as ApiResponse;
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to update user balance.");
+      }
+
+      setOpenBalanceModal(false);
+
+      setSelectedUser(null);
+
+      resetBalanceForm();
+
+      await loadUsers();
+    } catch (error) {
+      console.error("Balance update error:", error);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to update user balance.",
+      );
+    } finally {
+      setBalanceSaving(false);
+    }
+  };
+
+  /* ==========================================================
      TOGGLE STATUS
   ========================================================== */
 
@@ -404,15 +441,11 @@ export default function UserManagement() {
         `/api/admin/users/${encodeURIComponent(user.id)}`,
         {
           method: "PATCH",
-
           credentials: "include",
-
           headers: {
             "Content-Type": "application/json",
-
             Accept: "application/json",
           },
-
           body: JSON.stringify({
             status,
           }),
@@ -448,7 +481,7 @@ export default function UserManagement() {
   };
 
   /* ==========================================================
-     BALANCE
+     FORMAT BALANCE
   ========================================================== */
 
   const formatBalance = (balance: number) => {
@@ -459,7 +492,7 @@ export default function UserManagement() {
   };
 
   /* ==========================================================
-     DATE
+     FORMAT DATE
   ========================================================== */
 
   const formatDate = (value: string) => {
@@ -480,19 +513,10 @@ export default function UserManagement() {
      PAGE NUMBERS
   ========================================================== */
 
-  const getPageNumbers = () => {
-    const pages: number[] = [];
-
-    const start = Math.max(1, page - 2);
-
-    const end = Math.min(totalPages, page + 2);
-
-    for (let i = start; i <= end; i += 1) {
-      pages.push(i);
-    }
-
-    return pages;
-  };
+  const pageNumbers = Array.from(
+    { length: totalPages },
+    (_, index) => index + 1,
+  );
 
   /* ==========================================================
      RENDER
@@ -500,27 +524,15 @@ export default function UserManagement() {
 
   return (
     <div className="min-w-0">
-      {/* ======================================================
-          HEADER
-      ====================================================== */}
+      {/* HEADER */}
 
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
-              <Users size={22} />
-            </div>
+          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
 
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                User Management
-              </h1>
-
-              <p className="text-sm text-gray-500">
-                {total.toLocaleString()} total users
-              </p>
-            </div>
-          </div>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage users, roles, status and wallet balances.
+          </p>
         </div>
 
         <Button variant="success" onClick={openCreate}>
@@ -528,519 +540,293 @@ export default function UserManagement() {
         </Button>
       </div>
 
-      {/* ======================================================
-          ERROR
-      ====================================================== */}
+      {/* ERROR */}
 
       {error && (
-        <div className="mb-5 flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <span>{error}</span>
-
-          <button
-            type="button"
-            onClick={() => setError("")}
-            className="text-red-500 hover:text-red-700"
-          >
-            <XCircle size={18} />
-          </button>
+        <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
         </div>
       )}
 
-      {/* ======================================================
-          FILTER PANEL
-      ====================================================== */}
-
-      <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row">
-          {/* SEARCH */}
-
-          <div className="flex-1">
-            <div className="relative">
-              <Search
-                size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-                onKeyDown={handleSearchKeyDown}
-                placeholder="Search username, name, phone or email..."
-                className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-          </div>
-
-          {/* ROLE */}
-
-          <select
-            value={roleFilter}
-            onChange={(event) => {
-              setRoleFilter(event.target.value as "" | UserRole);
-
-              setPage(1);
-            }}
-            className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-500"
-          >
-            <option value="">All Roles</option>
-
-            <option value="PLAYER">Players</option>
-
-            <option value="ADMIN">Admins</option>
-          </select>
-
-          {/* STATUS */}
-
-          <select
-            value={statusFilter}
-            onChange={(event) => {
-              setStatusFilter(event.target.value as "" | UserStatus);
-
-              setPage(1);
-            }}
-            className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-500"
-          >
-            <option value="">All Status</option>
-
-            <option value="ACTIVE">Active</option>
-
-            <option value="INACTIVE">Inactive</option>
-
-            <option value="SUSPENDED">Suspended</option>
-          </select>
-
-          {/* SEARCH BUTTON */}
-
-          <button
-            type="button"
-            onClick={handleSearch}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-medium text-white transition hover:bg-blue-700"
-          >
-            <Search size={16} />
-            Search
-          </button>
-
-          {/* RESET */}
-
-          {(search || roleFilter || statusFilter) && (
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
-            >
-              Reset
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ======================================================
-          USER LIST
-      ====================================================== */}
-
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-        {/* LIST HEADER */}
-
-        <div className="hidden border-b border-gray-200 bg-gray-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 lg:grid lg:grid-cols-[2fr_1.4fr_1fr_1.2fr_1fr_1.3fr_auto] lg:items-center lg:gap-4">
-          <span>User</span>
-
-          <span>Contact</span>
-
-          <span>Role</span>
-
-          <span className="text-right">Balance</span>
-
-          <span>Status</span>
-
-          <span>Created</span>
-
-          <span>Action</span>
-        </div>
-
-        {/* LOADING */}
-
-        {loading ? (
-          <div className="space-y-3 p-5">
-            {Array.from({
-              length: 5,
-            }).map((_, index) => (
-              <div
-                key={index}
-                className="animate-pulse rounded-xl bg-gray-100 p-5"
-              >
-                <div className="h-4 w-1/3 rounded bg-gray-200" />
-
-                <div className="mt-3 h-3 w-1/2 rounded bg-gray-200" />
-              </div>
-            ))}
-          </div>
-        ) : users.length === 0 ? (
-          /* EMPTY */
-
-          <div className="px-6 py-16 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-400">
-              <Users size={26} />
-            </div>
-
-            <h3 className="mt-4 font-semibold text-gray-900">No users found</h3>
-
-            <p className="mt-1 text-sm text-gray-500">
-              Try changing your search or filters.
-            </p>
-          </div>
-        ) : (
-          /* USERS */
-
-          <div className="divide-y divide-gray-100">
-            {users.map((user) => (
-              <div
-                key={user.id}
-                className="px-4 py-4 transition hover:bg-gray-50 sm:px-5"
-              >
-                {/* DESKTOP */}
-
-                <div className="hidden lg:grid lg:grid-cols-[2fr_1.4fr_1fr_1.2fr_1fr_1.3fr_auto] lg:items-center lg:gap-4">
-                  {/* USER */}
-
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700">
-                      {(user.fullName || user.username).charAt(0).toUpperCase()}
-                    </div>
-
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-gray-900">
-                        {user.fullName || user.username}
-                      </p>
-
-                      <p className="truncate text-xs text-gray-500">
-                        @{user.username}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* CONTACT */}
-
-                  <div className="min-w-0">
-                    <p className="truncate text-sm text-gray-700">
-                      {user.phone}
-                    </p>
-
-                    <p className="truncate text-xs text-gray-400">
-                      {user.email || "No email"}
-                    </p>
-                  </div>
-
-                  {/* ROLE */}
-
-                  <div>
-                    <span
-                      className={
-                        user.role === "ADMIN"
-                          ? "inline-flex rounded-full bg-purple-100 px-2.5 py-1 text-xs font-semibold text-purple-700"
-                          : "inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700"
-                      }
-                    >
-                      {user.role}
-                    </span>
-                  </div>
-
-                  {/* BALANCE */}
-
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900">
-                      {formatBalance(user.balance)}
-                    </p>
-                  </div>
-
-                  {/* STATUS */}
-
-                  <div>
-                    <span
-                      className={
-                        user.status === "ACTIVE"
-                          ? "inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700"
-                          : user.status === "SUSPENDED"
-                            ? "inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700"
-                            : "inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700"
-                      }
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-
-                      {user.status}
-                    </span>
-                  </div>
-
-                  {/* CREATED */}
-
-                  <div className="text-sm text-gray-500">
-                    <p>{formatDate(user.createdAt)}</p>
-
-                    <p className="mt-1 text-xs">
-                      {user.isVerified ? (
-                        <span className="text-green-600">Verified</span>
-                      ) : (
-                        <span className="text-gray-400">Not verified</span>
-                      )}
-                    </p>
-                  </div>
-
-                  {/* ACTION */}
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(user)}
-                      title="Edit user"
-                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
-                    >
-                      <Edit3 size={16} />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => void toggleStatus(user)}
-                      title={
-                        user.status === "ACTIVE"
-                          ? "Disable user"
-                          : "Enable user"
-                      }
-                      className={
-                        user.status === "ACTIVE"
-                          ? "flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50"
-                          : "flex h-9 w-9 items-center justify-center rounded-lg border border-green-200 text-green-600 transition hover:bg-green-50"
-                      }
-                    >
-                      {user.status === "ACTIVE" ? (
-                        <UserX size={16} />
-                      ) : (
-                        <UserCheck size={16} />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* MOBILE / TABLET */}
-
-                <div className="lg:hidden">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700">
-                        {(user.fullName || user.username)
-                          .charAt(0)
-                          .toUpperCase()}
-                      </div>
-
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-gray-900">
-                          {user.fullName || user.username}
-                        </p>
-
-                        <p className="truncate text-xs text-gray-500">
-                          @{user.username}
-                        </p>
-                      </div>
-                    </div>
-
-                    <span
-                      className={
-                        user.status === "ACTIVE"
-                          ? "shrink-0 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700"
-                          : user.status === "SUSPENDED"
-                            ? "shrink-0 rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700"
-                            : "shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700"
-                      }
-                    >
-                      {user.status}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div className="rounded-xl bg-gray-50 p-3">
-                      <p className="text-xs text-gray-400">Phone</p>
-
-                      <p className="mt-1 truncate text-sm font-medium text-gray-800">
-                        {user.phone}
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl bg-gray-50 p-3">
-                      <p className="text-xs text-gray-400">Role</p>
-
-                      <p className="mt-1 text-sm font-semibold text-gray-800">
-                        {user.role}
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl bg-gray-50 p-3">
-                      <p className="text-xs text-gray-400">Balance</p>
-
-                      <p className="mt-1 truncate text-sm font-semibold text-gray-800">
-                        {formatBalance(user.balance)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl bg-gray-50 p-3">
-                      <p className="text-xs text-gray-400">Created</p>
-
-                      <p className="mt-1 text-sm font-medium text-gray-800">
-                        {formatDate(user.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-xs text-gray-500">
-                        {user.email || "No email"}
-                      </p>
-
-                      <p className="mt-1 flex items-center gap-1 text-xs">
-                        {user.isVerified ? (
-                          <>
-                            <CheckCircle2
-                              size={13}
-                              className="text-green-600"
-                            />
-
-                            <span className="text-green-600">Verified</span>
-                          </>
-                        ) : (
-                          <>
-                            <XCircle size={13} className="text-gray-400" />
-
-                            <span className="text-gray-400">Not verified</span>
-                          </>
-                        )}
-                      </p>
-                    </div>
-
-                    <div className="flex shrink-0 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(user)}
-                        className="inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                      >
-                        <Edit3 size={15} />
-                        Edit
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => void toggleStatus(user)}
+      {/* USER LIST */}
+
+      <div className="overflow-hidden rounded-xl bg-white shadow">
+        {/* Desktop */}
+
+        <div className="hidden overflow-x-auto md:block">
+          <table className="min-w-[1150px] w-full">
+            <thead>
+              <tr className="bg-gray-100 text-left text-sm text-gray-600">
+                <th className="p-3">Username</th>
+                <th className="p-3">Name</th>
+                <th className="p-3">Phone</th>
+                <th className="p-3">Email</th>
+                <th className="p-3">Role</th>
+                <th className="p-3 text-right">Balance</th>
+                <th className="p-3">Status</th>
+                <th className="p-3">Verified</th>
+                <th className="p-3">Created</th>
+                <th className="p-3">Action</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={10} className="p-10 text-center text-gray-500">
+                    Loading users...
+                  </td>
+                </tr>
+              ) : paginatedUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="p-10 text-center text-gray-500">
+                    No users found.
+                  </td>
+                </tr>
+              ) : (
+                paginatedUsers.map((user) => (
+                  <tr
+                    key={user.id}
+                    className="border-b last:border-b-0 hover:bg-gray-50"
+                  >
+                    <td className="p-3 font-medium">{user.username}</td>
+
+                    <td className="p-3">{user.fullName || "-"}</td>
+
+                    <td className="p-3">{user.phone}</td>
+
+                    <td className="p-3">{user.email || "-"}</td>
+
+                    <td className="p-3">
+                      <span
                         className={
-                          user.status === "ACTIVE"
-                            ? "inline-flex h-9 items-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-medium text-red-600 hover:bg-red-50"
-                            : "inline-flex h-9 items-center gap-2 rounded-lg border border-green-200 px-3 text-sm font-medium text-green-600 hover:bg-green-50"
+                          user.role === "ADMIN"
+                            ? "rounded-full bg-purple-100 px-2.5 py-1 text-xs font-semibold text-purple-700"
+                            : "rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700"
                         }
                       >
-                        {user.status === "ACTIVE" ? (
-                          <UserX size={15} />
-                        ) : (
-                          <UserCheck size={15} />
-                        )}
+                        {user.role}
+                      </span>
+                    </td>
 
-                        {user.status === "ACTIVE" ? "Disable" : "Enable"}
-                      </button>
+                    <td className="p-3 text-right font-semibold">
+                      {formatBalance(user.balance)}
+                    </td>
+
+                    <td className="p-3">
+                      <span
+                        className={
+                          user.status === "ACTIVE"
+                            ? "rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700"
+                            : user.status === "SUSPENDED"
+                              ? "rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700"
+                              : "rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700"
+                        }
+                      >
+                        {user.status}
+                      </span>
+                    </td>
+
+                    <td className="p-3">
+                      {user.isVerified ? (
+                        <span className="font-medium text-green-600">Yes</span>
+                      ) : (
+                        <span className="text-gray-400">No</span>
+                      )}
+                    </td>
+
+                    <td className="p-3 text-sm text-gray-500">
+                      {formatDate(user.createdAt)}
+                    </td>
+
+                    <td className="p-3">
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => openBalance(user)}
+                        >
+                          Balance
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          onClick={() => openEdit(user)}
+                        >
+                          Edit
+                        </Button>
+
+                        <Button
+                          variant={
+                            user.status === "ACTIVE" ? "danger" : "success"
+                          }
+                          onClick={() => void toggleStatus(user)}
+                        >
+                          {user.status === "ACTIVE" ? "Disable" : "Enable"}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile */}
+
+        <div className="md:hidden">
+          {loading ? (
+            <div className="p-8 text-center text-gray-500">
+              Loading users...
+            </div>
+          ) : paginatedUsers.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">No users found.</div>
+          ) : (
+            <div className="divide-y">
+              {paginatedUsers.map((user) => (
+                <div key={user.id} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate font-semibold text-gray-900">
+                        {user.username}
+                      </h3>
+
+                      <p className="mt-1 text-sm text-gray-500">
+                        {user.fullName || "-"}
+                      </p>
+                    </div>
+
+                    <span
+                      className={
+                        user.status === "ACTIVE"
+                          ? "rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700"
+                          : user.status === "SUSPENDED"
+                            ? "rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700"
+                            : "rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700"
+                      }
+                    >
+                      {user.status}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <div className="text-gray-400">Phone</div>
+
+                      <div className="font-medium">{user.phone}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-gray-400">Role</div>
+
+                      <div className="font-medium">{user.role}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-gray-400">Balance</div>
+
+                      <div className="font-semibold text-blue-600">
+                        {formatBalance(user.balance)}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-gray-400">Verified</div>
+
+                      <div className="font-medium">
+                        {user.isVerified ? "Yes" : "No"}
+                      </div>
                     </div>
                   </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button variant="outline" onClick={() => openBalance(user)}>
+                      Balance
+                    </Button>
+
+                    <Button variant="outline" onClick={() => openEdit(user)}>
+                      Edit
+                    </Button>
+
+                    <Button
+                      variant={user.status === "ACTIVE" ? "danger" : "success"}
+                      onClick={() => void toggleStatus(user)}
+                    >
+                      {user.status === "ACTIVE" ? "Disable" : "Enable"}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
 
-        {/* ====================================================
-            PAGINATION
-        ==================================================== */}
+        {/* PAGINATION */}
 
-        {!loading && total > 0 && (
-          <div className="border-t border-gray-200 bg-gray-50 px-4 py-4 sm:px-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              {/* INFO */}
+        {!loading && users.length > 0 && (
+          <div className="flex flex-col gap-3 border-t bg-gray-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-gray-500">
+              Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+              {Math.min(currentPage * itemsPerPage, users.length)} of{" "}
+              {users.length} users
+            </div>
 
-              <div className="text-sm text-gray-500">
-                Showing{" "}
-                <span className="font-medium text-gray-700">
-                  {(page - 1) * pageSize + 1}
-                </span>{" "}
-                to{" "}
-                <span className="font-medium text-gray-700">
-                  {Math.min(page * pageSize, total)}
-                </span>{" "}
-                of <span className="font-medium text-gray-700">{total}</span>{" "}
-                users
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={itemsPerPage}
+                onChange={(event) => {
+                  setItemsPerPage(Number(event.target.value));
+                  setCurrentPage(1);
+                }}
+                className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm"
+              >
+                <option value={5}>5 / page</option>
+                <option value={10}>10 / page</option>
+                <option value={20}>20 / page</option>
+                <option value={50}>50 / page</option>
+              </select>
 
-              {/* CONTROLS */}
+              <button
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                className="rounded-md border bg-white px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Previous
+              </button>
 
-              <div className="flex flex-wrap items-center gap-2">
-                {/* PAGE SIZE */}
-
-                <select
-                  value={pageSize}
-                  onChange={(event) =>
-                    handlePageSizeChange(Number(event.target.value))
-                  }
-                  className="h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-700 outline-none focus:border-blue-500"
-                >
-                  <option value={10}>10 / page</option>
-
-                  <option value={20}>20 / page</option>
-
-                  <option value={50}>50 / page</option>
-
-                  <option value={100}>100 / page</option>
-                </select>
-
-                {/* PREVIOUS */}
-
+              {pageNumbers.map((page) => (
                 <button
+                  key={page}
                   type="button"
-                  disabled={page <= 1 || loading}
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <ChevronLeft size={17} />
-                </button>
-
-                {/* PAGE NUMBERS */}
-
-                {getPageNumbers().map((pageNumber) => (
-                  <button
-                    key={pageNumber}
-                    type="button"
-                    onClick={() => setPage(pageNumber)}
-                    className={
-                      pageNumber === page
-                        ? "flex h-9 min-w-9 items-center justify-center rounded-lg bg-blue-600 px-2 text-sm font-semibold text-white"
-                        : "flex h-9 min-w-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-600 transition hover:bg-gray-100"
-                    }
-                  >
-                    {pageNumber}
-                  </button>
-                ))}
-
-                {/* NEXT */}
-
-                <button
-                  type="button"
-                  disabled={page >= totalPages || loading}
-                  onClick={() =>
-                    setPage((current) => Math.min(totalPages, current + 1))
+                  onClick={() => setCurrentPage(page)}
+                  className={
+                    page === currentPage
+                      ? "rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white"
+                      : "rounded-md border bg-white px-3 py-1.5 text-sm hover:bg-gray-100"
                   }
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  <ChevronRight size={17} />
+                  {page}
                 </button>
-              </div>
+              ))}
+
+              <button
+                type="button"
+                disabled={currentPage === totalPages}
+                onClick={() =>
+                  setCurrentPage((page) => Math.min(totalPages, page + 1))
+                }
+                className="rounded-md border bg-white px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
             </div>
           </div>
         )}
       </div>
 
       {/* ======================================================
-          MODAL
+          USER MODAL
       ====================================================== */}
 
       <Modal
@@ -1140,6 +926,168 @@ export default function UserManagement() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* ======================================================
+          BALANCE MODAL
+      ====================================================== */}
+
+      <Modal
+        open={openBalanceModal}
+        title="Update User Balance"
+        onClose={closeBalanceModal}
+      >
+        {selectedUser && (
+          <form onSubmit={handleBalanceSave} className="space-y-5">
+            {/* USER */}
+
+            <div className="rounded-xl border bg-gray-50 p-4">
+              <div className="text-sm text-gray-500">User</div>
+
+              <div className="mt-1 font-semibold text-gray-900">
+                {selectedUser.username}
+              </div>
+
+              <div className="mt-2 text-sm text-gray-500">Current Balance</div>
+
+              <div className="mt-1 text-xl font-bold text-blue-600">
+                {formatBalance(selectedUser.balance)}
+              </div>
+            </div>
+
+            {/* ACTION */}
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                Balance Action
+              </label>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  disabled={balanceSaving}
+                  onClick={() => setBalanceAction("ADD")}
+                  className={
+                    balanceAction === "ADD"
+                      ? "rounded-lg border-2 border-green-500 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700"
+                      : "rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                  }
+                >
+                  + Add Balance
+                </button>
+
+                <button
+                  type="button"
+                  disabled={balanceSaving}
+                  onClick={() => setBalanceAction("DEDUCT")}
+                  className={
+                    balanceAction === "DEDUCT"
+                      ? "rounded-lg border-2 border-red-500 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+                      : "rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                  }
+                >
+                  − Deduct Balance
+                </button>
+              </div>
+            </div>
+
+            {/* AMOUNT */}
+
+            <Input
+              label="Amount (MMK)"
+              type="number"
+              min="1"
+              step="0.01"
+              value={balanceAmount}
+              onChange={(event) => setBalanceAmount(event.target.value)}
+              disabled={balanceSaving}
+              placeholder="Enter amount"
+            />
+
+            {/* NOTE */}
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Note
+              </label>
+
+              <textarea
+                value={balanceNote}
+                onChange={(event) => setBalanceNote(event.target.value)}
+                disabled={balanceSaving}
+                rows={3}
+                placeholder="Reason for balance adjustment"
+                className="w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* PREVIEW */}
+
+            {Number(balanceAmount) > 0 && (
+              <div className="rounded-lg border bg-white p-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Current</span>
+
+                  <span>{formatBalance(selectedUser.balance)}</span>
+                </div>
+
+                <div className="mt-2 flex justify-between text-sm">
+                  <span className="text-gray-500">Adjustment</span>
+
+                  <span
+                    className={
+                      balanceAction === "ADD"
+                        ? "font-semibold text-green-600"
+                        : "font-semibold text-red-600"
+                    }
+                  >
+                    {balanceAction === "ADD" ? "+" : "-"}
+                    {formatBalance(Number(balanceAmount))}
+                  </span>
+                </div>
+
+                <div className="mt-2 border-t pt-2">
+                  <div className="flex justify-between">
+                    <span className="font-medium">New Balance</span>
+
+                    <span className="font-bold text-blue-600">
+                      {formatBalance(
+                        balanceAction === "ADD"
+                          ? selectedUser.balance + Number(balanceAmount)
+                          : selectedUser.balance - Number(balanceAmount),
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ACTIONS */}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={balanceSaving}
+                onClick={closeBalanceModal}
+              >
+                Cancel
+              </Button>
+
+              <Button
+                type="submit"
+                variant={balanceAction === "ADD" ? "success" : "danger"}
+                disabled={balanceSaving}
+              >
+                {balanceSaving
+                  ? "Updating..."
+                  : balanceAction === "ADD"
+                    ? "Add Balance"
+                    : "Deduct Balance"}
+              </Button>
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );

@@ -52,6 +52,12 @@
   status = 200
   force = true
 
+[[redirects]]
+  from = "/api/admin/users/*/balance"
+  to = "/.netlify/functions/admin-user-balance"
+  status = 200
+  force = true
+
 # ============================================================
 # FRONTEND SPA ROUTING
 # ============================================================

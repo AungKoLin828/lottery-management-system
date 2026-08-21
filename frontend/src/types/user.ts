@@ -7,11 +7,11 @@ export interface User {
 
   username: string;
 
-  fullName: string | null;
+  fullName: string;
 
   phone: string;
 
-  email: string | null;
+  email?: string | null;
 
   role: UserRole;
 
