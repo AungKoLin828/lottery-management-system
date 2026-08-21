@@ -1,6 +1,25 @@
 import { Outlet, Link } from "react-router-dom";
 import NotificationBell from "@/components/common/notification/NotificationBell";
 
+/* ============================================================
+     LOGOUT
+  ============================================================ */
+
+const handleLogout = async () => {
+  try {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "include",
+    });
+
+    window.location.href = "/login";
+  } catch (error) {
+    console.error("Logout error:", error);
+
+    window.location.href = "/login";
+  }
+};
+
 export default function AdminLayout() {
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -68,7 +87,10 @@ export default function AdminLayout() {
         <header className="flex items-center justify-between border-b bg-white px-6 py-4 shadow-sm">
           <h2 className="font-semibold text-gray-800">Admin Dashboard</h2>
           <NotificationBell role="ADMIN" />
-          <button className="text-red-600 transition hover:text-red-800">
+          <button
+            onClick={handleLogout}
+            className="text-red-600 transition hover:text-red-800"
+          >
             Logout
           </button>
         </header>
