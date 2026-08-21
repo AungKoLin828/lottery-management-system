@@ -18,31 +18,24 @@ import {
   Bell,
 } from "lucide-react";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import NotificationBell from "@/components/common/notification/NotificationBell";
 
 /* ============================================================
-   MAIN NAVIGATION
+   TYPES
 ============================================================ */
 
-// const navigation = [
-//   {
-//     name: "Dashboard",
-//     path: "/player",
-//     icon: LayoutDashboard,
-//   },
-//   {
-//     name: "My Tickets",
-//     path: "/player/tickets",
-//     icon: Ticket,
-//   },
-//   {
-//     name: "Wallet",
-//     path: "/player/wallet",
-//     icon: WalletCards,
-//   },
-// ];
+type WalletBalanceResponse = {
+  success?: boolean;
+  message?: string;
+
+  data?: {
+    balance?: number | string | null;
+  };
+
+  balance?: number | string | null;
+};
 
 /* ============================================================
    PLAY NAVIGATION
@@ -89,12 +82,34 @@ function isPlayerPath(path: string) {
 }
 
 /* ============================================================
+   FORMAT WALLET BALANCE
+============================================================ */
+
+function formatWalletBalance(
+  amount: number | string | null | undefined,
+): string {
+  const value = Number(amount ?? 0);
+
+  if (!Number.isFinite(value)) {
+    return "0";
+  }
+
+  return value.toLocaleString("en-US");
+}
+
+/* ============================================================
    COMPONENT
 ============================================================ */
 
 export default function PlayerLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+
+  /* ============================================================
+     WALLET BALANCE
+  ============================================================ */
+
+  const [walletBalance, setWalletBalance] = useState<number>(0);
 
   /* ============================================================
      DESKTOP DROPDOWN STATE
@@ -147,6 +162,121 @@ export default function PlayerLayout() {
   const isMoreActive =
     location.pathname.startsWith("/player/results-history") ||
     location.pathname.startsWith("/player/contact");
+
+  /* ============================================================
+     LOAD WALLET BALANCE
+  ============================================================ */
+
+  const loadWalletBalance = useCallback(async () => {
+    try {
+      const response = await fetch("/api/player/transactions", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      const contentType = response.headers.get("content-type") || "";
+
+      if (!contentType.toLowerCase().includes("application/json")) {
+        console.error("Player wallet balance API returned non-JSON response", {
+          status: response.status,
+          contentType,
+        });
+
+        return;
+      }
+
+      const result = (await response.json()) as WalletBalanceResponse;
+
+      if (!response.ok || result.success === false) {
+        console.error("Failed to load player wallet balance:", result.message);
+
+        return;
+      }
+
+      /*
+       * Supports:
+       *
+       * {
+       *   success: true,
+       *   data: {
+       *     balance: 125000
+       *   }
+       * }
+       *
+       * AND:
+       *
+       * {
+       *   success: true,
+       *   balance: 125000
+       * }
+       */
+
+      const balance = result.data?.balance ?? result.balance ?? 0;
+
+      const numericBalance = Number(balance);
+
+      if (Number.isFinite(numericBalance)) {
+        setWalletBalance(numericBalance);
+      }
+    } catch (error) {
+      /*
+       * Do not break PlayerLayout if the wallet API temporarily fails.
+       * The rest of the player application should continue working.
+       */
+
+      console.error("Player wallet balance loading error:", error);
+    }
+  }, []);
+
+  /* ============================================================
+     LOAD WALLET BALANCE
+  ============================================================ */
+
+  useEffect(() => {
+    void loadWalletBalance();
+  }, [loadWalletBalance]);
+
+  /* ============================================================
+     REFRESH WALLET BALANCE WHEN PAGE BECOMES VISIBLE
+  ============================================================ */
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void loadWalletBalance();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [loadWalletBalance]);
+
+  /* ============================================================
+     REFRESH WALLET BALANCE AFTER ROUTE CHANGE
+  ============================================================ */
+
+  useEffect(() => {
+    /*
+     * Refresh the balance whenever the player moves between pages.
+     *
+     * This is useful after:
+     *
+     * Deposit
+     * Withdraw
+     * 2D Play
+     * 3D Play
+     *
+     * so the header balance stays current.
+     */
+
+    void loadWalletBalance();
+  }, [location.pathname, loadWalletBalance]);
 
   /* ============================================================
      CLOSE EVERYTHING
@@ -461,6 +591,12 @@ export default function PlayerLayout() {
     }`;
 
   /* ============================================================
+     FORMATTED BALANCE
+  ============================================================ */
+
+  const formattedWalletBalance = formatWalletBalance(walletBalance);
+
+  /* ============================================================
      RENDER
   ============================================================ */
 
@@ -487,12 +623,10 @@ export default function PlayerLayout() {
 
             <div className="flex items-center">
               <span className="text-lg font-extrabold tracking-tight text-white">
-                {/* Lottery */}
                 AB
               </span>
 
               <span className="text-lg font-extrabold tracking-tight text-indigo-400">
-                {/* Play */}
                 CD
               </span>
             </div>
@@ -563,6 +697,7 @@ export default function PlayerLayout() {
 
                   {playNavigation.map((item, index) => {
                     const Icon = item.icon;
+
                     const is2D = index === 0;
 
                     return (
@@ -702,7 +837,9 @@ export default function PlayerLayout() {
                   Balance
                 </p>
 
-                <p className="text-sm font-bold text-white">125,000 MMK</p>
+                <p className="text-sm font-bold text-white">
+                  {formattedWalletBalance} MMK
+                </p>
               </div>
             </NavLink>
 
@@ -829,9 +966,7 @@ export default function PlayerLayout() {
         {mobileMenuOpen && (
           <div className="border-t border-slate-700 bg-slate-900 lg:hidden">
             <nav className="mx-auto max-w-7xl space-y-1 px-3 py-3 sm:px-5">
-              {/* =================================================
-                  DASHBOARD
-              ================================================= */}
+              {/* DASHBOARD */}
 
               <NavLink
                 to="/player"
@@ -852,9 +987,7 @@ export default function PlayerLayout() {
                 <span>Dashboard</span>
               </NavLink>
 
-              {/* =================================================
-                  MOBILE PLAY
-              ================================================= */}
+              {/* MOBILE PLAY */}
 
               <div
                 className={`rounded-xl border p-1 transition-colors ${
@@ -970,9 +1103,7 @@ export default function PlayerLayout() {
                 )}
               </div>
 
-              {/* =================================================
-                  MY TICKETS
-              ================================================= */}
+              {/* MY TICKETS */}
 
               <NavLink
                 to="/player/tickets"
@@ -992,9 +1123,7 @@ export default function PlayerLayout() {
                 <span>My Tickets</span>
               </NavLink>
 
-              {/* =================================================
-                  WALLET
-              ================================================= */}
+              {/* WALLET */}
 
               <NavLink
                 to="/player/wallet"
@@ -1014,13 +1143,11 @@ export default function PlayerLayout() {
                 <span>Wallet</span>
 
                 <span className="ml-auto rounded-md bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-400">
-                  125,000 MMK
+                  {formattedWalletBalance} MMK
                 </span>
               </NavLink>
 
-              {/* =================================================
-                  MORE SECTION
-              ================================================= */}
+              {/* MORE SECTION */}
 
               <div className="mt-2 border-t border-slate-700 pt-2">
                 {/* RESULTS + CONTACT */}
@@ -1050,13 +1177,9 @@ export default function PlayerLayout() {
                   );
                 })}
 
-                {/* =================================================
-                    MOBILE NOTIFICATIONS
-                ================================================= */}
+                {/* MOBILE NOTIFICATIONS */}
 
                 <div className="relative mt-1">
-                  {/* Notification row background */}
-
                   <div
                     className="
                       flex
@@ -1078,8 +1201,6 @@ export default function PlayerLayout() {
                       hover:text-white
                     "
                   >
-                    {/* CUSTOM MOBILE ICON */}
-
                     <span
                       className="
                         flex
@@ -1100,13 +1221,9 @@ export default function PlayerLayout() {
                       <Bell className="h-4 w-4" strokeWidth={2.5} />
                     </span>
 
-                    {/* LABEL */}
-
                     <span className="text-[13px] font-semibold">
                       Notifications
                     </span>
-
-                    {/* ACTUAL NOTIFICATION COMPONENT */}
 
                     <div
                       className="
@@ -1137,9 +1254,7 @@ export default function PlayerLayout() {
                   </div>
                 </div>
 
-                {/* =================================================
-                    PROFILE
-                ================================================= */}
+                {/* PROFILE */}
 
                 <NavLink
                   to="/player/profile"
@@ -1159,9 +1274,7 @@ export default function PlayerLayout() {
                   <span>Profile</span>
                 </NavLink>
 
-                {/* =================================================
-                    LOGOUT
-                ================================================= */}
+                {/* LOGOUT */}
 
                 <button
                   type="button"
