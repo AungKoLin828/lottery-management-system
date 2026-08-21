@@ -58,21 +58,6 @@ type WalletBalanceResponse = {
 };
 
 /* ============================================================
-   WALLET BALANCE EVENT
-============================================================ */
-
-/*
- * Use this event anywhere in the player application after
- * a successful wallet transaction:
- *
- * window.dispatchEvent(new Event("wallet-balance-updated"));
- *
- * PlayerLayout listens for this event and reloads the balance
- * from the database through /api/player/dashboard.
- */
-const WALLET_BALANCE_UPDATED_EVENT = "wallet-balance-updated";
-
-/* ============================================================
    PLAY NAVIGATION
 ============================================================ */
 
@@ -147,20 +132,11 @@ export default function PlayerLayout() {
   const [walletBalance, setWalletBalance] = useState<number>(0);
 
   /* ============================================================
-     BALANCE LOADING STATE
-  ============================================================ */
-
-  const [walletBalanceLoading, setWalletBalanceLoading] =
-    useState<boolean>(false);
-
-  /* ============================================================
      DESKTOP DROPDOWN STATE
   ============================================================ */
 
   const [playMenuOpen, setPlayMenuOpen] = useState(false);
-
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   /* ============================================================
@@ -168,7 +144,6 @@ export default function PlayerLayout() {
   ============================================================ */
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
   const [mobilePlayOpen, setMobilePlayOpen] = useState(false);
 
   /* ============================================================
@@ -182,15 +157,8 @@ export default function PlayerLayout() {
   ============================================================ */
 
   const profileMenuRef = useRef<HTMLDivElement>(null);
-
   const playMenuRef = useRef<HTMLDivElement>(null);
-
   const moreMenuRef = useRef<HTMLDivElement>(null);
-
-  /*
-   * Prevent overlapping wallet requests.
-   */
-  const walletRequestRef = useRef<Promise<void> | null>(null);
 
   /* ============================================================
      PLAYER HISTORY STORAGE KEY
@@ -215,168 +183,115 @@ export default function PlayerLayout() {
   ============================================================ */
 
   const loadWalletBalance = useCallback(async () => {
-    /*
-     * If another request is already running, reuse it.
-     *
-     * This prevents multiple simultaneous dashboard requests
-     * when route change + visibility + custom event happen together.
-     */
-    if (walletRequestRef.current) {
-      return walletRequestRef.current;
-    }
+    try {
+      const response = await fetch("/api/player/dashboard", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+        },
+      });
 
-    const request = (async () => {
-      try {
-        setWalletBalanceLoading(true);
+      const contentType = response.headers.get("content-type") || "";
 
-        const response = await fetch("/api/player/dashboard", {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            Accept: "application/json",
-            "Cache-Control": "no-cache",
-          },
-          cache: "no-store",
+      /*
+       * Read response as text first.
+       *
+       * This prevents response.json() from crashing
+       * when Netlify returns HTML instead of JSON.
+       */
+      const rawResponse = await response.text();
+
+      /*
+       * Empty response
+       */
+      if (!rawResponse.trim()) {
+        console.error("Wallet balance API returned an empty response", {
+          status: response.status,
+          contentType,
         });
 
-        const contentType = response.headers.get("content-type") || "";
-
-        /*
-         * Read response as text first.
-         *
-         * This prevents response.json() from crashing when
-         * Netlify returns HTML instead of JSON.
-         */
-        const rawResponse = await response.text();
-
-        /*
-         * Empty response.
-         */
-        if (!rawResponse.trim()) {
-          console.error("Wallet balance API returned an empty response", {
-            status: response.status,
-            contentType,
-          });
-
-          return;
-        }
-
-        /*
-         * Parse JSON manually.
-         */
-        let result: WalletBalanceResponse;
-
-        try {
-          result = JSON.parse(rawResponse) as WalletBalanceResponse;
-        } catch (parseError) {
-          console.error("Wallet balance API returned non-JSON response", {
-            status: response.status,
-            contentType,
-            responsePreview: rawResponse.substring(0, 500),
-            parseError,
-          });
-
-          return;
-        }
-
-        /*
-         * API error.
-         */
-        if (!response.ok || result.success === false) {
-          console.error("Failed to load player wallet balance", {
-            status: response.status,
-            message: result.message,
-            response: result,
-          });
-
-          return;
-        }
-
-        /* ======================================================
-           GET BALANCE
-        ====================================================== */
-
-        const balance =
-          /*
-           * data.stats.walletBalance
-           */
-          result.data?.stats?.walletBalance ??
-          /*
-           * data.stats.balance
-           */
-          result.data?.stats?.balance ??
-          /*
-           * data.balance
-           */
-          result.data?.balance ??
-          /*
-           * data.wallet.balance
-           */
-          result.data?.wallet?.balance ??
-          /*
-           * stats.walletBalance
-           */
-          result.stats?.walletBalance ??
-          /*
-           * stats.balance
-           */
-          result.stats?.balance ??
-          /*
-           * balance
-           */
-          result.balance ??
-          /*
-           * wallet.balance
-           */
-          result.wallet?.balance ??
-          /*
-           * Final fallback
-           */
-          0;
-
-        const numericBalance = Number(balance);
-
-        /*
-         * Invalid balance.
-         */
-        if (!Number.isFinite(numericBalance)) {
-          console.error("Invalid wallet balance returned by API", {
-            balance,
-            response: result,
-          });
-
-          return;
-        }
-
-        /*
-         * IMPORTANT:
-         *
-         * This updates React state immediately.
-         *
-         * No page refresh is required.
-         */
-        setWalletBalance(numericBalance);
-      } catch (error) {
-        /*
-         * Do not break PlayerLayout if wallet API temporarily fails.
-         */
-        console.error("Wallet balance loading error:", error);
-      } finally {
-        setWalletBalanceLoading(false);
+        return;
       }
-    })();
 
-    walletRequestRef.current = request;
+      /*
+       * Parse JSON manually.
+       */
+      let result: WalletBalanceResponse;
 
-    try {
-      await request;
-    } finally {
-      walletRequestRef.current = null;
+      try {
+        result = JSON.parse(rawResponse) as WalletBalanceResponse;
+      } catch (parseError) {
+        console.error("Wallet balance API returned non-JSON response", {
+          status: response.status,
+          contentType,
+          responsePreview: rawResponse.substring(0, 500),
+          parseError,
+        });
+
+        return;
+      }
+
+      /*
+       * API error
+       */
+      if (!response.ok || result.success === false) {
+        console.error("Failed to load player wallet balance", {
+          status: response.status,
+          message: result.message,
+          response: result,
+        });
+
+        return;
+      }
+
+      /* ========================================================
+         GET BALANCE
+      ======================================================== */
+
+      const balance =
+        result.data?.stats?.walletBalance ??
+        result.data?.stats?.balance ??
+        result.data?.balance ??
+        result.data?.wallet?.balance ??
+        result.stats?.walletBalance ??
+        result.stats?.balance ??
+        result.balance ??
+        result.wallet?.balance ??
+        0;
+
+      const numericBalance = Number(balance);
+
+      /*
+       * Invalid balance
+       */
+      if (!Number.isFinite(numericBalance)) {
+        console.error("Invalid wallet balance returned by API", {
+          balance,
+          response: result,
+        });
+
+        return;
+      }
+
+      /*
+       * Update React state.
+       *
+       * This updates the desktop/mobile balance immediately
+       * without reloading the page.
+       */
+      setWalletBalance(numericBalance);
+    } catch (error) {
+      /*
+       * Do not break PlayerLayout if wallet API
+       * temporarily fails.
+       */
+      console.error("Wallet balance loading error:", error);
     }
   }, []);
 
   /* ============================================================
-     INITIAL WALLET BALANCE LOAD
+     INITIAL WALLET BALANCE
   ============================================================ */
 
   useEffect(() => {
@@ -384,40 +299,38 @@ export default function PlayerLayout() {
   }, [loadWalletBalance]);
 
   /* ============================================================
-     IMPORTANT:
-     UPDATE BALANCE WITHOUT PAGE REFRESH
+     LISTEN FOR WALLET BALANCE UPDATES
+     
+     Other pages can call:
+
+       window.dispatchEvent(
+         new Event("wallet-balance-updated")
+       );
+
+     This causes PlayerLayout to reload the balance
+     from the database without refreshing the page.
   ============================================================ */
 
   useEffect(() => {
-    /*
-     * Another page/component can dispatch:
-     *
-     * window.dispatchEvent(
-     *   new Event("wallet-balance-updated")
-     * );
-     *
-     * This layout will immediately fetch the latest balance
-     * from the database.
-     */
     const handleWalletBalanceUpdated = () => {
       void loadWalletBalance();
     };
 
     window.addEventListener(
-      WALLET_BALANCE_UPDATED_EVENT,
+      "wallet-balance-updated",
       handleWalletBalanceUpdated,
     );
 
     return () => {
       window.removeEventListener(
-        WALLET_BALANCE_UPDATED_EVENT,
+        "wallet-balance-updated",
         handleWalletBalanceUpdated,
       );
     };
   }, [loadWalletBalance]);
 
   /* ============================================================
-     REFRESH WALLET BALANCE WHEN PAGE BECOMES VISIBLE
+     REFRESH WHEN PAGE BECOMES VISIBLE
   ============================================================ */
 
   useEffect(() => {
@@ -435,7 +348,7 @@ export default function PlayerLayout() {
   }, [loadWalletBalance]);
 
   /* ============================================================
-     REFRESH WALLET BALANCE AFTER ROUTE CHANGE
+     REFRESH AFTER ROUTE CHANGE
   ============================================================ */
 
   useEffect(() => {
@@ -637,7 +550,7 @@ export default function PlayerLayout() {
       }
 
       /*
-       * Remove current page.
+       * Remove current page
        */
       if (
         history.length > 0 &&
@@ -647,17 +560,17 @@ export default function PlayerLayout() {
       }
 
       /*
-       * Previous player page.
+       * Previous player page
        */
       const previousPlayerPage = history[history.length - 1];
 
       /*
-       * Save updated history.
+       * Save updated history
        */
       sessionStorage.setItem(PLAYER_HISTORY_KEY, JSON.stringify(history));
 
       /*
-       * Navigate to previous player page.
+       * Navigate to previous player page
        */
       if (previousPlayerPage && isPlayerPath(previousPlayerPage)) {
         navigate(previousPlayerPage);
@@ -665,7 +578,7 @@ export default function PlayerLayout() {
       }
 
       /*
-       * Safe fallback.
+       * Safe fallback
        */
       navigate("/player");
     } catch {
@@ -862,7 +775,6 @@ export default function PlayerLayout() {
 
                   {playNavigation.map((item, index) => {
                     const Icon = item.icon;
-
                     const is2D = index === 0;
 
                     return (
@@ -988,7 +900,6 @@ export default function PlayerLayout() {
                         }
                       >
                         <Icon size={17} />
-
                         {item.name}
                       </NavLink>
                     );
@@ -1001,7 +912,7 @@ export default function PlayerLayout() {
           {/* RIGHT SIDE */}
 
           <div className="flex items-center gap-2">
-            {/* WALLET */}
+            {/* WALLET BALANCE */}
 
             <NavLink
               to="/player/wallet"
@@ -1140,8 +1051,6 @@ export default function PlayerLayout() {
         {mobileMenuOpen && (
           <div className="border-t border-slate-700 bg-slate-900 lg:hidden">
             <nav className="mx-auto max-w-7xl space-y-1 px-3 py-3 sm:px-5">
-              {/* DASHBOARD */}
-
               <NavLink
                 to="/player"
                 end
@@ -1218,8 +1127,6 @@ export default function PlayerLayout() {
 
                 {mobilePlayOpen && (
                   <div className="mt-1 space-y-1 border-t border-slate-700 pt-1">
-                    {/* 2D */}
-
                     <NavLink
                       to="/player/play-2d"
                       onClick={handleMobileNavigation}
@@ -1245,8 +1152,6 @@ export default function PlayerLayout() {
                         </p>
                       </div>
                     </NavLink>
-
-                    {/* 3D */}
 
                     <NavLink
                       to="/player/play-3d"
@@ -1324,8 +1229,6 @@ export default function PlayerLayout() {
               {/* MORE SECTION */}
 
               <div className="mt-2 border-t border-slate-700 pt-2">
-                {/* RESULTS + CONTACT */}
-
                 {moreNavigation.map((item) => {
                   const Icon = item.icon;
 
