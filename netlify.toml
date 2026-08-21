@@ -71,6 +71,16 @@
   force = true
 
 # ============================================================
+# PLAYER TRANSACTIONS API
+# ============================================================
+
+[[redirects]]
+  from = "/api/player/transactions"
+  to = "/.netlify/functions/player-transactions"
+  status = 200
+  force = true
+
+# ============================================================
 # ADMIN USERS API
 # ============================================================
 

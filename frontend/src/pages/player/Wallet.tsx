@@ -6,72 +6,100 @@ import {
   ReceiptText,
   WalletCards,
   XCircle,
+  RefreshCw,
 } from "lucide-react";
+
+import { useCallback, useEffect, useState } from "react";
 
 import { Link } from "react-router-dom";
 
 /* ============================================================
-   TRANSACTION DATA
-   Replace this with API data later.
+   TYPES
 ============================================================ */
 
-const transactions = [
-  {
-    id: "TXN-10001",
-    type: "Deposit",
-    amount: 100000,
-    method: "KBZPay",
-    reference: "KBZ-829341",
-    date: "14 Aug 2026 · 09:25 AM",
-    status: "Completed",
-  },
-  {
-    id: "TXN-10002",
-    type: "Withdraw",
-    amount: 50000,
-    method: "WavePay",
-    reference: "WAV-382914",
-    date: "13 Aug 2026 · 04:10 PM",
-    status: "Completed",
-  },
-  {
-    id: "TXN-10003",
-    type: "Deposit",
-    amount: 75000,
-    method: "AYA Pay",
-    reference: "AYA-719283",
-    date: "12 Aug 2026 · 11:40 AM",
-    status: "Pending",
-  },
-  {
-    id: "TXN-10004",
-    type: "Withdraw",
-    amount: 25000,
-    method: "KBZ Bank",
-    reference: "KBZB-918273",
-    date: "10 Aug 2026 · 02:15 PM",
-    status: "Failed",
-  },
-];
+type TransactionStatus =
+  | "Completed"
+  | "Pending"
+  | "Failed"
+  | "Rejected"
+  | "Cancelled";
+
+type TransactionType = "Deposit" | "Withdraw";
+
+type WalletTransaction = {
+  id: string;
+  type: TransactionType;
+  amount: number;
+  method: string;
+  reference: string;
+  date: string;
+  status: TransactionStatus;
+};
+
+type WalletData = {
+  balance: number;
+  recentDeposits: number;
+  recentWithdrawals: number;
+  transactions: WalletTransaction[];
+};
+
+type WalletResponse = {
+  success: boolean;
+  message?: string;
+
+  data?: {
+    balance?: number;
+    recentDeposits?: number;
+    recentWithdrawals?: number;
+    transactions?: WalletTransaction[];
+  };
+
+  balance?: number;
+  recentDeposits?: number;
+  recentWithdrawals?: number;
+  transactions?: WalletTransaction[];
+};
 
 /* ============================================================
    HELPERS
 ============================================================ */
 
-const formatAmount = (amount: number) => {
-  return amount.toLocaleString();
+const formatAmount = (amount: number | string | null | undefined) => {
+  return Number(amount || 0).toLocaleString("en-US");
+};
+
+const formatDate = (value: string | Date | null | undefined): string => {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleString("en-US", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 };
 
 /* ============================================================
    STATUS
 ============================================================ */
 
-const StatusBadge = ({
-  status,
-}: {
-  status: string;
-}) => {
-  if (status === "Completed") {
+const StatusBadge = ({ status }: { status: string }) => {
+  if (
+    status === "Completed" ||
+    status === "APPROVED" ||
+    status === "COMPLETED" ||
+    status === "SUCCESS"
+  ) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-600">
         <CheckCircle2 className="h-3 w-3" />
@@ -80,7 +108,7 @@ const StatusBadge = ({
     );
   }
 
-  if (status === "Pending") {
+  if (status === "Pending" || status === "PENDING" || status === "PROCESSING") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-600">
         <Clock3 className="h-3 w-3" />
@@ -89,19 +117,330 @@ const StatusBadge = ({
     );
   }
 
+  if (
+    status === "Rejected" ||
+    status === "REJECTED" ||
+    status === "Cancelled" ||
+    status === "CANCELLED" ||
+    status === "Failed" ||
+    status === "FAILED"
+  ) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-600">
+        <XCircle className="h-3 w-3" />
+        Failed
+      </span>
+    );
+  }
+
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-600">
-      <XCircle className="h-3 w-3" />
-      Failed
+    <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-500">
+      <Clock3 className="h-3 w-3" />
+      {status || "Unknown"}
     </span>
   );
 };
+
+/* ============================================================
+   NORMALIZE TRANSACTION TYPE
+============================================================ */
+
+function normalizeTransactionType(value: unknown): TransactionType {
+  const type = String(value ?? "").toUpperCase();
+
+  if (type === "WITHDRAW" || type === "WITHDRAWAL" || type === "WITHDRAWALS") {
+    return "Withdraw";
+  }
+
+  return "Deposit";
+}
+
+/* ============================================================
+   NORMALIZE TRANSACTION STATUS
+============================================================ */
+
+function normalizeTransactionStatus(value: unknown): TransactionStatus {
+  const status = String(value ?? "").toUpperCase();
+
+  switch (status) {
+    case "COMPLETED":
+    case "SUCCESS":
+    case "APPROVED":
+      return "Completed";
+
+    case "PENDING":
+    case "PROCESSING":
+      return "Pending";
+
+    case "REJECTED":
+      return "Rejected";
+
+    case "CANCELLED":
+      return "Cancelled";
+
+    case "FAILED":
+      return "Failed";
+
+    default:
+      return "Pending";
+  }
+}
+
+/* ============================================================
+   NORMALIZE TRANSACTION
+============================================================ */
+
+function normalizeTransaction(transaction: any): WalletTransaction {
+  const type = normalizeTransactionType(
+    transaction.type ?? transaction.transactionType ?? transaction.category,
+  );
+
+  return {
+    id: String(
+      transaction.id ??
+        transaction.transactionId ??
+        transaction.transaction_id ??
+        "-",
+    ),
+
+    type,
+
+    amount: Number(
+      transaction.amount ?? transaction.value ?? transaction.totalAmount ?? 0,
+    ),
+
+    method:
+      transaction.methodName ??
+      transaction.paymentMethodName ??
+      transaction.paymentMethod ??
+      transaction.method ??
+      transaction.provider ??
+      "-",
+
+    reference:
+      transaction.reference ??
+      transaction.referenceNo ??
+      transaction.referenceNumber ??
+      transaction.transactionNumber ??
+      transaction.transactionNo ??
+      transaction.externalReference ??
+      "-",
+
+    date: formatDate(
+      transaction.createdAt ??
+        transaction.created_at ??
+        transaction.date ??
+        transaction.transactionDate ??
+        transaction.updatedAt,
+    ),
+
+    status: normalizeTransactionStatus(
+      transaction.status ?? transaction.transactionStatus,
+    ),
+  };
+}
 
 /* ============================================================
    PAGE
 ============================================================ */
 
 export default function Wallet() {
+  const [wallet, setWallet] = useState<WalletData>({
+    balance: 0,
+    recentDeposits: 0,
+    recentWithdrawals: 0,
+    transactions: [],
+  });
+
+  const [loading, setLoading] = useState(true);
+
+  const [error, setError] = useState("");
+
+  /* ==========================================================
+     LOAD WALLET / TRANSACTIONS
+  ========================================================== */
+
+  const loadWallet = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await fetch("/api/player/transactions", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      const contentType = response.headers.get("content-type") || "";
+
+      if (!contentType.toLowerCase().includes("application/json")) {
+        const text = await response.text();
+
+        console.error("Wallet API returned non-JSON response:", {
+          status: response.status,
+          contentType,
+          body: text.substring(0, 500),
+        });
+
+        throw new Error(
+          response.status === 404
+            ? "Wallet transaction API endpoint was not found"
+            : "Wallet API returned an invalid response",
+        );
+      }
+
+      const result = (await response.json()) as WalletResponse;
+
+      console.log("Wallet transaction API response:", result);
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to load wallet transactions");
+      }
+
+      /* ======================================================
+         SUPPORT BOTH:
+
+         {
+           success: true,
+           data: {
+             balance,
+             recentDeposits,
+             recentWithdrawals,
+             transactions
+           }
+         }
+
+         AND:
+
+         {
+           success: true,
+           balance,
+           recentDeposits,
+           recentWithdrawals,
+           transactions
+         }
+      ====================================================== */
+
+      const source = result.data ?? result;
+
+      const rawTransactions = Array.isArray(source.transactions)
+        ? source.transactions
+        : [];
+
+      const transactions = rawTransactions.map(normalizeTransaction);
+
+      setWallet({
+        balance: Number(source.balance ?? 0),
+
+        recentDeposits: Number(source.recentDeposits ?? 0),
+
+        recentWithdrawals: Number(source.recentWithdrawals ?? 0),
+
+        transactions,
+      });
+    } catch (err) {
+      console.error("Wallet loading error:", err);
+
+      setError(err instanceof Error ? err.message : "Failed to load wallet");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /* ==========================================================
+     INITIAL LOAD
+  ========================================================== */
+
+  useEffect(() => {
+    void loadWallet();
+  }, [loadWallet]);
+
+  /* ==========================================================
+     LOADING
+  ========================================================== */
+
+  if (loading) {
+    return (
+      <div className="space-y-5 pb-6">
+        <div>
+          <div className="h-3 w-28 animate-pulse rounded bg-slate-200" />
+
+          <div className="mt-3 h-8 w-40 animate-pulse rounded bg-slate-200" />
+
+          <div className="mt-2 h-4 w-80 max-w-full animate-pulse rounded bg-slate-100" />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="h-56 animate-pulse rounded-2xl bg-slate-200" />
+
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
+            <div className="h-24 animate-pulse rounded-2xl bg-slate-200" />
+            <div className="h-24 animate-pulse rounded-2xl bg-slate-200" />
+          </div>
+        </div>
+
+        <div className="h-80 animate-pulse rounded-2xl bg-slate-200" />
+      </div>
+    );
+  }
+
+  /* ==========================================================
+     ERROR
+  ========================================================== */
+
+  if (error) {
+    return (
+      <div className="space-y-5 pb-6">
+        <div>
+          <div className="flex items-center gap-1 text-xs font-semibold">
+            <span className="text-slate-400">Player</span>
+
+            <span className="text-indigo-400">/</span>
+
+            <span className="text-indigo-500">Wallet</span>
+          </div>
+
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            Wallet
+          </h1>
+
+          <p className="mt-1.5 text-xs text-slate-500 sm:text-sm">
+            Manage your balance, deposits, withdrawals and transactions.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-bold text-red-700">
+                Unable to load wallet
+              </p>
+
+              <p className="mt-1 text-xs text-red-600">{error}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void loadWallet()}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-red-700"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const transactions = wallet.transactions;
+
+  /* ==========================================================
+     PAGE
+  ========================================================== */
+
   return (
     <div className="space-y-5 pb-6">
       {/* ======================================================
@@ -131,13 +470,9 @@ export default function Wallet() {
       ======================================================= */}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-        {/* ====================================================
-            BALANCE CARD
-        ===================================================== */}
+        {/* BALANCE CARD */}
 
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-600 to-violet-600 p-5 text-white shadow-lg shadow-indigo-100 sm:p-6">
-          {/* Decorative circles */}
-
           <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10" />
 
           <div className="absolute -bottom-16 right-20 h-36 w-36 rounded-full bg-white/5" />
@@ -167,7 +502,8 @@ export default function Wallet() {
 
             <div className="mt-6">
               <p className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-                125,000
+                {formatAmount(wallet.balance)}
+
                 <span className="ml-2 text-base font-semibold text-indigo-200">
                   MMK
                 </span>
@@ -178,39 +514,29 @@ export default function Wallet() {
               </p>
             </div>
 
-            {/* Small summary */}
-
             <div className="mt-5 flex items-center gap-6 border-t border-white/10 pt-4">
               <div>
-                <p className="text-[9px] text-indigo-200">
-                  Recent Deposits
-                </p>
+                <p className="text-[9px] text-indigo-200">Recent Deposits</p>
 
                 <p className="mt-0.5 text-sm font-bold">
-                  +175,000 MMK
+                  +{formatAmount(wallet.recentDeposits)} MMK
                 </p>
               </div>
 
               <div>
-                <p className="text-[9px] text-indigo-200">
-                  Recent Withdrawals
-                </p>
+                <p className="text-[9px] text-indigo-200">Recent Withdrawals</p>
 
                 <p className="mt-0.5 text-sm font-bold">
-                  -75,000 MMK
+                  -{formatAmount(wallet.recentWithdrawals)} MMK
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ====================================================
-            ACTIONS
-        ===================================================== */}
+        {/* ACTIONS */}
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
-          {/* Deposit */}
-
           <Link
             to="/player/deposit"
             className="group flex items-center gap-3 rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50/50 hover:shadow-md"
@@ -220,9 +546,7 @@ export default function Wallet() {
             </div>
 
             <div className="min-w-0">
-              <p className="text-sm font-bold text-slate-900">
-                Deposit
-              </p>
+              <p className="text-sm font-bold text-slate-900">Deposit</p>
 
               <p className="mt-0.5 text-[11px] text-slate-400">
                 Add money to wallet
@@ -234,8 +558,6 @@ export default function Wallet() {
             </span>
           </Link>
 
-          {/* Withdraw */}
-
           <Link
             to="/player/withdraw"
             className="group flex items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-md"
@@ -245,9 +567,7 @@ export default function Wallet() {
             </div>
 
             <div className="min-w-0">
-              <p className="text-sm font-bold text-slate-900">
-                Withdraw
-              </p>
+              <p className="text-sm font-bold text-slate-900">Withdraw</p>
 
               <p className="mt-0.5 text-[11px] text-slate-400">
                 Withdraw your balance
@@ -266,9 +586,7 @@ export default function Wallet() {
       ======================================================= */}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        {/* ====================================================
-            HEADER
-        ===================================================== */}
+        {/* HEADER */}
 
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-5">
           <div className="flex min-w-0 items-center gap-2.5">
@@ -295,188 +613,169 @@ export default function Wallet() {
           </Link>
         </div>
 
-        {/* ====================================================
-            TABLE HEADER
-        ===================================================== */}
+        {/* TABLE HEADER */}
 
         <div className="hidden grid-cols-[minmax(0,1fr)_150px_120px_110px] border-b border-slate-100 bg-slate-50/70 px-5 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-400 md:grid">
           <span>Transaction</span>
-
           <span>Amount</span>
-
           <span>Reference</span>
-
           <span className="text-right">Status</span>
         </div>
 
-        {/* ====================================================
-            TRANSACTIONS
-        ===================================================== */}
+        {/* TRANSACTIONS */}
 
         <div className="divide-y divide-slate-100">
-          {transactions.map((transaction) => {
-            const isDeposit = transaction.type === "Deposit";
+          {transactions.length > 0 ? (
+            transactions.slice(0, 4).map((transaction) => {
+              const isDeposit = transaction.type === "Deposit";
 
-            return (
-              <div
-                key={transaction.id}
-                className="px-4 py-3 transition hover:bg-slate-50 sm:px-5"
-              >
-                {/* ==================================================
-                    DESKTOP
-                ================================================== */}
+              return (
+                <div
+                  key={transaction.id}
+                  className="px-4 py-3 transition hover:bg-slate-50 sm:px-5"
+                >
+                  {/* DESKTOP */}
 
-                <div className="hidden grid-cols-[minmax(0,1fr)_150px_120px_110px] items-center gap-3 md:grid">
-                  {/* Transaction */}
-
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                        isDeposit
-                          ? "bg-emerald-50 text-emerald-600"
-                          : "bg-blue-50 text-blue-600"
-                      }`}
-                    >
-                      {isDeposit ? (
-                        <ArrowDownToLine className="h-4 w-4" />
-                      ) : (
-                        <ArrowUpFromLine className="h-4 w-4" />
-                      )}
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate text-xs font-bold text-slate-900">
-                          {transaction.type}
-                        </p>
-
-                        <span className="text-[9px] text-slate-400">
-                          {transaction.id}
-                        </span>
+                  <div className="hidden grid-cols-[minmax(0,1fr)_150px_120px_110px] items-center gap-3 md:grid">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                          isDeposit
+                            ? "bg-emerald-50 text-emerald-600"
+                            : "bg-blue-50 text-blue-600"
+                        }`}
+                      >
+                        {isDeposit ? (
+                          <ArrowDownToLine className="h-4 w-4" />
+                        ) : (
+                          <ArrowUpFromLine className="h-4 w-4" />
+                        )}
                       </div>
 
-                      <p className="mt-0.5 truncate text-[9px] text-slate-400">
-                        {transaction.method} · {transaction.date}
-                      </p>
-                    </div>
-                  </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-xs font-bold text-slate-900">
+                            {transaction.type}
+                          </p>
 
-                  {/* Amount */}
+                          <span className="text-[9px] text-slate-400">
+                            {transaction.id}
+                          </span>
+                        </div>
 
-                  <div>
-                    <p
-                      className={`text-xs font-bold ${
-                        isDeposit
-                          ? "text-emerald-600"
-                          : "text-blue-600"
-                      }`}
-                    >
-                      {isDeposit ? "+" : "-"}
-                      {formatAmount(transaction.amount)}{" "}
-                      <span className="text-[9px] font-semibold opacity-70">
-                        MMK
-                      </span>
-                    </p>
-                  </div>
-
-                  {/* Reference */}
-
-                  <div>
-                    <p className="truncate text-[9px] font-medium text-slate-400">
-                      {transaction.reference}
-                    </p>
-                  </div>
-
-                  {/* Status */}
-
-                  <div className="flex justify-end">
-                    <StatusBadge status={transaction.status} />
-                  </div>
-                </div>
-
-                {/* ==================================================
-                    MOBILE
-                ================================================== */}
-
-                <div className="md:hidden">
-                  <div className="flex items-center gap-3">
-                    {/* Icon */}
-
-                    <div
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                        isDeposit
-                          ? "bg-emerald-50 text-emerald-600"
-                          : "bg-blue-50 text-blue-600"
-                      }`}
-                    >
-                      {isDeposit ? (
-                        <ArrowDownToLine className="h-4 w-4" />
-                      ) : (
-                        <ArrowUpFromLine className="h-4 w-4" />
-                      )}
-                    </div>
-
-                    {/* Main */}
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-bold text-slate-900">
-                          {transaction.type}
+                        <p className="mt-0.5 truncate text-[9px] text-slate-400">
+                          {transaction.method} · {transaction.date}
                         </p>
-
-                        <span className="truncate text-[9px] text-slate-400">
-                          {transaction.id}
-                        </span>
                       </div>
-
-                      <p className="mt-0.5 truncate text-[9px] text-slate-400">
-                        {transaction.method} · {transaction.date}
-                      </p>
                     </div>
 
-                    {/* Amount */}
-
-                    <div className="shrink-0 text-right">
+                    <div>
                       <p
                         className={`text-xs font-bold ${
-                          isDeposit
-                            ? "text-emerald-600"
-                            : "text-blue-600"
+                          isDeposit ? "text-emerald-600" : "text-blue-600"
                         }`}
                       >
                         {isDeposit ? "+" : "-"}
-                        {formatAmount(transaction.amount)}
+                        {formatAmount(transaction.amount)}{" "}
+                        <span className="text-[9px] font-semibold opacity-70">
+                          MMK
+                        </span>
                       </p>
+                    </div>
 
-                      <p className="text-[8px] font-semibold text-slate-400">
-                        MMK
+                    <div>
+                      <p className="truncate text-[9px] font-medium text-slate-400">
+                        {transaction.reference}
                       </p>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <StatusBadge status={transaction.status} />
                     </div>
                   </div>
 
-                  {/* Bottom details */}
+                  {/* MOBILE */}
 
-                  <div className="mt-2.5 flex items-center justify-between gap-3 pl-12">
-                    <p className="truncate text-[9px] text-slate-400">
-                      Ref: {transaction.reference}
-                    </p>
+                  <div className="md:hidden">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                          isDeposit
+                            ? "bg-emerald-50 text-emerald-600"
+                            : "bg-blue-50 text-blue-600"
+                        }`}
+                      >
+                        {isDeposit ? (
+                          <ArrowDownToLine className="h-4 w-4" />
+                        ) : (
+                          <ArrowUpFromLine className="h-4 w-4" />
+                        )}
+                      </div>
 
-                    <StatusBadge status={transaction.status} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-bold text-slate-900">
+                            {transaction.type}
+                          </p>
+
+                          <span className="truncate text-[9px] text-slate-400">
+                            {transaction.id}
+                          </span>
+                        </div>
+
+                        <p className="mt-0.5 truncate text-[9px] text-slate-400">
+                          {transaction.method} · {transaction.date}
+                        </p>
+                      </div>
+
+                      <div className="shrink-0 text-right">
+                        <p
+                          className={`text-xs font-bold ${
+                            isDeposit ? "text-emerald-600" : "text-blue-600"
+                          }`}
+                        >
+                          {isDeposit ? "+" : "-"}
+                          {formatAmount(transaction.amount)}
+                        </p>
+
+                        <p className="text-[8px] font-semibold text-slate-400">
+                          MMK
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-2.5 flex items-center justify-between gap-3 pl-12">
+                      <p className="truncate text-[9px] text-slate-400">
+                        Ref: {transaction.reference}
+                      </p>
+
+                      <StatusBadge status={transaction.status} />
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          ) : (
+            <div className="px-5 py-10 text-center">
+              <ReceiptText className="mx-auto h-7 w-7 text-slate-300" />
+
+              <p className="mt-2 text-xs font-bold text-slate-500">
+                No transactions yet
+              </p>
+
+              <p className="mt-1 text-[10px] text-slate-400">
+                Your deposit and withdrawal activity will appear here.
+              </p>
+            </div>
+          )}
         </div>
 
-        {/* ====================================================
-            FOOTER
-        ===================================================== */}
+        {/* FOOTER */}
 
         <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-3 sm:px-5">
           <div className="flex items-center justify-between gap-3">
             <p className="text-[9px] text-slate-400 sm:text-[10px]">
-              Showing {transactions.length} recent transactions
+              Showing {Math.min(transactions.length, 4)} recent transactions
             </p>
 
             <Link
