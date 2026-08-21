@@ -32,21 +32,16 @@ type WalletBalanceResponse = {
 
   data?: {
     balance?: number | string | null;
-
     wallet?: {
       balance?: number | string | null;
-    };
+    } | null;
+  } | null;
 
-    data?: {
-      balance?: number | string | null;
-    };
-  };
+  balance?: number | string | null;
 
   wallet?: {
     balance?: number | string | null;
-  };
-
-  balance?: number | string | null;
+  } | null;
 };
 
 /* ============================================================
@@ -107,76 +102,6 @@ function formatWalletBalance(
   }
 
   return value.toLocaleString("en-US");
-}
-
-/* ============================================================
-   EXTRACT WALLET BALANCE
-============================================================ */
-
-function extractWalletBalance(result: WalletBalanceResponse): number | null {
-  /*
-   * Supported response formats:
-   *
-   * 1.
-   * {
-   *   success: true,
-   *   balance: 125000
-   * }
-   *
-   * 2.
-   * {
-   *   success: true,
-   *   data: {
-   *     balance: 125000
-   *   }
-   * }
-   *
-   * 3.
-   * {
-   *   success: true,
-   *   wallet: {
-   *     balance: 125000
-   *   }
-   * }
-   *
-   * 4.
-   * {
-   *   success: true,
-   *   data: {
-   *     wallet: {
-   *       balance: 125000
-   *     }
-   *   }
-   *
-   * 5.
-   * {
-   *   success: true,
-   *   data: {
-   *     data: {
-   *       balance: 125000
-   *     }
-   *   }
-   */
-
-  const possibleBalances: Array<number | string | null | undefined> = [
-    result.data?.balance,
-    result.data?.wallet?.balance,
-    result.data?.data?.balance,
-    result.wallet?.balance,
-    result.balance,
-  ];
-
-  for (const balance of possibleBalances) {
-    if (balance !== null && balance !== undefined && balance !== "") {
-      const numericBalance = Number(balance);
-
-      if (Number.isFinite(numericBalance)) {
-        return numericBalance;
-      }
-    }
-  }
-
-  return null;
 }
 
 /* ============================================================
@@ -251,34 +176,29 @@ export default function PlayerLayout() {
 
   const loadWalletBalance = useCallback(async () => {
     try {
-      /*
-       * IMPORTANT:
-       *
-       * Use the dedicated wallet balance endpoint instead of
-       * /api/player/dashboard.
-       *
-       * Backend function:
-       *
-       * netlify/functions/wallet/balance.ts
-       *
-       * Netlify API route:
-       *
-       * /api/wallet/balance
-       */
-
-      const response = await fetch("/api/wallet/balance", {
+      const response = await fetch("/api/player/dashboard", {
         method: "GET",
         credentials: "include",
         headers: {
           Accept: "application/json",
         },
-        cache: "no-store",
       });
 
       const contentType = response.headers.get("content-type") || "";
 
-      if (!contentType.toLowerCase().includes("application/json")) {
-        console.error("Wallet balance API returned non-JSON response", {
+      /*
+       * Read the response as text first.
+       *
+       * This is important because calling response.json()
+       * directly will throw if Netlify returns HTML.
+       */
+      const rawResponse = await response.text();
+
+      /*
+       * Empty response
+       */
+      if (!rawResponse.trim()) {
+        console.error("Wallet balance API returned an empty response", {
           status: response.status,
           contentType,
         });
@@ -286,45 +206,114 @@ export default function PlayerLayout() {
         return;
       }
 
-      const result = (await response.json()) as WalletBalanceResponse;
+      /*
+       * Parse JSON manually.
+       *
+       * This gives us a useful error if the endpoint returns
+       * an HTML page instead of JSON.
+       */
+      let result: WalletBalanceResponse;
 
-      if (!response.ok) {
-        console.error(
-          "Failed to load wallet balance:",
-          result.message || `HTTP ${response.status}`,
-        );
+      try {
+        result = JSON.parse(rawResponse) as WalletBalanceResponse;
+      } catch (parseError) {
+        console.error("Wallet balance API returned non-JSON response", {
+          status: response.status,
+          contentType,
+          responsePreview: rawResponse.substring(0, 500),
+          parseError,
+        });
 
         return;
       }
 
-      if (result.success === false) {
-        console.error(
-          "Wallet balance API error:",
-          result.message || "Unable to load wallet balance",
-        );
+      /*
+       * API error
+       */
+      if (!response.ok || result.success === false) {
+        console.error("Failed to load player wallet balance", {
+          status: response.status,
+          message: result.message,
+          response: result,
+        });
 
         return;
       }
 
-      const numericBalance = extractWalletBalance(result);
+      /*
+       * Supports:
+       *
+       * {
+       *   success: true,
+       *   data: {
+       *     balance: 125000
+       *   }
+       * }
+       *
+       * OR:
+       *
+       * {
+       *   success: true,
+       *   balance: 125000
+       * }
+       *
+       * OR:
+       *
+       * {
+       *   success: true,
+       *   wallet: {
+       *     balance: 125000
+       *   }
+       * }
+       *
+       * OR:
+       *
+       * {
+       *   success: true,
+       *   data: {
+       *     wallet: {
+       *       balance: 125000
+       *     }
+       *   }
+       * }
+       */
 
-      if (numericBalance !== null) {
-        setWalletBalance(numericBalance);
-      } else {
-        console.error("Wallet balance was not found in API response:", result);
+      const balance =
+        result.data?.balance ??
+        result.balance ??
+        result.wallet?.balance ??
+        result.data?.wallet?.balance ??
+        0;
+
+      const numericBalance = Number(balance);
+
+      /*
+       * Invalid balance
+       */
+      if (!Number.isFinite(numericBalance)) {
+        console.error("Invalid wallet balance returned by API", {
+          balance,
+          response: result,
+        });
+
+        return;
       }
+
+      /*
+       * Update wallet balance
+       */
+      setWalletBalance(numericBalance);
     } catch (error) {
       /*
        * Do not break PlayerLayout if the wallet API
        * temporarily fails.
        */
-
       console.error("Wallet balance loading error:", error);
     }
   }, []);
 
   /* ============================================================
-     INITIAL WALLET BALANCE
+     LOAD WALLET BALANCE
   ============================================================ */
 
   useEffect(() => {
@@ -354,17 +343,6 @@ export default function PlayerLayout() {
   ============================================================ */
 
   useEffect(() => {
-    /*
-     * Refresh the balance whenever the player moves between pages.
-     *
-     * Useful after:
-     *
-     * Deposit
-     * Withdraw
-     * 2D Play
-     * 3D Play
-     */
-
     void loadWalletBalance();
   }, [location.pathname, loadWalletBalance]);
 
@@ -562,8 +540,9 @@ export default function PlayerLayout() {
         }
       }
 
-      /* Remove current page */
-
+      /*
+       * Remove current page
+       */
       if (
         history.length > 0 &&
         history[history.length - 1] === location.pathname
@@ -571,23 +550,27 @@ export default function PlayerLayout() {
         history.pop();
       }
 
-      /* Previous player page */
-
+      /*
+       * Previous player page
+       */
       const previousPlayerPage = history[history.length - 1];
 
-      /* Save updated history */
-
+      /*
+       * Save updated history
+       */
       sessionStorage.setItem(PLAYER_HISTORY_KEY, JSON.stringify(history));
 
-      /* Navigate to previous player page */
-
+      /*
+       * Navigate to previous player page
+       */
       if (previousPlayerPage && isPlayerPath(previousPlayerPage)) {
         navigate(previousPlayerPage);
         return;
       }
 
-      /* Safe fallback */
-
+      /*
+       * Safe fallback
+       */
       navigate("/player");
     } catch {
       navigate("/player");
@@ -698,9 +681,7 @@ export default function PlayerLayout() {
 
       <header className="sticky top-0 z-50 border-b border-slate-700/80 bg-slate-900/95 backdrop-blur-xl">
         <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          {/* ==================================================
-              LOGO
-          =================================================== */}
+          {/* LOGO */}
 
           <NavLink
             to="/player"
@@ -722,9 +703,7 @@ export default function PlayerLayout() {
             </div>
           </NavLink>
 
-          {/* ==================================================
-              DESKTOP NAVIGATION
-          =================================================== */}
+          {/* DESKTOP NAVIGATION */}
 
           <nav className="hidden items-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 lg:flex">
             {/* DASHBOARD */}
@@ -906,9 +885,7 @@ export default function PlayerLayout() {
             </div>
           </nav>
 
-          {/* ==================================================
-              RIGHT SIDE
-          =================================================== */}
+          {/* RIGHT SIDE */}
 
           <div className="flex items-center gap-2">
             {/* WALLET */}
@@ -933,9 +910,7 @@ export default function PlayerLayout() {
               </div>
             </NavLink>
 
-            {/* ==================================================
-                DESKTOP NOTIFICATIONS
-            =================================================== */}
+            {/* DESKTOP NOTIFICATIONS */}
 
             <div className="hidden rounded-xl sm:block">
               <NotificationBell role="PLAYER" />
@@ -1023,9 +998,7 @@ export default function PlayerLayout() {
               )}
             </div>
 
-            {/* ==================================================
-                MOBILE MENU BUTTON
-            =================================================== */}
+            {/* MOBILE MENU BUTTON */}
 
             <button
               type="button"
@@ -1049,9 +1022,7 @@ export default function PlayerLayout() {
           </div>
         </div>
 
-        {/* ====================================================
-            MOBILE NAVIGATION
-        ===================================================== */}
+        {/* MOBILE NAVIGATION */}
 
         {mobileMenuOpen && (
           <div className="border-t border-slate-700 bg-slate-900 lg:hidden">
