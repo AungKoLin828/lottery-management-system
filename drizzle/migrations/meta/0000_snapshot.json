@@ -1,5 +1,5 @@
 {
-  "id": "31b12243-422d-4f07-b292-fb5b110bfe10",
+  "id": "4ed6ad2a-dd81-46d8-bfb4-1091e126afa7",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -341,18 +341,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "set_value": {
-          "name": "set_value",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "value": {
-          "name": "value",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "note": {
           "name": "note",
           "type": "text",
@@ -604,38 +592,23 @@
           "primaryKey": false,
           "notNull": true
         },
-        "bet_type": {
-          "name": "bet_type",
-          "type": "bet_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
         "number": {
           "name": "number",
           "type": "varchar(10)",
           "primaryKey": false,
           "notNull": true
         },
-        "amount": {
-          "name": "amount",
+        "session": {
+          "name": "session",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bet_amount": {
+          "name": "bet_amount",
           "type": "numeric(18, 2)",
           "primaryKey": false,
           "notNull": true
-        },
-        "multiplier": {
-          "name": "multiplier",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'1'"
-        },
-        "potential_win": {
-          "name": "potential_win",
-          "type": "numeric(18, 2)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'0'"
         },
         "win_amount": {
           "name": "win_amount",
@@ -650,10 +623,17 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'PENDING'"
+          "default": "'ACTIVE'"
         },
         "created_at": {
           "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
@@ -685,7 +665,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -1341,19 +1321,11 @@
         "SYSTEM"
       ]
     },
-    "public.bet_type": {
-      "name": "bet_type",
-      "schema": "public",
-      "values": [
-        "2D",
-        "3D"
-      ]
-    },
     "public.ticket_item_status": {
       "name": "ticket_item_status",
       "schema": "public",
       "values": [
-        "PENDING",
+        "ACTIVE",
         "WON",
         "LOST",
         "CANCELLED"

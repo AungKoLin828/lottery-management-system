@@ -42,7 +42,18 @@
   status = 200
   force = true
 
+[[redirects]]
+  from = "/api/admin/results"
+  to = "/.netlify/functions/admin-results"
+  status = 200
+  force = true
 
+[[redirects]]
+  from = "/api/admin/results/*"
+  to = "/.netlify/functions/admin-results"
+  status = 200
+  force = true
+  
 # ============================================================
 # ADMIN USER BALANCE API
 #

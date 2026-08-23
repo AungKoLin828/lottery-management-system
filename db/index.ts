@@ -1,7 +1,7 @@
 import "dotenv/config";
 
-import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
 
 import * as users from "./schema/users";
 import * as wallets from "./schema/wallets";
@@ -18,8 +18,22 @@ import * as auditLogs from "./schema/auditLogs";
 
 import * as relations from "./relations";
 
+/* ============================================================
+   DATABASE URL
+============================================================ */
+
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL environment variable is not configured.");
+}
+
+/* ============================================================
+   DATABASE CONNECTION POOL
+============================================================ */
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: databaseUrl,
 
   ssl: {
     rejectUnauthorized: false,
@@ -31,6 +45,10 @@ const pool = new Pool({
 
   connectionTimeoutMillis: 10_000,
 });
+
+/* ============================================================
+   DRIZZLE DATABASE
+============================================================ */
 
 export const db = drizzle(pool, {
   schema: {
@@ -49,5 +67,9 @@ export const db = drizzle(pool, {
     ...relations,
   },
 });
+
+/* ============================================================
+   EXPORT POOL
+============================================================ */
 
 export { pool };

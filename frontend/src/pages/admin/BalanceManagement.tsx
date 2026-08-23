@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import type { Wallet } from "@/types/wallet";
 import type { Transaction } from "@/types/transaction";
 import type { DepositRequest } from "@/types/deposit";
 import type { WithdrawRequest } from "@/types/withdraw";
@@ -23,12 +22,6 @@ export default function BalanceManagement() {
      STATE
   ============================================================ */
 
-  const [openModal, setOpenModal] = useState(false);
-
-  const [selectedPlayer, setSelectedPlayer] = useState<Wallet | null>(null);
-
-  const [depositAmount, setDepositAmount] = useState("");
-
   const [openApproveModal, setOpenApproveModal] = useState(false);
 
   const [selectedRequest, setSelectedRequest] = useState<DepositRequest | null>(
@@ -46,28 +39,7 @@ export default function BalanceManagement() {
   const [processing, setProcessing] = useState(false);
 
   /* ============================================================
-     SAMPLE WALLETS
-  ============================================================ */
-
-  const [wallets, setWallets] = useState<Wallet[]>([
-    {
-      id: 1,
-      playerId: "P001",
-      playerName: "Mg Mg",
-      phone: "09123456789",
-      balance: 10000,
-    },
-    {
-      id: 2,
-      playerId: "P002",
-      playerName: "Aung Aung",
-      phone: "09987654321",
-      balance: 5000,
-    },
-  ]);
-
-  /* ============================================================
-     SAMPLE DEPOSIT REQUESTS
+     DEPOSIT REQUESTS
   ============================================================ */
 
   const [depositRequests, setDepositRequests] = useState<DepositRequest[]>([
@@ -96,7 +68,7 @@ export default function BalanceManagement() {
   ]);
 
   /* ============================================================
-     SAMPLE WITHDRAW REQUESTS
+     WITHDRAW REQUESTS
   ============================================================ */
 
   const [withdrawRequests, setWithdrawRequests] = useState<WithdrawRequest[]>([
@@ -120,17 +92,6 @@ export default function BalanceManagement() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   /* ============================================================
-     OPEN MANUAL DEPOSIT MODAL
-  ============================================================ */
-
-  const openDeposit = (wallet: Wallet) => {
-    setSelectedPlayer(wallet);
-    setDepositAmount("");
-    setNote("");
-    setOpenModal(true);
-  };
-
-  /* ============================================================
      OPEN APPROVE DEPOSIT MODAL
   ============================================================ */
 
@@ -146,100 +107,6 @@ export default function BalanceManagement() {
     setNote("");
 
     setOpenApproveModal(true);
-  };
-
-  /* ============================================================
-     MANUAL DEPOSIT
-  ============================================================ */
-
-  const handleDeposit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!selectedPlayer) {
-      return;
-    }
-
-    const amount = Number(depositAmount);
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      alert("Please enter a valid deposit amount.");
-      return;
-    }
-
-    try {
-      setProcessing(true);
-
-      const transactionId = Date.now();
-
-      /* --------------------------------------------------------
-         Update wallet
-      -------------------------------------------------------- */
-
-      setWallets((prev) =>
-        prev.map((wallet) =>
-          wallet.id === selectedPlayer.id
-            ? {
-                ...wallet,
-                balance: wallet.balance + amount,
-              }
-            : wallet,
-        ),
-      );
-
-      /* --------------------------------------------------------
-         Create transaction
-      -------------------------------------------------------- */
-
-      const transaction: Transaction = {
-        id: transactionId,
-
-        playerId: selectedPlayer.playerId,
-
-        playerName: selectedPlayer.playerName,
-
-        type: "Deposit",
-
-        amount,
-
-        note: note || "Manual deposit by admin",
-
-        createdBy: "admin",
-
-        createdAt: new Date().toISOString().split("T")[0],
-      };
-
-      setTransactions((prev) => [transaction, ...prev]);
-
-      /* --------------------------------------------------------
-         Notify player
-      -------------------------------------------------------- */
-
-      await notifyPlayerDepositApproved({
-        playerId: selectedPlayer.playerId,
-
-        depositId: String(transactionId),
-
-        amount,
-      });
-
-      /* --------------------------------------------------------
-         Close modal
-      -------------------------------------------------------- */
-
-      setOpenModal(false);
-
-      setSelectedPlayer(null);
-
-      setDepositAmount("");
-
-      setNote("");
-    } catch (error) {
-      console.error("Manual deposit error:", error);
-
-      alert("Deposit completed locally, but notification failed.");
-    } finally {
-      setProcessing(false);
-    }
   };
 
   /* ============================================================
@@ -270,37 +137,15 @@ export default function BalanceManagement() {
       return;
     }
 
-    const wallet = wallets.find(
-      (item) => item.playerId === selectedRequest.playerId,
-    );
-
-    if (!wallet) {
-      alert("Player wallet not found.");
-      return;
-    }
-
     try {
       setProcessing(true);
 
       const transactionId = Date.now();
 
       /* --------------------------------------------------------
-         1. Update wallet
-      -------------------------------------------------------- */
-
-      setWallets((prev) =>
-        prev.map((wallet) =>
-          wallet.playerId === selectedRequest.playerId
-            ? {
-                ...wallet,
-                balance: wallet.balance + amount,
-              }
-            : wallet,
-        ),
-      );
-
-      /* --------------------------------------------------------
-         2. Add transaction
+         Add transaction
+         
+         The real backend should also update the player's wallet.
       -------------------------------------------------------- */
 
       const transaction: Transaction = {
@@ -330,7 +175,7 @@ export default function BalanceManagement() {
       setTransactions((prev) => [transaction, ...prev]);
 
       /* --------------------------------------------------------
-         3. Update request
+         Update request
       -------------------------------------------------------- */
 
       setDepositRequests((prev) =>
@@ -348,7 +193,7 @@ export default function BalanceManagement() {
       );
 
       /* --------------------------------------------------------
-         4. Notify player
+         Notify player
       -------------------------------------------------------- */
 
       await notifyPlayerDepositApproved({
@@ -360,7 +205,7 @@ export default function BalanceManagement() {
       });
 
       /* --------------------------------------------------------
-         5. Close modal
+         Close modal
       -------------------------------------------------------- */
 
       setOpenApproveModal(false);
@@ -400,7 +245,7 @@ export default function BalanceManagement() {
       setProcessing(true);
 
       /* --------------------------------------------------------
-         Update request
+         Update request status
       -------------------------------------------------------- */
 
       setDepositRequests((prev) =>
@@ -415,11 +260,7 @@ export default function BalanceManagement() {
       );
 
       /* --------------------------------------------------------
-         Add transaction
-         
-         Use "Adjustment" because your Transaction
-         type may only allow:
-         Deposit | Withdraw | Adjustment
+         Add rejection transaction
       -------------------------------------------------------- */
 
       const transaction: Transaction = {
@@ -470,25 +311,21 @@ export default function BalanceManagement() {
 
   /* ============================================================
      APPROVE WITHDRAW
+     
+     IMPORTANT:
+     Wallet balance is no longer maintained in this component.
+     The backend should:
+       1. Check player's real wallet balance.
+       2. Deduct the withdrawal amount.
+       3. Update the withdrawal request.
+       4. Create the transaction.
   ============================================================ */
 
   const handleApproveWithdraw = async (req: WithdrawRequest) => {
     const amount = req.requestedAmount;
 
-    const wallet = wallets.find((w) => w.playerId === req.playerId);
-
-    if (!wallet) {
-      alert("Player wallet not found.");
-      return;
-    }
-
-    if (amount <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       alert("Invalid withdrawal amount.");
-      return;
-    }
-
-    if (wallet.balance < amount) {
-      alert("Insufficient wallet balance.");
       return;
     }
 
@@ -506,22 +343,9 @@ export default function BalanceManagement() {
       const transactionId = Date.now();
 
       /* --------------------------------------------------------
-         1. Deduct wallet balance
-      -------------------------------------------------------- */
-
-      setWallets((prev) =>
-        prev.map((wallet) =>
-          wallet.playerId === req.playerId
-            ? {
-                ...wallet,
-                balance: wallet.balance - amount,
-              }
-            : wallet,
-        ),
-      );
-
-      /* --------------------------------------------------------
-         2. Add transaction
+         Add transaction
+         
+         The real backend should validate and deduct the wallet.
       -------------------------------------------------------- */
 
       const transaction: Transaction = {
@@ -549,7 +373,7 @@ export default function BalanceManagement() {
       setTransactions((prev) => [transaction, ...prev]);
 
       /* --------------------------------------------------------
-         3. Update withdraw request
+         Update withdraw request
       -------------------------------------------------------- */
 
       setWithdrawRequests((prev) =>
@@ -564,7 +388,7 @@ export default function BalanceManagement() {
       );
 
       /* --------------------------------------------------------
-         4. Notify player
+         Notify player
       -------------------------------------------------------- */
 
       await notifyPlayerWithdrawApproved({
@@ -686,7 +510,7 @@ export default function BalanceManagement() {
   ============================================================ */
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       {/* ======================================================
           PAGE HEADER
       ====================================================== */}
@@ -695,71 +519,8 @@ export default function BalanceManagement() {
         <h1 className="text-2xl font-bold text-gray-900">Balance Management</h1>
 
         <p className="mt-1 text-sm text-gray-500">
-          Manage player wallets, deposits, withdrawals and transactions.
+          Manage player deposits, withdrawals and transactions.
         </p>
-      </div>
-
-      {/* ======================================================
-          WALLET LIST
-      ====================================================== */}
-
-      <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
-        <div className="border-b px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Player Wallets
-          </h2>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3">Player ID</th>
-
-                <th className="px-6 py-3">Player</th>
-
-                <th className="px-6 py-3">Phone</th>
-
-                <th className="px-6 py-3">Balance</th>
-
-                <th className="px-6 py-3 text-right">Action</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y">
-              {wallets.map((wallet) => (
-                <tr key={wallet.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 font-medium">{wallet.playerId}</td>
-
-                  <td className="px-6 py-4">{wallet.playerName}</td>
-
-                  <td className="px-6 py-4">{wallet.phone}</td>
-
-                  <td className="px-6 py-4 font-semibold text-green-600">
-                    {wallet.balance.toLocaleString()} MMK
-                  </td>
-
-                  <td className="px-6 py-4 text-right">
-                    <Button type="button" onClick={() => openDeposit(wallet)}>
-                      Deposit
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-
-              {wallets.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-6 py-8 text-center text-gray-500"
-                  >
-                    No wallets found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
       </div>
 
       {/* ======================================================
@@ -785,10 +546,12 @@ export default function BalanceManagement() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3">Player</th>
+
+                <th className="px-6 py-3">Phone</th>
 
                 <th className="px-6 py-3">Amount</th>
 
@@ -812,6 +575,8 @@ export default function BalanceManagement() {
 
                     <div className="text-xs text-gray-500">{req.playerId}</div>
                   </td>
+
+                  <td className="px-6 py-4">{req.phone}</td>
 
                   <td className="px-6 py-4 font-semibold">
                     {req.requestedAmount.toLocaleString()} MMK
@@ -838,8 +603,8 @@ export default function BalanceManagement() {
                       <div className="flex justify-end gap-2">
                         <Button
                           type="button"
-                          onClick={() => openApprove(req)}
                           disabled={processing}
+                          onClick={() => openApprove(req)}
                         >
                           Approve
                         </Button>
@@ -847,7 +612,7 @@ export default function BalanceManagement() {
                         <button
                           type="button"
                           disabled={processing}
-                          onClick={() => handleReject(req)}
+                          onClick={() => void handleReject(req)}
                           className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Reject
@@ -861,7 +626,7 @@ export default function BalanceManagement() {
               {depositRequests.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-6 py-8 text-center text-gray-500"
                   >
                     No deposit requests.
@@ -899,10 +664,12 @@ export default function BalanceManagement() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3">Player</th>
+
+                <th className="px-6 py-3">Phone</th>
 
                 <th className="px-6 py-3">Amount</th>
 
@@ -926,6 +693,8 @@ export default function BalanceManagement() {
 
                     <div className="text-xs text-gray-500">{req.playerId}</div>
                   </td>
+
+                  <td className="px-6 py-4">{req.phone}</td>
 
                   <td className="px-6 py-4 font-semibold">
                     {req.requestedAmount.toLocaleString()} MMK
@@ -953,7 +722,7 @@ export default function BalanceManagement() {
                         <Button
                           type="button"
                           disabled={processing}
-                          onClick={() => handleApproveWithdraw(req)}
+                          onClick={() => void handleApproveWithdraw(req)}
                         >
                           Approve
                         </Button>
@@ -961,7 +730,7 @@ export default function BalanceManagement() {
                         <button
                           type="button"
                           disabled={processing}
-                          onClick={() => handleRejectWithdraw(req)}
+                          onClick={() => void handleRejectWithdraw(req)}
                           className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Reject
@@ -975,7 +744,7 @@ export default function BalanceManagement() {
               {withdrawRequests.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-6 py-8 text-center text-gray-500"
                   >
                     No withdraw requests.
@@ -996,10 +765,14 @@ export default function BalanceManagement() {
           <h2 className="text-lg font-semibold text-gray-900">
             Recent Transactions
           </h2>
+
+          <p className="mt-1 text-sm text-gray-500">
+            Deposit and withdrawal transaction history.
+          </p>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3">Player</th>
@@ -1079,77 +852,6 @@ export default function BalanceManagement() {
       </div>
 
       {/* ======================================================
-          MANUAL DEPOSIT MODAL
-      ====================================================== */}
-
-      <Modal
-        open={openModal}
-        onClose={() => {
-          if (!processing) {
-            setOpenModal(false);
-            setSelectedPlayer(null);
-          }
-        }}
-        title="Manual Deposit"
-      >
-        <form onSubmit={handleDeposit} className="space-y-4">
-          {selectedPlayer && (
-            <>
-              <div className="rounded-lg bg-gray-50 p-4">
-                <p className="text-sm text-gray-500">Player</p>
-
-                <p className="font-semibold text-gray-900">
-                  {selectedPlayer.playerName}
-                </p>
-
-                <p className="text-sm text-gray-500">
-                  {selectedPlayer.playerId}
-                </p>
-
-                <p className="mt-2 text-sm text-gray-500">Current Balance</p>
-
-                <p className="font-semibold text-green-600">
-                  {selectedPlayer.balance.toLocaleString()} MMK
-                </p>
-              </div>
-
-              <Input
-                label="Deposit Amount"
-                type="number"
-                min="1"
-                value={depositAmount}
-                onChange={(e) => setDepositAmount(e.target.value)}
-                placeholder="Enter amount"
-                required
-              />
-
-              <Input
-                label="Note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Optional note"
-              />
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  disabled={processing}
-                  onClick={() => setOpenModal(false)}
-                  className="rounded-md border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-
-                <Button type="submit" disabled={processing}>
-                  {processing ? "Processing..." : "Deposit"}
-                </Button>
-              </div>
-            </>
-          )}
-        </form>
-      </Modal>
-
-      {/* ======================================================
           APPROVE DEPOSIT MODAL
       ====================================================== */}
 
@@ -1171,7 +873,7 @@ export default function BalanceManagement() {
                   <div>
                     <p className="text-gray-500">Player</p>
 
-                    <p className="font-semibold">
+                    <p className="font-semibold text-gray-900">
                       {selectedRequest.playerName}
                     </p>
                   </div>
@@ -1179,7 +881,17 @@ export default function BalanceManagement() {
                   <div>
                     <p className="text-gray-500">Player ID</p>
 
-                    <p className="font-semibold">{selectedRequest.playerId}</p>
+                    <p className="font-semibold text-gray-900">
+                      {selectedRequest.playerId}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-500">Phone</p>
+
+                    <p className="font-semibold text-gray-900">
+                      {selectedRequest.phone}
+                    </p>
                   </div>
 
                   <div>
@@ -1193,8 +905,16 @@ export default function BalanceManagement() {
                   <div>
                     <p className="text-gray-500">Requested Payment</p>
 
-                    <p className="font-semibold">
+                    <p className="font-semibold text-gray-900">
                       {selectedRequest.paymentMethod}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-500">Transaction Number</p>
+
+                    <p className="font-semibold text-gray-900">
+                      {selectedRequest.transactionNumber}
                     </p>
                   </div>
                 </div>
@@ -1206,6 +926,7 @@ export default function BalanceManagement() {
                 min="1"
                 value={approvedAmount}
                 onChange={(e) => setApprovedAmount(e.target.value)}
+                disabled={processing}
                 required
               />
 
@@ -1214,6 +935,7 @@ export default function BalanceManagement() {
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
                 placeholder="KBZPay / WavePay / Bank Transfer"
+                disabled={processing}
                 required
               />
 
@@ -1222,6 +944,7 @@ export default function BalanceManagement() {
                 value={transactionNumber}
                 onChange={(e) => setTransactionNumber(e.target.value)}
                 placeholder="Enter transaction number"
+                disabled={processing}
                 required
               />
 
@@ -1230,6 +953,7 @@ export default function BalanceManagement() {
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Optional note"
+                disabled={processing}
               />
 
               <div className="flex justify-end gap-3 pt-2">
@@ -1237,7 +961,7 @@ export default function BalanceManagement() {
                   type="button"
                   disabled={processing}
                   onClick={() => setOpenApproveModal(false)}
-                  className="rounded-md border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className="rounded-md border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Cancel
                 </button>

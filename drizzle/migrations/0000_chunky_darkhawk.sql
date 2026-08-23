@@ -5,8 +5,7 @@ CREATE TYPE "public"."draw_status" AS ENUM('OPEN', 'CLOSED', 'DRAWN', 'PUBLISHED
 CREATE TYPE "public"."lottery_type" AS ENUM('2D', '3D');--> statement-breakpoint
 CREATE TYPE "public"."payment_method_type" AS ENUM('DEPOSIT', 'WITHDRAW', 'BOTH');--> statement-breakpoint
 CREATE TYPE "public"."setting_type" AS ENUM('GENERAL', 'LOTTERY', 'DEPOSIT', 'WITHDRAW', 'SYSTEM');--> statement-breakpoint
-CREATE TYPE "public"."bet_type" AS ENUM('2D', '3D');--> statement-breakpoint
-CREATE TYPE "public"."ticket_item_status" AS ENUM('PENDING', 'WON', 'LOST', 'CANCELLED');--> statement-breakpoint
+CREATE TYPE "public"."ticket_item_status" AS ENUM('ACTIVE', 'WON', 'LOST', 'CANCELLED');--> statement-breakpoint
 CREATE TYPE "public"."ticket_status" AS ENUM('ACTIVE', 'WON', 'LOST', 'CANCELLED');--> statement-breakpoint
 CREATE TYPE "public"."transaction_status" AS ENUM('PENDING', 'COMPLETED', 'REJECTED', 'CANCELLED');--> statement-breakpoint
 CREATE TYPE "public"."transaction_type" AS ENUM('DEPOSIT', 'WITHDRAW', 'BET', 'WIN', 'ADJUSTMENT', 'REFUND');--> statement-breakpoint
@@ -60,8 +59,6 @@ CREATE TABLE "lottery_results" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"draw_id" uuid NOT NULL,
 	"result" varchar(10) NOT NULL,
-	"set_value" varchar(20),
-	"value" varchar(20),
 	"note" text,
 	"created_by" uuid NOT NULL,
 	"published_at" timestamp with time zone,
@@ -99,14 +96,13 @@ CREATE TABLE "ticket_items" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"ticket_id" uuid NOT NULL,
 	"draw_id" uuid NOT NULL,
-	"bet_type" "bet_type" NOT NULL,
 	"number" varchar(10) NOT NULL,
-	"amount" numeric(18, 2) NOT NULL,
-	"multiplier" numeric(10, 2) DEFAULT '1' NOT NULL,
-	"potential_win" numeric(18, 2) DEFAULT '0' NOT NULL,
+	"session" varchar(10),
+	"bet_amount" numeric(18, 2) NOT NULL,
 	"win_amount" numeric(18, 2) DEFAULT '0' NOT NULL,
-	"status" "ticket_item_status" DEFAULT 'PENDING' NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"status" "ticket_item_status" DEFAULT 'ACTIVE' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "tickets" (
@@ -191,7 +187,7 @@ ALTER TABLE "deposits" ADD CONSTRAINT "deposits_approved_by_users_id_fk" FOREIGN
 ALTER TABLE "lottery_results" ADD CONSTRAINT "lottery_results_draw_id_lottery_draws_id_fk" FOREIGN KEY ("draw_id") REFERENCES "public"."lottery_draws"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "lottery_results" ADD CONSTRAINT "lottery_results_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "ticket_items" ADD CONSTRAINT "ticket_items_ticket_id_tickets_id_fk" FOREIGN KEY ("ticket_id") REFERENCES "public"."tickets"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "ticket_items" ADD CONSTRAINT "ticket_items_draw_id_lottery_draws_id_fk" FOREIGN KEY ("draw_id") REFERENCES "public"."lottery_draws"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "ticket_items" ADD CONSTRAINT "ticket_items_draw_id_lottery_draws_id_fk" FOREIGN KEY ("draw_id") REFERENCES "public"."lottery_draws"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tickets" ADD CONSTRAINT "tickets_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "transactions" ADD CONSTRAINT "transactions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "transactions" ADD CONSTRAINT "transactions_payment_method_id_payment_methods_id_fk" FOREIGN KEY ("payment_method_id") REFERENCES "public"."payment_methods"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

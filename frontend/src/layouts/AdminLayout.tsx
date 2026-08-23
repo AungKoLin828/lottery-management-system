@@ -35,6 +35,19 @@ const handleLogout = async () => {
 
 /* ============================================================
    NAVIGATION
+
+   Admin
+   ├── Dashboard
+   ├── Results Management
+   ├── User Management
+   ├── Balance Management
+   │   ├── Deposit Requests
+   │   └── Withdraw Requests
+   ├── Reports
+   └── Settings
+
+   Player Wallet Management is NOT a separate menu item.
+   It should be managed from User Management.
 ============================================================ */
 
 const navigation = [
@@ -76,7 +89,12 @@ const navigation = [
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const location = useLocation();
+
+  /* ==========================================================
+     ACTIVE NAVIGATION
+  ========================================================== */
 
   const isActive = (path: string) => {
     if (path === "/admin") {
@@ -86,9 +104,108 @@ export default function AdminLayout() {
     return location.pathname.startsWith(path);
   };
 
+  /* ==========================================================
+     CLOSE SIDEBAR
+  ========================================================== */
+
   const closeSidebar = () => {
     setSidebarOpen(false);
   };
+
+  /* ==========================================================
+     PAGE TITLE
+     
+     The page title changes according to the current route.
+
+     Deposit Requests:
+       Deposit Requests • YYYY-MM-DD HH:mm:ss
+
+     Withdraw Requests:
+       Withdraw Requests • YYYY-MM-DD HH:mm:ss
+  ========================================================== */
+
+  const getPageTitle = () => {
+    const path = location.pathname;
+
+    /* ========================================================
+       DASHBOARD
+    ======================================================== */
+
+    if (path === "/admin") {
+      return "Admin Dashboard";
+    }
+
+    /* ========================================================
+       RESULTS MANAGEMENT
+    ======================================================== */
+
+    if (path.startsWith("/admin/results")) {
+      return "Results Management";
+    }
+
+    /* ========================================================
+       USER MANAGEMENT
+    ======================================================== */
+
+    if (path.startsWith("/admin/users")) {
+      return "User Management";
+    }
+
+    /* ========================================================
+       DEPOSIT REQUESTS
+
+       This must come BEFORE /admin/balance because
+       /admin/balance/deposits also starts with /admin/balance.
+    ======================================================== */
+
+    if (path.startsWith("/admin/balance/deposits")) {
+      return "Deposit Requests • YYYY-MM-DD HH:mm:ss";
+    }
+
+    /* ========================================================
+       WITHDRAW REQUESTS
+
+       This must come BEFORE /admin/balance.
+    ======================================================== */
+
+    if (path.startsWith("/admin/balance/withdrawals")) {
+      return "Withdraw Requests • YYYY-MM-DD HH:mm:ss";
+    }
+
+    /* ========================================================
+       BALANCE MANAGEMENT
+    ======================================================== */
+
+    if (path.startsWith("/admin/balance")) {
+      return "Balance Management";
+    }
+
+    /* ========================================================
+       REPORTS
+    ======================================================== */
+
+    if (path.startsWith("/admin/reports")) {
+      return "Reports";
+    }
+
+    /* ========================================================
+       SETTINGS
+    ======================================================== */
+
+    if (path.startsWith("/admin/settings")) {
+      return "Settings";
+    }
+
+    /* ========================================================
+       DEFAULT
+    ======================================================== */
+
+    return "Admin Dashboard";
+  };
+
+  /* ==========================================================
+     RENDER
+  ========================================================== */
 
   return (
     <div className="flex min-h-screen overflow-x-hidden bg-gray-100">
@@ -139,7 +256,8 @@ export default function AdminLayout() {
             onClick={closeSidebar}
             aria-label="Close sidebar"
             className="
-              rounded-md p-2
+              rounded-md
+              p-2
               text-gray-400
               transition
               hover:bg-gray-800
@@ -158,6 +276,7 @@ export default function AdminLayout() {
         <nav className="flex-1 space-y-1 overflow-y-auto p-3 sm:p-4">
           {navigation.map((item) => {
             const Icon = item.icon;
+
             const active = isActive(item.path);
 
             return (
@@ -166,9 +285,12 @@ export default function AdminLayout() {
                 to={item.path}
                 onClick={closeSidebar}
                 className={`
-                  flex items-center gap-3
+                  flex
+                  items-center
+                  gap-3
                   rounded-md
-                  px-3 py-2.5
+                  px-3
+                  py-2.5
                   text-sm
                   transition
                   sm:px-4
@@ -208,8 +330,11 @@ export default function AdminLayout() {
 
         <header
           className="
-            sticky top-0 z-30
-            flex min-h-[73px]
+            sticky
+            top-0
+            z-30
+            flex
+            min-h-[73px]
             items-center
             justify-between
             gap-3
@@ -222,7 +347,9 @@ export default function AdminLayout() {
             md:px-6
           "
         >
-          {/* Left Side */}
+          {/* ==================================================
+              LEFT SIDE
+          ================================================== */}
 
           <div className="flex min-w-0 items-center gap-3">
             {/* Mobile Menu Button */}
@@ -245,12 +372,16 @@ export default function AdminLayout() {
               <Menu className="h-6 w-6" />
             </button>
 
+            {/* Dynamic Page Title */}
+
             <h2 className="truncate text-sm font-semibold text-gray-800 sm:text-base">
-              Admin Dashboard
+              {getPageTitle()}
             </h2>
           </div>
 
-          {/* Right Side */}
+          {/* ==================================================
+              RIGHT SIDE
+          ================================================== */}
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-4">
             {/* Notification */}

@@ -1,19 +1,27 @@
+export type ResultStatus = "Published" | "Draft";
+
+export type ResultDrawType = "2D" | "3D";
+
+export type ResultSession = "AM" | "PM";
+
 export interface Result {
-  id: number;
+  id: string;
   drawDate: string;
-  drawType: "2D" | "3D";
-  session: "AM" | "PM";
+  drawType: ResultDrawType;
+  session: ResultSession | null;
   winningNumber: string;
-  status: "Published" | "Draft";
+  status: ResultStatus;
   createdBy: string;
+  note?: string | null;
 }
 
 export const initialResult: Result = {
-  id: 0,
+  id: "",
   drawDate: "",
   drawType: "2D",
   session: "AM",
   winningNumber: "",
-  status: "Published",
+  status: "Draft",
   createdBy: "admin",
+  note: "",
 };

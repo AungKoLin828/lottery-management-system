@@ -1,3 +1,5 @@
+// db/schema/lotteryResults.ts
+
 import { pgTable, uuid, varchar, timestamp, text } from "drizzle-orm/pg-core";
 
 import { lotteryDraws } from "./lotteryDraws";
@@ -16,14 +18,6 @@ export const lotteryResults = pgTable("lottery_results", {
   result: varchar("result", {
     length: 10,
   }).notNull(),
-
-  setValue: varchar("set_value", {
-    length: 20,
-  }),
-
-  value: varchar("value", {
-    length: 20,
-  }),
 
   note: text("note"),
 
