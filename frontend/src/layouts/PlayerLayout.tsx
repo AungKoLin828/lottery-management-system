@@ -58,6 +58,22 @@ type WalletBalanceResponse = {
 };
 
 /* ============================================================
+   WALLET BALANCE UPDATE EVENT
+============================================================ */
+
+/*
+ * Other wallet pages can call:
+ *
+ * window.dispatchEvent(new Event("wallet-balance-updated"));
+ *
+ * after a successful deposit / withdraw / wallet transaction.
+ *
+ * PlayerLayout listens for this event and reloads the balance
+ * without refreshing the page.
+ */
+export const WALLET_BALANCE_UPDATED_EVENT = "wallet-balance-updated";
+
+/* ============================================================
    PLAY NAVIGATION
 ============================================================ */
 
@@ -136,7 +152,9 @@ export default function PlayerLayout() {
   ============================================================ */
 
   const [playMenuOpen, setPlayMenuOpen] = useState(false);
+
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   /* ============================================================
@@ -144,6 +162,7 @@ export default function PlayerLayout() {
   ============================================================ */
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const [mobilePlayOpen, setMobilePlayOpen] = useState(false);
 
   /* ============================================================
@@ -157,7 +176,9 @@ export default function PlayerLayout() {
   ============================================================ */
 
   const profileMenuRef = useRef<HTMLDivElement>(null);
+
   const playMenuRef = useRef<HTMLDivElement>(null);
+
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
   /* ============================================================
@@ -195,16 +216,13 @@ export default function PlayerLayout() {
       const contentType = response.headers.get("content-type") || "";
 
       /*
-       * Read response as text first.
+       * Read as text first.
        *
-       * This prevents response.json() from crashing
-       * when Netlify returns HTML instead of JSON.
+       * This prevents JSON parsing errors when Netlify
+       * temporarily returns HTML or another response.
        */
       const rawResponse = await response.text();
 
-      /*
-       * Empty response
-       */
       if (!rawResponse.trim()) {
         console.error("Wallet balance API returned an empty response", {
           status: response.status,
@@ -214,9 +232,6 @@ export default function PlayerLayout() {
         return;
       }
 
-      /*
-       * Parse JSON manually.
-       */
       let result: WalletBalanceResponse;
 
       try {
@@ -233,7 +248,7 @@ export default function PlayerLayout() {
       }
 
       /*
-       * API error
+       * API error.
        */
       if (!response.ok || result.success === false) {
         console.error("Failed to load player wallet balance", {
@@ -262,9 +277,6 @@ export default function PlayerLayout() {
 
       const numericBalance = Number(balance);
 
-      /*
-       * Invalid balance
-       */
       if (!Number.isFinite(numericBalance)) {
         console.error("Invalid wallet balance returned by API", {
           balance,
@@ -275,15 +287,15 @@ export default function PlayerLayout() {
       }
 
       /*
-       * Update React state.
+       * IMPORTANT:
        *
-       * This updates the desktop/mobile balance immediately
-       * without reloading the page.
+       * React state update immediately updates the existing
+       * Balance display without refreshing the page.
        */
       setWalletBalance(numericBalance);
     } catch (error) {
       /*
-       * Do not break PlayerLayout if wallet API
+       * Do not break PlayerLayout if the wallet API
        * temporarily fails.
        */
       console.error("Wallet balance loading error:", error);
@@ -299,35 +311,12 @@ export default function PlayerLayout() {
   }, [loadWalletBalance]);
 
   /* ============================================================
-     LISTEN FOR WALLET BALANCE UPDATES
-     
-     Other pages can call:
-
-       window.dispatchEvent(
-         new Event("wallet-balance-updated")
-       );
-
-     This causes PlayerLayout to reload the balance
-     from the database without refreshing the page.
+     REFRESH WALLET BALANCE AFTER ROUTE CHANGE
   ============================================================ */
 
   useEffect(() => {
-    const handleWalletBalanceUpdated = () => {
-      void loadWalletBalance();
-    };
-
-    window.addEventListener(
-      "wallet-balance-updated",
-      handleWalletBalanceUpdated,
-    );
-
-    return () => {
-      window.removeEventListener(
-        "wallet-balance-updated",
-        handleWalletBalanceUpdated,
-      );
-    };
-  }, [loadWalletBalance]);
+    void loadWalletBalance();
+  }, [location.pathname, loadWalletBalance]);
 
   /* ============================================================
      REFRESH WHEN PAGE BECOMES VISIBLE
@@ -348,12 +337,50 @@ export default function PlayerLayout() {
   }, [loadWalletBalance]);
 
   /* ============================================================
-     REFRESH AFTER ROUTE CHANGE
+     REAL-TIME WALLET BALANCE UPDATE EVENT
   ============================================================ */
 
   useEffect(() => {
-    void loadWalletBalance();
-  }, [location.pathname, loadWalletBalance]);
+    const handleWalletBalanceUpdated = () => {
+      void loadWalletBalance();
+    };
+
+    window.addEventListener(
+      WALLET_BALANCE_UPDATED_EVENT,
+      handleWalletBalanceUpdated,
+    );
+
+    return () => {
+      window.removeEventListener(
+        WALLET_BALANCE_UPDATED_EVENT,
+        handleWalletBalanceUpdated,
+      );
+    };
+  }, [loadWalletBalance]);
+
+  /* ============================================================
+     WALLET BALANCE FALLBACK REFRESH
+  ============================================================ */
+
+  /*
+   * This is a fallback for cases where another page updates
+   * the database but does not dispatch the custom event.
+   *
+   * It does NOT refresh the browser page.
+   *
+   * It only requests the latest wallet balance from the API.
+   */
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadWalletBalance();
+      }
+    }, 10000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [loadWalletBalance]);
 
   /* ============================================================
      CLOSE EVERYTHING
@@ -549,9 +576,6 @@ export default function PlayerLayout() {
         }
       }
 
-      /*
-       * Remove current page
-       */
       if (
         history.length > 0 &&
         history[history.length - 1] === location.pathname
@@ -559,27 +583,15 @@ export default function PlayerLayout() {
         history.pop();
       }
 
-      /*
-       * Previous player page
-       */
       const previousPlayerPage = history[history.length - 1];
 
-      /*
-       * Save updated history
-       */
       sessionStorage.setItem(PLAYER_HISTORY_KEY, JSON.stringify(history));
 
-      /*
-       * Navigate to previous player page
-       */
       if (previousPlayerPage && isPlayerPath(previousPlayerPage)) {
         navigate(previousPlayerPage);
         return;
       }
 
-      /*
-       * Safe fallback
-       */
       navigate("/player");
     } catch {
       navigate("/player");
@@ -689,7 +701,7 @@ export default function PlayerLayout() {
       ======================================================= */}
 
       <header className="sticky top-0 z-50 border-b border-slate-700/80 bg-slate-900/95 backdrop-blur-xl">
-        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
           {/* LOGO */}
 
           <NavLink
@@ -714,7 +726,7 @@ export default function PlayerLayout() {
 
           {/* DESKTOP NAVIGATION */}
 
-          <nav className="hidden items-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 lg:flex">
+          <nav className="hidden min-w-0 items-center justify-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 lg:flex">
             {/* DASHBOARD */}
 
             <NavLink to="/player" end className={navClass}>
@@ -775,6 +787,7 @@ export default function PlayerLayout() {
 
                   {playNavigation.map((item, index) => {
                     const Icon = item.icon;
+
                     const is2D = index === 0;
 
                     return (
@@ -826,26 +839,23 @@ export default function PlayerLayout() {
 
             {/* WALLET */}
 
-            <NavLink
-              to="/player/wallet"
-              className={({ isActive }) =>
-                `group flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
-                  isActive
-                    ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
-                    : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
-                }`
-              }
-            >
+            {/*
+             * IMPORTANT:
+             *
+             * The balance amount is intentionally NOT displayed
+             * inside this Wallet menu item.
+             *
+             * The existing desktop Balance box on the right is
+             * the single desktop balance display.
+             *
+             * This prevents the desktop navigation from becoming
+             * too wide and hiding/squeezing the existing Balance
+             * display.
+             */}
+
+            <NavLink to="/player/wallet" className={navClass}>
               <WalletCards size={17} />
-
-              <span>Wallet</span>
-
-              <span
-                className="ml-0.5 rounded-lg bg-emerald-500/10 px-2 py-1 text-[10px] font-bold leading-none text-emerald-400 ring-1 ring-emerald-500/10"
-                title="Wallet balance"
-              >
-                {formattedWalletBalance} MMK
-              </span>
+              Wallet
             </NavLink>
 
             {/* MORE */}
@@ -900,6 +910,7 @@ export default function PlayerLayout() {
                         }
                       >
                         <Icon size={17} />
+
                         {item.name}
                       </NavLink>
                     );
@@ -911,13 +922,13 @@ export default function PlayerLayout() {
 
           {/* RIGHT SIDE */}
 
-          <div className="flex items-center gap-2">
-            {/* WALLET BALANCE */}
+          <div className="flex shrink-0 items-center gap-2">
+            {/* EXISTING DESKTOP BALANCE */}
 
             <NavLink
               to="/player/wallet"
               onClick={closeAllMenus}
-              className="hidden items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 transition-all hover:border-emerald-400/30 hover:bg-emerald-500/15 sm:flex"
+              className="hidden shrink-0 items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 transition-all hover:border-emerald-400/30 hover:bg-emerald-500/15 sm:flex"
             >
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-800 text-emerald-400">
                 <WalletCards size={16} />
@@ -928,7 +939,7 @@ export default function PlayerLayout() {
                   Balance
                 </p>
 
-                <p className="text-sm font-bold text-white">
+                <p className="whitespace-nowrap text-sm font-bold text-white">
                   {formattedWalletBalance} MMK
                 </p>
               </div>
@@ -936,13 +947,16 @@ export default function PlayerLayout() {
 
             {/* DESKTOP NOTIFICATIONS */}
 
-            <div className="hidden rounded-xl sm:block">
+            <div className="hidden shrink-0 rounded-xl sm:block">
               <NotificationBell role="PLAYER" />
             </div>
 
             {/* PROFILE */}
 
-            <div ref={profileMenuRef} className="relative hidden sm:block">
+            <div
+              ref={profileMenuRef}
+              className="relative hidden shrink-0 sm:block"
+            >
               <button
                 type="button"
                 onClick={toggleProfileMenu}
@@ -1051,6 +1065,8 @@ export default function PlayerLayout() {
         {mobileMenuOpen && (
           <div className="border-t border-slate-700 bg-slate-900 lg:hidden">
             <nav className="mx-auto max-w-7xl space-y-1 px-3 py-3 sm:px-5">
+              {/* DASHBOARD */}
+
               <NavLink
                 to="/player"
                 end
@@ -1127,6 +1143,8 @@ export default function PlayerLayout() {
 
                 {mobilePlayOpen && (
                   <div className="mt-1 space-y-1 border-t border-slate-700 pt-1">
+                    {/* 2D */}
+
                     <NavLink
                       to="/player/play-2d"
                       onClick={handleMobileNavigation}
@@ -1152,6 +1170,8 @@ export default function PlayerLayout() {
                         </p>
                       </div>
                     </NavLink>
+
+                    {/* 3D */}
 
                     <NavLink
                       to="/player/play-3d"
@@ -1229,6 +1249,8 @@ export default function PlayerLayout() {
               {/* MORE SECTION */}
 
               <div className="mt-2 border-t border-slate-700 pt-2">
+                {/* RESULTS + CONTACT */}
+
                 {moreNavigation.map((item) => {
                   const Icon = item.icon;
 
