@@ -50,9 +50,8 @@ const INITIAL_USAGE: Record<Session2D, NumberUsage> = {
    NUMBER LIST
 ============================================================ */
 
-const NUMBER_LIST = Array.from(
-  { length: 100 },
-  (_, index) => index.toString().padStart(2, "0"),
+const NUMBER_LIST = Array.from({ length: 100 }, (_, index) =>
+  index.toString().padStart(2, "0"),
 );
 
 /* ============================================================
@@ -62,17 +61,13 @@ const NUMBER_LIST = Array.from(
 export default function Play2D() {
   const [session, setSession] = useState<Session2D>("AM");
 
-  const [selectedNumbers, setSelectedNumbers] = useState<string[]>(
-    [],
-  );
+  const [selectedNumbers, setSelectedNumbers] = useState<string[]>([]);
 
   const [amount, setAmount] = useState("");
 
   const [bets, setBets] = useState<Bet2D[]>([]);
 
-  const [editingBetId, setEditingBetId] = useState<string | null>(
-    null,
-  );
+  const [editingBetId, setEditingBetId] = useState<string | null>(null);
 
   const [editingAmount, setEditingAmount] = useState("");
 
@@ -81,8 +76,7 @@ export default function Play2D() {
    */
   const [mobileBetsOpen, setMobileBetsOpen] = useState(false);
 
-  const [numberUsage] =
-    useState<Record<Session2D, NumberUsage>>(INITIAL_USAGE);
+  const [numberUsage] = useState<Record<Session2D, NumberUsage>>(INITIAL_USAGE);
 
   /* ============================================================
      CALCULATIONS
@@ -114,19 +108,13 @@ export default function Play2D() {
   };
 
   const getRemainingAmount = (number: string) => {
-    return Math.max(
-      MAX_BET_AMOUNT - getUsedAmount(number),
-      0,
-    );
+    return Math.max(MAX_BET_AMOUNT - getUsedAmount(number), 0);
   };
 
   const getProgress = (number: string) => {
     const used = getUsedAmount(number);
 
-    return Math.min(
-      (used / MAX_BET_AMOUNT) * 100,
-      100,
-    );
+    return Math.min((used / MAX_BET_AMOUNT) * 100, 100);
   };
 
   const isBlocked = (number: string) => {
@@ -175,9 +163,7 @@ export default function Play2D() {
 
   const selectAllAvailable = () => {
     const availableNumbers = NUMBER_LIST.filter(
-      (item) =>
-        !isBlocked(item) &&
-        !isLimitReached(item),
+      (item) => !isBlocked(item) && !isLimitReached(item),
     );
 
     setSelectedNumbers(availableNumbers);
@@ -194,21 +180,14 @@ export default function Play2D() {
   const addBet = () => {
     const betAmount = Number(amount);
 
-    if (
-      selectedNumbers.length === 0 ||
-      !betAmount ||
-      betAmount <= 0
-    ) {
+    if (selectedNumbers.length === 0 || !betAmount || betAmount <= 0) {
       return;
     }
 
     const validNumbers = selectedNumbers.filter((item) => {
       const remaining = getRemainingAmount(item);
 
-      return (
-        !isBlocked(item) &&
-        remaining >= betAmount
-      );
+      return !isBlocked(item) && remaining >= betAmount;
     });
 
     if (validNumbers.length === 0) {
@@ -271,9 +250,7 @@ export default function Play2D() {
     const currentAmount = bet.amount;
     const usedAmount = getUsedAmount(bet.number);
 
-    const availableForEdit =
-      MAX_BET_AMOUNT -
-      (usedAmount - currentAmount);
+    const availableForEdit = MAX_BET_AMOUNT - (usedAmount - currentAmount);
 
     if (newAmount > availableForEdit) {
       return;
@@ -298,9 +275,7 @@ export default function Play2D() {
   ============================================================ */
 
   const removeBet = (id: string) => {
-    setBets((current) =>
-      current.filter((bet) => bet.id !== id),
-    );
+    setBets((current) => current.filter((bet) => bet.id !== id));
 
     if (editingBetId === id) {
       cancelEditBet();
@@ -325,8 +300,7 @@ export default function Play2D() {
      FORMAT
   ============================================================ */
 
-  const formatAmount = (value: number) =>
-    value.toLocaleString();
+  const formatAmount = (value: number) => value.toLocaleString();
 
   /* ============================================================
      MOBILE MODAL BODY LOCK
@@ -352,17 +326,12 @@ export default function Play2D() {
      Used inside mobile modal to keep cards small.
   ============================================================ */
 
-  const renderBetCard = (
-    bet: Bet2D,
-    compact = false,
-  ) => {
+  const renderBetCard = (bet: Bet2D, compact = false) => {
     const isEditing = editingBetId === bet.id;
 
     const usedAmount = getUsedAmount(bet.number);
 
-    const maxEditableAmount =
-      MAX_BET_AMOUNT -
-      (usedAmount - bet.amount);
+    const maxEditableAmount = MAX_BET_AMOUNT - (usedAmount - bet.amount);
 
     /*
      * COMPACT MOBILE CARD
@@ -390,9 +359,7 @@ export default function Play2D() {
               <div className="flex items-center gap-1.5">
                 <span
                   className={`rounded px-1.5 py-0.5 text-[8px] font-bold leading-none text-white ${
-                    bet.session === "AM"
-                      ? "bg-blue-500"
-                      : "bg-emerald-500"
+                    bet.session === "AM" ? "bg-blue-500" : "bg-emerald-500"
                   }`}
                 >
                   {bet.session}
@@ -460,9 +427,7 @@ export default function Play2D() {
                     min="100"
                     max={maxEditableAmount}
                     value={editingAmount}
-                    onChange={(event) =>
-                      setEditingAmount(event.target.value)
-                    }
+                    onChange={(event) => setEditingAmount(event.target.value)}
                     autoFocus
                     className="w-full rounded-md border border-emerald-300 bg-white px-2.5 py-1.5 pr-10 text-xs font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-50"
                   />
@@ -478,8 +443,7 @@ export default function Play2D() {
                   disabled={
                     !Number(editingAmount) ||
                     Number(editingAmount) < 100 ||
-                    Number(editingAmount) >
-                      maxEditableAmount
+                    Number(editingAmount) > maxEditableAmount
                   }
                   className="rounded-md bg-emerald-600 px-2.5 text-[10px] font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
@@ -528,9 +492,7 @@ export default function Play2D() {
               <div className="flex items-center gap-2">
                 <span
                   className={`rounded-md px-2 py-0.5 text-[10px] font-bold text-white ${
-                    bet.session === "AM"
-                      ? "bg-blue-500"
-                      : "bg-emerald-500"
+                    bet.session === "AM" ? "bg-blue-500" : "bg-emerald-500"
                   }`}
                 >
                   {bet.session}
@@ -587,9 +549,7 @@ export default function Play2D() {
                   min="100"
                   max={maxEditableAmount}
                   value={editingAmount}
-                  onChange={(event) =>
-                    setEditingAmount(event.target.value)
-                  }
+                  onChange={(event) => setEditingAmount(event.target.value)}
                   autoFocus
                   className="w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 pr-12 text-sm font-semibold text-slate-900 outline-none focus:ring-4 focus:ring-emerald-50"
                 />
@@ -605,8 +565,7 @@ export default function Play2D() {
                 disabled={
                   !Number(editingAmount) ||
                   Number(editingAmount) < 100 ||
-                  Number(editingAmount) >
-                    maxEditableAmount
+                  Number(editingAmount) > maxEditableAmount
                 }
                 className="rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
@@ -628,15 +587,11 @@ export default function Play2D() {
           </div>
         ) : (
           <div className="mt-3 flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-slate-100">
-            <span className="text-xs text-slate-400">
-              Amount
-            </span>
+            <span className="text-xs text-slate-400">Amount</span>
 
             <span className="text-sm font-bold text-slate-800">
               {formatAmount(bet.amount)}{" "}
-              <span className="text-xs font-semibold text-slate-400">
-                MMK
-              </span>
+              <span className="text-xs font-semibold text-slate-400">MMK</span>
             </span>
           </div>
         )}
@@ -656,17 +611,11 @@ export default function Play2D() {
 
       <div>
         <div className="flex items-center gap-1 text-sm font-semibold">
-          <span className="text-slate-500">
-            Lottery
-          </span>
+          <span className="text-slate-500">Lottery</span>
 
-          <span className="text-emerald-600">
-            /
-          </span>
+          <span className="text-emerald-600">/</span>
 
-          <span className="text-emerald-600">
-            Play
-          </span>
+          <span className="text-emerald-600">Play</span>
         </div>
 
         <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
@@ -696,9 +645,7 @@ export default function Play2D() {
             </div>
 
             <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                Place 2D Bet
-              </h2>
+              <h2 className="text-lg font-bold text-slate-900">Place 2D Bet</h2>
 
               <p className="text-xs text-slate-400">
                 Choose one or more numbers
@@ -716,40 +663,33 @@ export default function Play2D() {
             </label>
 
             <div className="grid grid-cols-2 gap-2.5">
-              {(["AM", "PM"] as Session2D[]).map(
-                (item) => {
-                  const active = session === item;
+              {(["AM", "PM"] as Session2D[]).map((item) => {
+                const active = session === item;
 
-                  return (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() =>
-                        changeSession(item)
-                      }
-                      className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${
-                        active
-                          ? item === "AM"
-                            ? "border-blue-400 bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md shadow-blue-100"
-                            : "border-emerald-400 bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md shadow-emerald-100"
-                          : "border-slate-200 bg-slate-50 text-slate-500 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600"
-                      }`}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <span
-                          className={`h-2 w-2 rounded-full ${
-                            active
-                              ? "bg-white"
-                              : "bg-slate-300"
-                          }`}
-                        />
-
-                        {item} Session
-                      </div>
-                    </button>
-                  );
-                },
-              )}
+                return (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => changeSession(item)}
+                    className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                      active
+                        ? item === "AM"
+                          ? "border-blue-400 bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md shadow-blue-100"
+                          : "border-emerald-400 bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md shadow-emerald-100"
+                        : "border-slate-200 bg-slate-50 text-slate-500 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600"
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          active ? "bg-white" : "bg-slate-300"
+                        }`}
+                      />
+                      {item} Session
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -783,9 +723,7 @@ export default function Play2D() {
                 <button
                   type="button"
                   onClick={clearSelection}
-                  disabled={
-                    selectedNumbers.length === 0
-                  }
+                  disabled={selectedNumbers.length === 0}
                   className="rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Clear
@@ -795,60 +733,53 @@ export default function Play2D() {
 
             {/* NUMBER GRID */}
 
-            <div className="mt-3 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 p-2.5 shadow-inner sm:p-3">
-              <div className="grid grid-cols-10 gap-1">
+            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-2.5 sm:p-3">
+              <div className="grid grid-cols-5 gap-2">
                 {NUMBER_LIST.map((item) => {
                   const selected = isSelected(item);
 
                   const blocked = isBlocked(item);
 
-                  const limitReached =
-                    isLimitReached(item);
+                  const limitReached = isLimitReached(item);
 
                   const used = getUsedAmount(item);
 
                   const progress = getProgress(item);
 
-                  const unavailable =
-                    blocked || limitReached;
+                  const unavailable = blocked || limitReached;
 
-                  const nearLimit =
-                    progress >= 80 &&
-                    progress < 100;
+                  const nearLimit = progress >= 80 && progress < 100;
 
                   return (
                     <button
                       key={item}
                       type="button"
                       disabled={unavailable}
-                      onClick={() =>
-                        toggleNumber(item)
-                      }
+                      onClick={() => toggleNumber(item)}
                       title={
                         blocked
                           ? `${item} is blocked`
                           : limitReached
                             ? `${item} is full`
                             : `${formatAmount(
-                                getRemainingAmount(
-                                  item,
-                                ),
+                                getRemainingAmount(item),
                               )} MMK remaining`
                       }
                       className={`
                         relative flex
-                        h-8
+                        h-11
                         min-w-0
                         flex-col
                         items-center
                         justify-center
                         overflow-hidden
-                        rounded-md
+                        rounded-lg
                         border
-                        px-0
+                        px-1
                         transition-all
                         duration-150
-                        sm:h-9
+                        active:scale-[0.97]
+                        sm:h-12
 
                         ${
                           blocked
@@ -856,32 +787,26 @@ export default function Play2D() {
                             : limitReached
                               ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
                               : selected
-                                ? "border-emerald-600 bg-emerald-600 text-white shadow-md shadow-emerald-200 ring-1 ring-emerald-500"
+                                ? "border-emerald-600 bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-100"
                                 : nearLimit
-                                  ? "border-orange-300 bg-orange-100 text-orange-800 hover:border-orange-400 hover:bg-orange-200"
-                                  : "border-slate-200 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-sm"
+                                  ? "border-amber-300 bg-amber-50 text-amber-800 hover:border-amber-400 hover:bg-amber-100"
+                                  : "border-slate-200 bg-white text-slate-700 shadow-sm hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700"
                         }
                       `}
                     >
                       <div className="flex items-center justify-center gap-0.5">
-                        {blocked && (
-                          <Lock className="h-2 w-2" />
-                        )}
+                        {blocked && <Lock className="h-2 w-2" />}
 
-                        {selected && (
-                          <Check className="h-2 w-2" />
-                        )}
+                        {selected && <Check className="h-2 w-2" />}
 
-                        <span className="text-[10px] font-bold leading-none sm:text-[11px]">
+                        <span className="text-sm font-extrabold leading-none tracking-wide sm:text-base">
                           {item}
                         </span>
                       </div>
 
                       <div
-                        className={`mt-0.5 h-0.5 w-3/4 overflow-hidden rounded-full ${
-                          selected
-                            ? "bg-white/40"
-                            : "bg-slate-200"
+                        className={`mt-1 h-1 w-4/5 overflow-hidden rounded-full ${
+                          selected ? "bg-white/30" : "bg-slate-100"
                         }`}
                       >
                         <div
@@ -893,7 +818,7 @@ export default function Play2D() {
                                 : selected
                                   ? "bg-white"
                                   : nearLimit
-                                    ? "bg-orange-400"
+                                    ? "bg-amber-400"
                                     : "bg-emerald-400"
                           }`}
                           style={{
@@ -903,15 +828,15 @@ export default function Play2D() {
                       </div>
 
                       <span
-                        className={`mt-0.5 text-[6px] font-medium leading-none ${
+                        className={`mt-1 text-[7px] font-semibold leading-none ${
                           selected
                             ? "text-emerald-100"
                             : blocked
-                              ? "text-red-300"
+                              ? "text-red-400"
                               : limitReached
                                 ? "text-slate-400"
                                 : nearLimit
-                                  ? "text-orange-500"
+                                  ? "text-amber-600"
                                   : "text-slate-400"
                         }`}
                       >
@@ -975,9 +900,7 @@ export default function Play2D() {
 
                 <p className="mt-0.5 text-lg font-bold text-teal-800">
                   {formatAmount(selectedTotal)}{" "}
-                  <span className="text-xs">
-                    MMK
-                  </span>
+                  <span className="text-xs">MMK</span>
                 </p>
               </div>
             </div>
@@ -988,9 +911,7 @@ export default function Play2D() {
                   <button
                     key={item}
                     type="button"
-                    onClick={() =>
-                      toggleNumber(item)
-                    }
+                    onClick={() => toggleNumber(item)}
                     className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white shadow-sm transition hover:bg-emerald-700"
                   >
                     {item}
@@ -1015,9 +936,7 @@ export default function Play2D() {
               <input
                 type="number"
                 value={amount}
-                onChange={(event) =>
-                  setAmount(event.target.value)
-                }
+                onChange={(event) => setAmount(event.target.value)}
                 placeholder="Enter amount"
                 min="100"
                 className="w-full rounded-xl border border-emerald-200 bg-emerald-50/50 px-4 py-3 pr-16 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
@@ -1048,7 +967,6 @@ export default function Play2D() {
             className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 px-5 py-3 font-semibold text-white shadow-md shadow-emerald-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-emerald-700 hover:via-green-700 hover:to-teal-700 hover:shadow-lg disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none"
           >
             <Dice5 className="h-4 w-4" />
-
             Add{" "}
             {selectedNumbers.length > 0
               ? `${selectedNumbers.length} Numbers`
@@ -1161,9 +1079,7 @@ export default function Play2D() {
                 {bets.length === 0
                   ? "No bets selected"
                   : `${bets.length} ${
-                      bets.length === 1
-                        ? "bet"
-                        : "bets"
+                      bets.length === 1 ? "bet" : "bets"
                     } selected`}
               </p>
             </div>
@@ -1173,9 +1089,7 @@ export default function Play2D() {
 
           <div className="flex shrink-0 items-center gap-3">
             <div className="text-right">
-              <p className="text-[10px] font-medium text-emerald-100">
-                Total
-              </p>
+              <p className="text-[10px] font-medium text-emerald-100">Total</p>
 
               <p className="text-sm font-extrabold">
                 {formatAmount(totalAmount)} MMK
@@ -1247,9 +1161,7 @@ export default function Play2D() {
 
               <button
                 type="button"
-                onClick={() =>
-                  setMobileBetsOpen(false)
-                }
+                onClick={() => setMobileBetsOpen(false)}
                 className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
                 aria-label="Close selected bets"
               >
@@ -1273,15 +1185,12 @@ export default function Play2D() {
                   </p>
 
                   <p className="mt-1 max-w-xs text-[10px] leading-4 text-slate-400">
-                    Select numbers, enter your amount,
-                    then add the bet.
+                    Select numbers, enter your amount, then add the bet.
                   </p>
 
                   <button
                     type="button"
-                    onClick={() =>
-                      setMobileBetsOpen(false)
-                    }
+                    onClick={() => setMobileBetsOpen(false)}
                     className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-emerald-700"
                   >
                     Choose Numbers
@@ -1289,9 +1198,7 @@ export default function Play2D() {
                 </div>
               ) : (
                 <div className="space-y-1.5">
-                  {bets.map((bet) =>
-                    renderBetCard(bet, true),
-                  )}
+                  {bets.map((bet) => renderBetCard(bet, true))}
                 </div>
               )}
             </div>
