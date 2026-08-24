@@ -27,6 +27,8 @@ export default function PlayerList() {
 
   const [saving, setSaving] = useState(false);
 
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const [error, setError] = useState("");
 
   const [openModal, setOpenModal] = useState(false);
@@ -109,24 +111,20 @@ export default function PlayerList() {
         throw new Error(result.message || "Failed to load users.");
       }
 
-      /*
-       * IMPORTANT:
-       *
-       * Display ALL users returned by the API.
-       *
-       * No role filtering is performed here.
-       *
-       * Therefore:
-       * PLAYER -> displayed
-       * ADMIN  -> displayed
-       */
       const allUsers = Array.isArray(result.data?.users)
         ? result.data.users
         : [];
 
       setUsers(allUsers);
 
-      setCurrentPage(1);
+      setCurrentPage((page) => {
+        const newTotalPages = Math.max(
+          1,
+          Math.ceil(allUsers.length / itemsPerPage),
+        );
+
+        return page > newTotalPages ? newTotalPages : page;
+      });
     } catch (error) {
       console.error("Load users error:", error);
 
@@ -138,7 +136,7 @@ export default function PlayerList() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [itemsPerPage]);
 
   /* ==========================================================
      INITIAL LOAD
@@ -204,7 +202,7 @@ export default function PlayerList() {
   ========================================================== */
 
   const closeModal = () => {
-    if (saving) {
+    if (saving || deletingId) {
       return;
     }
 
@@ -309,14 +307,34 @@ export default function PlayerList() {
 
   /* ==========================================================
      TOGGLE STATUS
+     
+     ADMIN accounts cannot be disabled/enabled from this page.
   ========================================================== */
 
   const toggleStatus = async (user: User) => {
+    /*
+     * Protect ADMIN accounts.
+     *
+     * The Disable/Enable button is also disabled in the UI,
+     * but this check prevents accidental calls if the function
+     * is triggered another way.
+     */
+    if (user.role === "ADMIN") {
+      setError("Admin accounts cannot be disabled or enabled.");
+      return;
+    }
+
+    if (saving || deletingId) {
+      return;
+    }
+
     setError("");
 
     const status: UserStatus = user.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
 
     try {
+      setSaving(true);
+
       const response = await fetch(
         `/api/admin/users/${encodeURIComponent(user.id)}`,
         {
@@ -357,6 +375,109 @@ export default function PlayerList() {
       setError(
         error instanceof Error ? error.message : "Failed to update status.",
       );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* ==========================================================
+     DELETE USER
+  ========================================================== */
+
+  const handleDelete = async (user: User) => {
+    /*
+     * Protect ADMIN accounts.
+     *
+     * Admin accounts cannot be deleted from Player List.
+     */
+    if (user.role === "ADMIN") {
+      setError("Admin accounts cannot be deleted.");
+      return;
+    }
+
+    if (saving || deletingId) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete user "${user.username}"?\n\nThis action cannot be undone.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+
+    setDeletingId(user.id);
+
+    try {
+      const response = await fetch(
+        `/api/admin/users/${encodeURIComponent(user.id)}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+          },
+        },
+      );
+
+      const contentType = response.headers.get("content-type") || "";
+
+      if (!contentType.toLowerCase().includes("application/json")) {
+        const text = await response.text();
+
+        console.error(
+          "Delete user API returned non-JSON:",
+          text.slice(0, 1000),
+        );
+
+        throw new Error(
+          `API returned ${response.status} ${response.statusText} instead of JSON.`,
+        );
+      }
+
+      const result = (await response.json()) as ApiResponse;
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to delete user.");
+      }
+
+      /*
+       * Remove immediately from local state.
+       */
+      setUsers((currentUsers) =>
+        currentUsers.filter((currentUser) => currentUser.id !== user.id),
+      );
+
+      /*
+       * Keep pagination valid after deletion.
+       */
+      setCurrentPage((page) => {
+        const remainingUsers = users.length - 1;
+
+        const newTotalPages = Math.max(
+          1,
+          Math.ceil(remainingUsers / itemsPerPage),
+        );
+
+        return Math.min(page, newTotalPages);
+      });
+
+      /*
+       * Reload from database to make sure the UI
+       * is synchronized with the backend.
+       */
+      await loadUsers();
+    } catch (error) {
+      console.error("Delete user error:", error);
+
+      setError(
+        error instanceof Error ? error.message : "Failed to delete user.",
+      );
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -451,7 +572,7 @@ export default function PlayerList() {
         ==================================================== */}
 
         <div className="hidden overflow-x-auto md:block">
-          <table className="min-w-[1050px] w-full">
+          <table className="min-w-[1200px] w-full">
             <thead>
               <tr className="bg-gray-100 text-left text-sm text-gray-600">
                 <th className="p-3">Username</th>
@@ -480,78 +601,95 @@ export default function PlayerList() {
                   </td>
                 </tr>
               ) : (
-                paginatedUsers.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="border-b last:border-b-0 hover:bg-gray-50"
-                  >
-                    <td className="p-3 font-medium">{user.username}</td>
+                paginatedUsers.map((user) => {
+                  const isAdmin = user.role === "ADMIN";
+                  const isDeleting = deletingId === user.id;
 
-                    <td className="p-3">{user.fullName || "-"}</td>
+                  return (
+                    <tr
+                      key={user.id}
+                      className="border-b last:border-b-0 hover:bg-gray-50"
+                    >
+                      <td className="p-3 font-medium">{user.username}</td>
 
-                    <td className="p-3">{user.phone || "-"}</td>
+                      <td className="p-3">{user.fullName || "-"}</td>
 
-                    <td className="p-3">{user.email || "-"}</td>
+                      <td className="p-3">{user.phone || "-"}</td>
 
-                    <td className="p-3">
-                      <span
-                        className={
-                          user.role === "ADMIN"
-                            ? "rounded-full bg-purple-100 px-2.5 py-1 text-xs font-semibold text-purple-700"
-                            : "rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700"
-                        }
-                      >
-                        {user.role}
-                      </span>
-                    </td>
+                      <td className="p-3">{user.email || "-"}</td>
 
-                    <td className="p-3">
-                      <span
-                        className={
-                          user.status === "ACTIVE"
-                            ? "rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700"
-                            : user.status === "SUSPENDED"
-                              ? "rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700"
-                              : "rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700"
-                        }
-                      >
-                        {user.status}
-                      </span>
-                    </td>
-
-                    <td className="p-3">
-                      {user.isVerified ? (
-                        <span className="font-medium text-green-600">Yes</span>
-                      ) : (
-                        <span className="text-gray-400">No</span>
-                      )}
-                    </td>
-
-                    <td className="p-3 text-sm text-gray-500">
-                      {formatDate(user.createdAt)}
-                    </td>
-
-                    <td className="p-3">
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => openEdit(user)}
-                        >
-                          Edit
-                        </Button>
-
-                        <Button
-                          variant={
-                            user.status === "ACTIVE" ? "danger" : "success"
+                      <td className="p-3">
+                        <span
+                          className={
+                            isAdmin
+                              ? "rounded-full bg-purple-100 px-2.5 py-1 text-xs font-semibold text-purple-700"
+                              : "rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700"
                           }
-                          onClick={() => void toggleStatus(user)}
                         >
-                          {user.status === "ACTIVE" ? "Disable" : "Enable"}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          {user.role}
+                        </span>
+                      </td>
+
+                      <td className="p-3">
+                        <span
+                          className={
+                            user.status === "ACTIVE"
+                              ? "rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700"
+                              : user.status === "SUSPENDED"
+                                ? "rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700"
+                                : "rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700"
+                          }
+                        >
+                          {user.status}
+                        </span>
+                      </td>
+
+                      <td className="p-3">
+                        {user.isVerified ? (
+                          <span className="font-medium text-green-600">
+                            Yes
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">No</span>
+                        )}
+                      </td>
+
+                      <td className="p-3 text-sm text-gray-500">
+                        {formatDate(user.createdAt)}
+                      </td>
+
+                      <td className="p-3">
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            disabled={saving || deletingId !== null}
+                            onClick={() => openEdit(user)}
+                          >
+                            Edit
+                          </Button>
+
+                          <Button
+                            variant={
+                              user.status === "ACTIVE" ? "danger" : "success"
+                            }
+                            disabled={isAdmin || saving || deletingId !== null}
+                            onClick={() => void toggleStatus(user)}
+                          >
+                            {user.status === "ACTIVE" ? "Disable" : "Enable"}
+                          </Button>
+
+                          <Button
+                            variant="danger"
+                            disabled={isAdmin || saving || deletingId !== null}
+                            onClick={() => void handleDelete(user)}
+                          >
+                            {isDeleting ? "Deleting..." : "Delete"}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -570,98 +708,118 @@ export default function PlayerList() {
             <div className="p-8 text-center text-gray-500">No users found.</div>
           ) : (
             <div className="divide-y">
-              {paginatedUsers.map((user) => (
-                <div key={user.id} className="p-4">
-                  {/* USER HEADER */}
+              {paginatedUsers.map((user) => {
+                const isAdmin = user.role === "ADMIN";
+                const isDeleting = deletingId === user.id;
 
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="truncate font-semibold text-gray-900">
-                        {user.username}
-                      </h3>
+                return (
+                  <div key={user.id} className="p-4">
+                    {/* USER HEADER */}
 
-                      <p className="mt-1 text-sm text-gray-500">
-                        {user.fullName || "-"}
-                      </p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate font-semibold text-gray-900">
+                          {user.username}
+                        </h3>
+
+                        <p className="mt-1 text-sm text-gray-500">
+                          {user.fullName || "-"}
+                        </p>
+                      </div>
+
+                      <span
+                        className={
+                          user.status === "ACTIVE"
+                            ? "rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700"
+                            : user.status === "SUSPENDED"
+                              ? "rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700"
+                              : "rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700"
+                        }
+                      >
+                        {user.status}
+                      </span>
                     </div>
 
-                    <span
-                      className={
-                        user.status === "ACTIVE"
-                          ? "rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700"
-                          : user.status === "SUSPENDED"
-                            ? "rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700"
-                            : "rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700"
-                      }
-                    >
-                      {user.status}
-                    </span>
+                    {/* USER INFORMATION */}
+
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <div className="text-gray-400">Phone</div>
+
+                        <div className="font-medium">{user.phone || "-"}</div>
+                      </div>
+
+                      <div>
+                        <div className="text-gray-400">Role</div>
+
+                        <div className="font-medium">{user.role}</div>
+                      </div>
+
+                      <div>
+                        <div className="text-gray-400">Email</div>
+
+                        <div className="break-all font-medium">
+                          {user.email || "-"}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-gray-400">Verified</div>
+
+                        <div className="font-medium">
+                          {user.isVerified ? "Yes" : "No"}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-gray-400">Balance</div>
+
+                        <div className="font-semibold text-blue-600">
+                          {formatBalance(user.balance)}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-gray-400">Created</div>
+
+                        <div className="font-medium">
+                          {formatDate(user.createdAt)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ACTIONS */}
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        disabled={saving || deletingId !== null}
+                        onClick={() => openEdit(user)}
+                      >
+                        Edit
+                      </Button>
+
+                      <Button
+                        variant={
+                          user.status === "ACTIVE" ? "danger" : "success"
+                        }
+                        disabled={isAdmin || saving || deletingId !== null}
+                        onClick={() => void toggleStatus(user)}
+                      >
+                        {user.status === "ACTIVE" ? "Disable" : "Enable"}
+                      </Button>
+
+                      <Button
+                        variant="danger"
+                        disabled={isAdmin || saving || deletingId !== null}
+                        onClick={() => void handleDelete(user)}
+                      >
+                        {isDeleting ? "Deleting..." : "Delete"}
+                      </Button>
+                    </div>
                   </div>
-
-                  {/* USER INFORMATION */}
-
-                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <div className="text-gray-400">Phone</div>
-
-                      <div className="font-medium">{user.phone || "-"}</div>
-                    </div>
-
-                    <div>
-                      <div className="text-gray-400">Role</div>
-
-                      <div className="font-medium">{user.role}</div>
-                    </div>
-
-                    <div>
-                      <div className="text-gray-400">Email</div>
-
-                      <div className="break-all font-medium">
-                        {user.email || "-"}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-gray-400">Verified</div>
-
-                      <div className="font-medium">
-                        {user.isVerified ? "Yes" : "No"}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-gray-400">Balance</div>
-
-                      <div className="font-semibold text-blue-600">
-                        {formatBalance(user.balance)}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-gray-400">Created</div>
-
-                      <div className="font-medium">
-                        {formatDate(user.createdAt)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ACTIONS */}
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Button variant="outline" onClick={() => openEdit(user)}>
-                      Edit
-                    </Button>
-
-                    <Button
-                      variant={user.status === "ACTIVE" ? "danger" : "success"}
-                      onClick={() => void toggleStatus(user)}
-                    >
-                      {user.status === "ACTIVE" ? "Disable" : "Enable"}
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -823,6 +981,13 @@ export default function PlayerList() {
 
                 <strong>{formatBalance(selectedUser.balance)}</strong>
               </div>
+
+              {selectedUser.role === "ADMIN" && (
+                <div className="mt-2 rounded-md bg-purple-50 px-3 py-2 text-xs text-purple-700">
+                  Admin account: Disable/Enable and Delete actions are
+                  protected.
+                </div>
+              )}
             </div>
           )}
 
@@ -832,13 +997,17 @@ export default function PlayerList() {
             <Button
               type="button"
               variant="outline"
-              disabled={saving}
+              disabled={saving || deletingId !== null}
               onClick={closeModal}
             >
               Cancel
             </Button>
 
-            <Button type="submit" variant="success" disabled={saving}>
+            <Button
+              type="submit"
+              variant="success"
+              disabled={saving || deletingId !== null}
+            >
               {saving ? "Saving..." : "Save"}
             </Button>
           </div>

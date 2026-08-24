@@ -104,7 +104,7 @@ function getUserId(event: HandlerEvent): string | null {
   const parts = event.path.split("/").filter(Boolean);
 
   if (parts.length > 0 && parts[parts.length - 1] !== "users") {
-    return parts[parts.length - 1];
+    return decodeURIComponent(parts[parts.length - 1]);
   }
 
   return null;
@@ -150,6 +150,25 @@ function formatUser(row: {
 }
 
 /* ============================================================
+   FIND USER
+============================================================ */
+
+async function findUser(userId: string) {
+  const result = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      role: users.role,
+      status: users.status,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  return result[0] ?? null;
+}
+
+/* ============================================================
    GET USERS
 ============================================================ */
 
@@ -182,11 +201,8 @@ async function getUsers(event: HandlerEvent) {
     conditions.push(
       or(
         ilike(users.username, searchPattern),
-
         ilike(users.fullName, searchPattern),
-
         ilike(users.phone, searchPattern),
-
         ilike(users.email, searchPattern),
       ),
     );
@@ -419,7 +435,7 @@ async function createUser(event: HandlerEvent) {
   const passwordHash = await hash(password, 12);
 
   /* ----------------------------------------------------------
-     INSERT
+     INSERT USER
   ---------------------------------------------------------- */
 
   const inserted = await db
@@ -471,7 +487,7 @@ async function createUser(event: HandlerEvent) {
   }
 
   /* ----------------------------------------------------------
-     WALLET
+     CREATE WALLET
   ---------------------------------------------------------- */
 
   await db.insert(wallets).values({
@@ -559,15 +575,9 @@ async function updateUser(event: HandlerEvent, userId: string) {
     });
   }
 
-  const existing = await db
-    .select({
-      id: users.id,
-    })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
+  const existing = await findUser(userId);
 
-  if (!existing.length) {
+  if (!existing) {
     return json(404, {
       success: false,
       message: "User not found.",
@@ -579,13 +589,7 @@ async function updateUser(event: HandlerEvent, userId: string) {
       id: users.id,
     })
     .from(users)
-    .where(
-      and(
-        eq(users.username, username),
-
-        ne(users.id, userId),
-      ),
-    )
+    .where(and(eq(users.username, username), ne(users.id, userId)))
     .limit(1);
 
   if (usernameConflict.length) {
@@ -600,13 +604,7 @@ async function updateUser(event: HandlerEvent, userId: string) {
       id: users.id,
     })
     .from(users)
-    .where(
-      and(
-        eq(users.phone, phone),
-
-        ne(users.id, userId),
-      ),
-    )
+    .where(and(eq(users.phone, phone), ne(users.id, userId)))
     .limit(1);
 
   if (phoneConflict.length) {
@@ -624,13 +622,7 @@ async function updateUser(event: HandlerEvent, userId: string) {
         id: users.id,
       })
       .from(users)
-      .where(
-        and(
-          eq(users.email, normalizedEmail),
-
-          ne(users.id, userId),
-        ),
-      )
+      .where(and(eq(users.email, normalizedEmail), ne(users.id, userId)))
       .limit(1);
 
     if (emailConflict.length) {
@@ -705,18 +697,26 @@ async function updateStatus(event: HandlerEvent, userId: string) {
     });
   }
 
-  const existing = await db
-    .select({
-      id: users.id,
-    })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
+  const existing = await findUser(userId);
 
-  if (!existing.length) {
+  if (!existing) {
     return json(404, {
       success: false,
       message: "User not found.",
+    });
+  }
+
+  /* ----------------------------------------------------------
+     ADMIN STATUS PROTECTION
+     
+     Admin accounts cannot be disabled/enabled from
+     the player/user management screen.
+  ---------------------------------------------------------- */
+
+  if (existing.role === "ADMIN") {
+    return json(403, {
+      success: false,
+      message: "Admin account status cannot be changed.",
     });
   }
 
@@ -737,6 +737,60 @@ async function updateStatus(event: HandlerEvent, userId: string) {
 }
 
 /* ============================================================
+   DELETE USER
+============================================================ */
+
+async function deleteUser(_event: HandlerEvent, userId: string) {
+  /* ----------------------------------------------------------
+     FIND USER
+  ---------------------------------------------------------- */
+
+  const existing = await findUser(userId);
+
+  if (!existing) {
+    return json(404, {
+      success: false,
+      message: "User not found.",
+    });
+  }
+
+  /* ----------------------------------------------------------
+     ADMIN PROTECTION
+     
+     ADMIN accounts must never be deleted from the
+     player/user management screen.
+  ---------------------------------------------------------- */
+
+  if (existing.role === "ADMIN") {
+    return json(403, {
+      success: false,
+      message: "Admin accounts cannot be deleted.",
+    });
+  }
+
+  /* ----------------------------------------------------------
+     DELETE WALLET
+     
+     Remove the player's wallet first so that the
+     foreign-key relationship cannot prevent deletion.
+  ---------------------------------------------------------- */
+
+  await db.delete(wallets).where(eq(wallets.userId, userId));
+
+  /* ----------------------------------------------------------
+     DELETE USER
+  ---------------------------------------------------------- */
+
+  await db.delete(users).where(eq(users.id, userId));
+
+  return json(200, {
+    success: true,
+
+    message: "Player deleted successfully.",
+  });
+}
+
+/* ============================================================
    HANDLER
 ============================================================ */
 
@@ -744,19 +798,25 @@ export const handler: Handler = async (event) => {
   try {
     console.log(`[admin-users] ${event.httpMethod} ${event.path}`);
 
-    /* GET */
+    /* --------------------------------------------------------
+       GET
+    -------------------------------------------------------- */
 
     if (event.httpMethod === "GET") {
       return await getUsers(event);
     }
 
-    /* POST */
+    /* --------------------------------------------------------
+       POST
+    -------------------------------------------------------- */
 
     if (event.httpMethod === "POST") {
       return await createUser(event);
     }
 
-    /* USER ID */
+    /* --------------------------------------------------------
+       USER ID
+    -------------------------------------------------------- */
 
     const userId = getUserId(event);
 
@@ -767,17 +827,37 @@ export const handler: Handler = async (event) => {
       });
     }
 
-    /* PUT */
+    /* --------------------------------------------------------
+       PUT
+    -------------------------------------------------------- */
 
     if (event.httpMethod === "PUT") {
       return await updateUser(event, userId);
     }
 
-    /* PATCH */
+    /* --------------------------------------------------------
+       PATCH
+       
+       Used for Enable / Disable.
+    -------------------------------------------------------- */
 
     if (event.httpMethod === "PATCH") {
       return await updateStatus(event, userId);
     }
+
+    /* --------------------------------------------------------
+       DELETE
+       
+       Used for deleting PLAYER accounts.
+    -------------------------------------------------------- */
+
+    if (event.httpMethod === "DELETE") {
+      return await deleteUser(event, userId);
+    }
+
+    /* --------------------------------------------------------
+       METHOD NOT ALLOWED
+    -------------------------------------------------------- */
 
     return json(405, {
       success: false,
