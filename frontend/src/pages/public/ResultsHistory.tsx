@@ -652,14 +652,6 @@ export default function ResultsHistory() {
                         </th>
 
                         <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                          Set
-                        </th>
-
-                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                          Value
-                        </th>
-
-                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
                           Status
                         </th>
                       </tr>
@@ -707,18 +699,6 @@ export default function ResultsHistory() {
                                 >
                                   {result.result}
                                 </span>
-                              </td>
-
-                              {/* SET */}
-
-                              <td className="px-4 py-3 text-center text-sm font-medium text-slate-600">
-                                -
-                              </td>
-
-                              {/* VALUE */}
-
-                              <td className="px-4 py-3 text-center text-sm font-medium text-slate-600">
-                                -
                               </td>
 
                               <td className="px-4 py-3 text-center">
