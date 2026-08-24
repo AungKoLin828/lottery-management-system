@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   ChevronLeft,
@@ -20,191 +20,85 @@ type ResultTab = "2D" | "3D";
 type DrawSession = "Morning" | "Evening";
 
 interface LotteryResult2D {
-  id: number;
+  id: string;
+  drawId: string;
   date: string;
-  session: DrawSession;
+  session: DrawSession | null;
   result: string;
-  setValue: string;
-  value: string;
+  note: string | null;
   status: "Published" | "Pending";
+  publishedAt: string | null;
 }
 
 interface LotteryResult3D {
-  id: number;
+  id: string;
+  drawId: string;
   date: string;
   result: string;
+  note: string | null;
   status: "Published" | "Pending";
+  publishedAt: string | null;
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
 }
 
 /* ============================================================
-   MOCK 2D RESULTS
+   API
 ============================================================ */
 
-const mockResults2D: LotteryResult2D[] = [
-  {
-    id: 1,
-    date: "2026-08-08",
-    session: "Morning",
-    result: "27",
-    setValue: "123.45",
-    value: "67.89",
-    status: "Published",
-  },
-  {
-    id: 2,
-    date: "2026-08-07",
-    session: "Evening",
-    result: "58",
-    setValue: "456.78",
-    value: "12.34",
-    status: "Published",
-  },
-  {
-    id: 3,
-    date: "2026-08-07",
-    session: "Morning",
-    result: "14",
-    setValue: "234.56",
-    value: "45.67",
-    status: "Published",
-  },
-  {
-    id: 4,
-    date: "2026-08-06",
-    session: "Evening",
-    result: "92",
-    setValue: "345.67",
-    value: "78.90",
-    status: "Published",
-  },
-  {
-    id: 5,
-    date: "2026-08-06",
-    session: "Morning",
-    result: "36",
-    setValue: "567.89",
-    value: "23.45",
-    status: "Published",
-  },
-  {
-    id: 6,
-    date: "2026-08-05",
-    session: "Evening",
-    result: "81",
-    setValue: "678.90",
-    value: "34.56",
-    status: "Published",
-  },
-  {
-    id: 7,
-    date: "2026-08-05",
-    session: "Morning",
-    result: "45",
-    setValue: "789.01",
-    value: "56.78",
-    status: "Published",
-  },
-  {
-    id: 8,
-    date: "2026-08-04",
-    session: "Evening",
-    result: "63",
-    setValue: "890.12",
-    value: "67.89",
-    status: "Published",
-  },
-  {
-    id: 9,
-    date: "2026-08-04",
-    session: "Morning",
-    result: "19",
-    setValue: "901.23",
-    value: "78.90",
-    status: "Published",
-  },
-  {
-    id: 10,
-    date: "2026-08-03",
-    session: "Evening",
-    result: "74",
-    setValue: "112.23",
-    value: "89.01",
-    status: "Published",
-  },
-  {
-    id: 11,
-    date: "2026-08-03",
-    session: "Morning",
-    result: "08",
-    setValue: "223.34",
-    value: "90.12",
-    status: "Published",
-  },
-  {
-    id: 12,
-    date: "2026-08-02",
-    session: "Evening",
-    result: "51",
-    setValue: "334.45",
-    value: "01.23",
-    status: "Published",
-  },
-];
+async function fetchResults<T>(
+  type: ResultTab,
+  search: string,
+  fromDate: string,
+  toDate: string,
+  session: "All" | DrawSession,
+): Promise<T[]> {
+  const params = new URLSearchParams();
 
-/* ============================================================
-   MOCK 3D RESULTS
-============================================================ */
+  params.set("type", type);
 
-const mockResults3D: LotteryResult3D[] = [
-  {
-    id: 1,
-    date: "2026-08-03",
-    result: "428",
-    status: "Published",
-  },
-  {
-    id: 2,
-    date: "2026-07-16",
-    result: "615",
-    status: "Published",
-  },
-  {
-    id: 3,
-    date: "2026-07-01",
-    result: "392",
-    status: "Published",
-  },
-  {
-    id: 4,
-    date: "2026-06-16",
-    result: "731",
-    status: "Published",
-  },
-  {
-    id: 5,
-    date: "2026-06-01",
-    result: "284",
-    status: "Published",
-  },
-  {
-    id: 6,
-    date: "2026-05-16",
-    result: "915",
-    status: "Published",
-  },
-  {
-    id: 7,
-    date: "2026-05-01",
-    result: "367",
-    status: "Published",
-  },
-  {
-    id: 8,
-    date: "2026-04-16",
-    result: "542",
-    status: "Published",
-  },
-];
+  if (search.trim()) {
+    params.set("search", search.trim());
+  }
+
+  if (fromDate) {
+    params.set("fromDate", fromDate);
+  }
+
+  if (toDate) {
+    params.set("toDate", toDate);
+  }
+
+  if (type === "2D" && session !== "All") {
+    params.set("session", session);
+  }
+
+  const response = await fetch(`/api/results-history?${params.toString()}`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+    credentials: "include",
+  });
+
+  let body: ApiResponse<T[]>;
+
+  try {
+    body = (await response.json()) as ApiResponse<T[]>;
+  } catch {
+    throw new Error("Invalid response from results API");
+  }
+
+  if (!response.ok || !body.success) {
+    throw new Error(body.message || "Failed to load lottery results");
+  }
+
+  return body.data ?? [];
+}
 
 /* ============================================================
    PAGE
@@ -221,6 +115,14 @@ export default function ResultsHistory() {
 
   const [currentPage, setCurrentPage] = useState(1);
 
+  const [results2D, setResults2D] = useState<LotteryResult2D[]>([]);
+
+  const [results3D, setResults3D] = useState<LotteryResult3D[]>([]);
+
+  const [loading, setLoading] = useState(false);
+
+  const [error, setError] = useState("");
+
   const itemsPerPage = 8;
 
   /* ==========================================================
@@ -228,12 +130,96 @@ export default function ResultsHistory() {
   ========================================================== */
 
   const formatDate = (date: string) => {
-    return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
+    if (!date) {
+      return "-";
+    }
+
+    const parsed = new Date(`${date}T00:00:00`);
+
+    if (Number.isNaN(parsed.getTime())) {
+      return date;
+    }
+
+    return parsed.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
     });
   };
+
+  /* ==========================================================
+     LOAD RESULTS
+  ========================================================== */
+
+  const loadResults = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      setError("");
+
+      try {
+        if (activeTab === "2D") {
+          const data = await fetchResults<LotteryResult2D>(
+            "2D",
+            search,
+            fromDate,
+            toDate,
+            session,
+          );
+
+          if (!signal?.aborted) {
+            setResults2D(data);
+          }
+        } else {
+          const data = await fetchResults<LotteryResult3D>(
+            "3D",
+            search,
+            fromDate,
+            toDate,
+            "All",
+          );
+
+          if (!signal?.aborted) {
+            setResults3D(data);
+          }
+        }
+      } catch (err) {
+        if (signal?.aborted) {
+          return;
+        }
+
+        console.error("Failed to load results:", err);
+
+        setError(
+          err instanceof Error ? err.message : "Failed to load lottery results",
+        );
+
+        if (activeTab === "2D") {
+          setResults2D([]);
+        } else {
+          setResults3D([]);
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
+      }
+    },
+    [activeTab, search, fromDate, toDate, session],
+  );
+
+  /* ==========================================================
+     INITIAL / FILTER LOAD
+  ========================================================== */
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    void loadResults(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
+  }, [loadResults]);
 
   /* ==========================================================
      CHANGE RESULT TYPE
@@ -247,6 +233,8 @@ export default function ResultsHistory() {
     setFromDate("");
     setToDate("");
     setSession("All");
+
+    setError("");
   };
 
   /* ==========================================================
@@ -283,60 +271,16 @@ export default function ResultsHistory() {
     setFromDate("");
     setToDate("");
     setCurrentPage(1);
+    setError("");
   };
-
-  /* ==========================================================
-     FILTER 2D
-  ========================================================== */
-
-  const filteredResults2D = useMemo(() => {
-    return mockResults2D.filter((item) => {
-      const searchValue = search.trim().toLowerCase();
-
-      const matchesSearch =
-        searchValue === "" ||
-        item.result.toLowerCase().includes(searchValue) ||
-        item.date.toLowerCase().includes(searchValue);
-
-      const matchesSession = session === "All" || item.session === session;
-
-      const matchesFromDate = fromDate === "" || item.date >= fromDate;
-
-      const matchesToDate = toDate === "" || item.date <= toDate;
-
-      return (
-        matchesSearch && matchesSession && matchesFromDate && matchesToDate
-      );
-    });
-  }, [search, session, fromDate, toDate]);
-
-  /* ==========================================================
-     FILTER 3D
-  ========================================================== */
-
-  const filteredResults3D = useMemo(() => {
-    return mockResults3D.filter((item) => {
-      const searchValue = search.trim().toLowerCase();
-
-      const matchesSearch =
-        searchValue === "" ||
-        item.result.toLowerCase().includes(searchValue) ||
-        item.date.toLowerCase().includes(searchValue);
-
-      const matchesFromDate = fromDate === "" || item.date >= fromDate;
-
-      const matchesToDate = toDate === "" || item.date <= toDate;
-
-      return matchesSearch && matchesFromDate && matchesToDate;
-    });
-  }, [search, fromDate, toDate]);
 
   /* ==========================================================
      ACTIVE RESULTS
   ========================================================== */
 
-  const activeResults =
-    activeTab === "2D" ? filteredResults2D : filteredResults3D;
+  const activeResults = useMemo<LotteryResult2D[] | LotteryResult3D[]>(() => {
+    return activeTab === "2D" ? results2D : results3D;
+  }, [activeTab, results2D, results3D]);
 
   /* ==========================================================
      PAGINATION
@@ -344,7 +288,10 @@ export default function ResultsHistory() {
 
   const totalPages = Math.ceil(activeResults.length / itemsPerPage);
 
-  const startIndex = (currentPage - 1) * itemsPerPage;
+  const safeCurrentPage =
+    totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
+
+  const startIndex = (safeCurrentPage - 1) * itemsPerPage;
 
   const paginatedResults = activeResults.slice(
     startIndex,
@@ -352,7 +299,7 @@ export default function ResultsHistory() {
   );
 
   /* ==========================================================
-     UI
+     RENDER
   ========================================================== */
 
   return (
@@ -363,10 +310,6 @@ export default function ResultsHistory() {
 
       <section className="w-full bg-indigo-50/40 px-4 py-6 sm:px-6 lg:px-8">
         <div className="relative mx-auto max-w-6xl overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-600 px-5 py-7 text-white shadow-lg shadow-indigo-200/60 sm:px-8 sm:py-9">
-          {/* ==================================================
-              DECORATIVE BACKGROUND
-          ================================================== */}
-
           <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-white/10" />
 
           <div className="absolute -bottom-24 right-24 h-56 w-56 rounded-full bg-violet-300/10" />
@@ -375,35 +318,22 @@ export default function ResultsHistory() {
 
           <div className="absolute right-20 top-10 h-20 w-20 rounded-full bg-amber-300/5" />
 
-          {/* ==================================================
-              CONTENT
-          ================================================== */}
-
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            {/* Hero Text */}
-
             <div className="max-w-2xl">
-              {/* Badge */}
-
               <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-sm">
                 <Trophy className="h-3.5 w-3.5 text-amber-300" />
+
                 <span>Lottery Results</span>
               </div>
-
-              {/* Heading */}
 
               <h1 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
                 Results History
               </h1>
 
-              {/* Description */}
-
               <p className="mt-2 max-w-xl text-sm leading-relaxed text-indigo-100 sm:text-base">
                 Browse previous 2D and 3D lottery results, search winning
                 numbers, and filter results by date or session.
               </p>
-
-              {/* Quick Info */}
 
               <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-indigo-100">
                 <span className="flex items-center gap-1">
@@ -423,13 +353,9 @@ export default function ResultsHistory() {
               </div>
             </div>
 
-            {/* ==================================================
-                RESULT TYPE SWITCHER
-            ================================================== */}
+            {/* RESULT TYPE SWITCHER */}
 
             <div className="relative flex w-full rounded-xl bg-indigo-950/25 p-1.5 ring-1 ring-white/10 backdrop-blur-sm lg:w-auto">
-              {/* 2D */}
-
               <button
                 type="button"
                 onClick={() => handleTabChange("2D")}
@@ -451,8 +377,6 @@ export default function ResultsHistory() {
 
                 <span>Results</span>
               </button>
-
-              {/* 3D */}
 
               <button
                 type="button"
@@ -485,9 +409,7 @@ export default function ResultsHistory() {
       ======================================================= */}
 
       <main className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
-        {/* ====================================================
-            CURRENT RESULT TYPE
-        ===================================================== */}
+        {/* CURRENT RESULT TYPE */}
 
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -530,13 +452,9 @@ export default function ResultsHistory() {
           </div>
         </div>
 
-        {/* ====================================================
-            FILTER CARD
-        ===================================================== */}
+        {/* FILTER CARD */}
 
         <div className="mb-5 overflow-hidden rounded-xl border border-indigo-100 bg-white shadow-sm">
-          {/* Filter Header */}
-
           <div className="border-b border-indigo-100 bg-gradient-to-r from-indigo-50 to-violet-50 px-5 py-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -559,8 +477,6 @@ export default function ResultsHistory() {
               </button>
             </div>
           </div>
-
-          {/* Filters */}
 
           <div className="p-5">
             <div
@@ -617,7 +533,9 @@ export default function ResultsHistory() {
                       className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                     >
                       <option value="All">All Sessions</option>
+
                       <option value="Morning">Morning</option>
+
                       <option value="Evening">Evening</option>
                     </select>
                   </div>
@@ -673,9 +591,15 @@ export default function ResultsHistory() {
           </div>
         </div>
 
-        {/* ====================================================
-            RESULTS COUNT
-        ===================================================== */}
+        {/* ERROR */}
+
+        {error && (
+          <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {/* RESULTS COUNT */}
 
         <div className="mb-3 flex items-center justify-between">
           <p className="text-xs text-slate-500">
@@ -694,210 +618,220 @@ export default function ResultsHistory() {
         </div>
 
         {/* ====================================================
-            2D TABLE
+            LOADING
         ===================================================== */}
 
-        {activeTab === "2D" && (
-          <div className="overflow-hidden rounded-xl border border-indigo-100 bg-white shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px]">
-                <thead>
-                  <tr className="border-b border-indigo-100 bg-gradient-to-r from-indigo-50 to-violet-50">
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                      #
-                    </th>
+        {loading ? (
+          <LoadingResults activeTab={activeTab} />
+        ) : (
+          <>
+            {/* ==================================================
+                2D TABLE
+            ================================================== */}
 
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                      Date
-                    </th>
+            {activeTab === "2D" && (
+              <div className="overflow-hidden rounded-xl border border-indigo-100 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px]">
+                    <thead>
+                      <tr className="border-b border-indigo-100 bg-gradient-to-r from-indigo-50 to-violet-50">
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                          #
+                        </th>
 
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                      Session
-                    </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                          Date
+                        </th>
 
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                      Winning Number
-                    </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                          Session
+                        </th>
 
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                      Set
-                    </th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                          Winning Number
+                        </th>
 
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                      Value
-                    </th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                          Set
+                        </th>
 
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                      Status
-                    </th>
-                  </tr>
-                </thead>
+                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                          Value
+                        </th>
 
-                <tbody>
-                  {paginatedResults.length > 0 ? (
-                    paginatedResults.map((item, index) => {
-                      const result = item as LotteryResult2D;
+                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                          Status
+                        </th>
+                      </tr>
+                    </thead>
 
-                      const isMorning = result.session === "Morning";
+                    <tbody>
+                      {paginatedResults.length > 0 ? (
+                        paginatedResults.map((item, index) => {
+                          const result = item as LotteryResult2D;
 
-                      return (
-                        <tr
-                          key={result.id}
-                          className="border-b border-slate-100 last:border-b-0 transition-colors hover:bg-indigo-50/40"
-                        >
-                          <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-400">
-                            {startIndex + index + 1}
-                          </td>
+                          const isMorning = result.session === "Morning";
 
-                          <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-700">
-                            {formatDate(result.date)}
-                          </td>
-
-                          <td className="px-4 py-3">
-                            <span
-                              className={`inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold ${
-                                isMorning
-                                  ? "bg-amber-50 text-amber-600"
-                                  : "bg-indigo-50 text-indigo-700"
-                              }`}
+                          return (
+                            <tr
+                              key={result.id}
+                              className="border-b border-slate-100 last:border-b-0 transition-colors hover:bg-indigo-50/40"
                             >
-                              {result.session}
-                            </span>
-                          </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-400">
+                                {startIndex + index + 1}
+                              </td>
 
-                          <td className="px-4 py-3 text-center">
-                            <span
-                              className={`inline-flex h-10 w-10 items-center justify-center rounded-lg text-base font-bold ${
-                                isMorning
-                                  ? "bg-amber-50 text-amber-600 ring-1 ring-amber-100"
-                                  : "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100"
-                              }`}
-                            >
-                              {result.result}
-                            </span>
-                          </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-700">
+                                {formatDate(result.date)}
+                              </td>
 
-                          <td className="px-4 py-3 text-center text-sm font-medium text-slate-600">
-                            {result.setValue}
-                          </td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold ${
+                                    isMorning
+                                      ? "bg-amber-50 text-amber-600"
+                                      : "bg-indigo-50 text-indigo-700"
+                                  }`}
+                                >
+                                  {result.session ?? "-"}
+                                </span>
+                              </td>
 
-                          <td className="px-4 py-3 text-center text-sm font-medium text-slate-600">
-                            {result.value}
-                          </td>
+                              <td className="px-4 py-3 text-center">
+                                <span
+                                  className={`inline-flex h-10 w-10 items-center justify-center rounded-lg text-base font-bold ${
+                                    isMorning
+                                      ? "bg-amber-50 text-amber-600 ring-1 ring-amber-100"
+                                      : "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100"
+                                  }`}
+                                >
+                                  {result.result}
+                                </span>
+                              </td>
 
-                          <td className="px-4 py-3 text-center">
-                            <span className="inline-flex rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-600">
-                              {result.status}
-                            </span>
+                              {/* SET */}
+
+                              <td className="px-4 py-3 text-center text-sm font-medium text-slate-600">
+                                -
+                              </td>
+
+                              {/* VALUE */}
+
+                              <td className="px-4 py-3 text-center text-sm font-medium text-slate-600">
+                                -
+                              </td>
+
+                              <td className="px-4 py-3 text-center">
+                                <span className="inline-flex rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-600">
+                                  {result.status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-10 text-center">
+                            <EmptyResults />
                           </td>
                         </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center">
-                        <EmptyResults />
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
-        {/* ====================================================
-            3D TABLE
-        ===================================================== */}
+            {/* ==================================================
+                3D TABLE
+            ================================================== */}
 
-        {activeTab === "3D" && (
-          <div className="overflow-hidden rounded-xl border border-violet-100 bg-white shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[600px]">
-                <thead>
-                  <tr className="border-b border-violet-100 bg-gradient-to-r from-violet-50 to-indigo-50">
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-violet-700">
-                      #
-                    </th>
+            {activeTab === "3D" && (
+              <div className="overflow-hidden rounded-xl border border-violet-100 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[600px]">
+                    <thead>
+                      <tr className="border-b border-violet-100 bg-gradient-to-r from-violet-50 to-indigo-50">
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-violet-700">
+                          #
+                        </th>
 
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-violet-700">
-                      Draw Date
-                    </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-violet-700">
+                          Draw Date
+                        </th>
 
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-violet-700">
-                      3D Winning Number
-                    </th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-violet-700">
+                          3D Winning Number
+                        </th>
 
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-violet-700">
-                      Status
-                    </th>
-                  </tr>
-                </thead>
+                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-violet-700">
+                          Status
+                        </th>
+                      </tr>
+                    </thead>
 
-                <tbody>
-                  {paginatedResults.length > 0 ? (
-                    paginatedResults.map((item, index) => {
-                      const result = item as LotteryResult3D;
+                    <tbody>
+                      {paginatedResults.length > 0 ? (
+                        paginatedResults.map((item, index) => {
+                          const result = item as LotteryResult3D;
 
-                      return (
-                        <tr
-                          key={result.id}
-                          className="border-b border-slate-100 last:border-b-0 transition-colors hover:bg-violet-50/40"
-                        >
-                          <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-400">
-                            {startIndex + index + 1}
-                          </td>
+                          return (
+                            <tr
+                              key={result.id}
+                              className="border-b border-slate-100 last:border-b-0 transition-colors hover:bg-violet-50/40"
+                            >
+                              <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-400">
+                                {startIndex + index + 1}
+                              </td>
 
-                          <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-700">
-                            {formatDate(result.date)}
-                          </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-700">
+                                {formatDate(result.date)}
+                              </td>
 
-                          <td className="px-4 py-3 text-center">
-                            <span className="inline-flex h-10 min-w-[76px] items-center justify-center rounded-lg bg-violet-50 px-3 text-lg font-bold tracking-widest text-violet-700 ring-1 ring-violet-100">
-                              {result.result}
-                            </span>
-                          </td>
+                              <td className="px-4 py-3 text-center">
+                                <span className="inline-flex h-10 min-w-[76px] items-center justify-center rounded-lg bg-violet-50 px-3 text-lg font-bold tracking-widest text-violet-700 ring-1 ring-violet-100">
+                                  {result.result}
+                                </span>
+                              </td>
 
-                          <td className="px-4 py-3 text-center">
-                            <span className="inline-flex rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-600">
-                              {result.status}
-                            </span>
+                              <td className="px-4 py-3 text-center">
+                                <span className="inline-flex rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-600">
+                                  {result.status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-10 text-center">
+                            <EmptyResults />
                           </td>
                         </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-10 text-center">
-                        <EmptyResults />
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* ====================================================
             PAGINATION
         ===================================================== */}
 
-        {totalPages > 1 && (
+        {!loading && totalPages > 1 && (
           <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5">
-            {/* Previous */}
-
             <button
               type="button"
-              disabled={currentPage === 1}
+              disabled={safeCurrentPage === 1}
               onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
               Previous
             </button>
-
-            {/* Pages */}
 
             {Array.from({ length: totalPages }, (_, index) => index + 1).map(
               (page) => (
@@ -906,7 +840,7 @@ export default function ResultsHistory() {
                   type="button"
                   onClick={() => setCurrentPage(page)}
                   className={`min-w-9 rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                    currentPage === page
+                    safeCurrentPage === page
                       ? activeTab === "2D"
                         ? "bg-indigo-600 text-white shadow-sm"
                         : "bg-violet-600 text-white shadow-sm"
@@ -918,11 +852,9 @@ export default function ResultsHistory() {
               ),
             )}
 
-            {/* Next */}
-
             <button
               type="button"
-              disabled={currentPage === totalPages}
+              disabled={safeCurrentPage === totalPages}
               onClick={() =>
                 setCurrentPage((page) => Math.min(page + 1, totalPages))
               }
@@ -939,6 +871,53 @@ export default function ResultsHistory() {
 }
 
 /* ============================================================
+   LOADING
+============================================================ */
+
+function LoadingResults({ activeTab }: { activeTab: ResultTab }) {
+  if (activeTab === "2D") {
+    return (
+      <div className="overflow-hidden rounded-xl border border-indigo-100 bg-white shadow-sm">
+        <div className="animate-pulse">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div
+              key={index}
+              className="grid grid-cols-7 gap-4 border-b border-slate-100 px-4 py-4"
+            >
+              <div className="h-4 rounded bg-slate-100" />
+              <div className="h-4 rounded bg-slate-100" />
+              <div className="h-4 rounded bg-slate-100" />
+              <div className="mx-auto h-10 w-10 rounded-lg bg-slate-100" />
+              <div className="h-4 rounded bg-slate-100" />
+              <div className="h-4 rounded bg-slate-100" />
+              <div className="mx-auto h-5 w-16 rounded bg-slate-100" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-violet-100 bg-white shadow-sm">
+      <div className="animate-pulse">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div
+            key={index}
+            className="grid grid-cols-4 gap-4 border-b border-slate-100 px-4 py-4"
+          >
+            <div className="h-4 rounded bg-slate-100" />
+            <div className="h-4 rounded bg-slate-100" />
+            <div className="mx-auto h-10 w-20 rounded-lg bg-slate-100" />
+            <div className="mx-auto h-5 w-16 rounded bg-slate-100" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    EMPTY RESULTS
 ============================================================ */
 
@@ -949,9 +928,7 @@ function EmptyResults() {
         <Search className="h-5 w-5 text-indigo-400" />
       </div>
 
-      <p className="text-sm font-semibold text-slate-600">
-        No results found
-      </p>
+      <p className="text-sm font-semibold text-slate-600">No results found</p>
 
       <p className="mt-1 text-xs text-slate-400">
         Try changing your search or filters.

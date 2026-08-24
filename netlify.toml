@@ -113,7 +113,11 @@
   status = 200
   force = true
 
-
+[[redirects]]
+  from = "/api/results-history"
+  to = "/.netlify/functions/results-history"
+  status = 200
+  
 # ============================================================
 # FRONTEND SPA ROUTING
 #
