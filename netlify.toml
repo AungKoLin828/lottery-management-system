@@ -145,6 +145,19 @@
   to = "/.netlify/functions/admin-number-restrictions/:splat"
   status = 200
   force = true
+
+
+  [[redirects]]
+  from = "/api/admin/draw-settings"
+  to = "/.netlify/functions/admin-draw-settings"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/admin/draw-settings/*"
+  to = "/.netlify/functions/admin-draw-settings"
+  status = 200
+  force = true
   
 # Other API redirects should be here...
 

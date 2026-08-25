@@ -15,8 +15,10 @@ import * as tickets from "./schema/tickets";
 import * as ticketItems from "./schema/ticketItems";
 import * as settings from "./schema/settings";
 import * as auditLogs from "./schema/auditLogs";
-export * from "./schema/publicHolidays";
-export * from "./schema/numberRestrictions";
+
+import * as publicHolidays from "./schema/publicHolidays";
+import * as numberRestrictions from "./schema/numberRestrictions";
+import * as drawSettings from "./schema/drawSettings";
 
 import * as relations from "./relations";
 
@@ -54,6 +56,10 @@ const pool = new Pool({
 
 export const db = drizzle(pool, {
   schema: {
+    /* ========================================================
+       EXISTING SCHEMAS
+    ======================================================== */
+
     ...users,
     ...wallets,
     ...transactions,
@@ -66,6 +72,19 @@ export const db = drizzle(pool, {
     ...ticketItems,
     ...settings,
     ...auditLogs,
+
+    /* ========================================================
+       NEW LOTTERY SETTINGS SCHEMAS
+    ======================================================== */
+
+    ...drawSettings,
+    ...publicHolidays,
+    ...numberRestrictions,
+
+    /* ========================================================
+       RELATIONS
+    ======================================================== */
+
     ...relations,
   },
 });
@@ -75,3 +94,26 @@ export const db = drizzle(pool, {
 ============================================================ */
 
 export { pool };
+
+/* ============================================================
+   EXPORT SCHEMA MODULES
+============================================================ */
+
+export { users };
+export { wallets };
+export { transactions };
+export { deposits };
+export { withdrawals };
+export { paymentMethods };
+export { lotteryDraws };
+export { lotteryResults };
+export { tickets };
+export { ticketItems };
+export { settings };
+export { auditLogs };
+
+export { publicHolidays };
+export { numberRestrictions };
+export { drawSettings };
+
+export { relations };
