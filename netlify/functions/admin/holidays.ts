@@ -1,6 +1,6 @@
 import type { Handler, HandlerEvent } from "@netlify/functions";
 
-import { and, asc, eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 
 import { publicHolidays } from "../../../db/schema/publicHolidays";
 
@@ -37,17 +37,20 @@ const response = <T>(statusCode: number, body: ApiResponse<T>) => {
 ============================================================ */
 
 /**
- * Supports:
+ * Supported paths:
  *
  * /api/admin/holidays
  * /api/admin/holidays/:id
  *
- * and also Netlify's direct function path:
+ * Netlify function path:
  *
  * /.netlify/functions/admin/holidays
  * /.netlify/functions/admin/holidays/:id
+ *
+ * Because the request may arrive through the redirect,
+ * we intentionally do not depend on one specific prefix.
  */
-const getPathId = (event: Parameters<Handler>[0]) => {
+const getPathId = (event: HandlerEvent): string | null => {
   const path = event.path || "";
 
   const parts = path.split("/").filter(Boolean);
@@ -58,7 +61,9 @@ const getPathId = (event: Parameters<Handler>[0]) => {
     return null;
   }
 
-  return parts[holidaysIndex + 1] || null;
+  const possibleId = parts[holidaysIndex + 1];
+
+  return possibleId || null;
 };
 
 /* ============================================================
@@ -82,12 +87,10 @@ const isValidDate = (value: string): boolean => {
 };
 
 /* ============================================================
-   GET
-   GET /api/admin/holidays
-   GET /api/admin/holidays/:id
+   GET ALL / SINGLE HOLIDAY
 ============================================================ */
 
-const handleGet = async (event: HandlerEvent, id: string | null) => {
+const handleGet = async (id: string | null) => {
   /* ----------------------------------------------------------
      GET SINGLE HOLIDAY
   ---------------------------------------------------------- */
@@ -147,7 +150,6 @@ const handleGet = async (event: HandlerEvent, id: string | null) => {
 
 /* ============================================================
    POST
-   POST /api/admin/holidays
 ============================================================ */
 
 const handlePost = async (event: HandlerEvent) => {
@@ -157,7 +159,7 @@ const handlePost = async (event: HandlerEvent) => {
   const name = String(body.name || "").trim();
 
   /* ----------------------------------------------------------
-     VALIDATE DATE
+     DATE
   ---------------------------------------------------------- */
 
   if (!date) {
@@ -175,7 +177,7 @@ const handlePost = async (event: HandlerEvent) => {
   }
 
   /* ----------------------------------------------------------
-     VALIDATE NAME
+     NAME
   ---------------------------------------------------------- */
 
   if (!name) {
@@ -193,7 +195,7 @@ const handlePost = async (event: HandlerEvent) => {
   }
 
   /* ----------------------------------------------------------
-     CHECK DUPLICATE DATE
+     DUPLICATE DATE
   ---------------------------------------------------------- */
 
   const existing = await db
@@ -212,7 +214,7 @@ const handlePost = async (event: HandlerEvent) => {
   }
 
   /* ----------------------------------------------------------
-     CREATE HOLIDAY
+     INSERT
   ---------------------------------------------------------- */
 
   const [holiday] = await db
@@ -235,7 +237,6 @@ const handlePost = async (event: HandlerEvent) => {
 
 /* ============================================================
    PUT
-   PUT /api/admin/holidays/:id
 ============================================================ */
 
 const handlePut = async (event: HandlerEvent, id: string) => {
@@ -303,19 +304,16 @@ const handlePut = async (event: HandlerEvent, id: string) => {
      CHECK DUPLICATE DATE
   ---------------------------------------------------------- */
 
-  const duplicate = await db
+  const holidaysWithSameDate = await db
     .select({
       id: publicHolidays.id,
     })
     .from(publicHolidays)
-    .where(
-      and(
-        eq(publicHolidays.date, date),
-        // The current record is excluded below.
-      ),
-    );
+    .where(eq(publicHolidays.date, date));
 
-  const duplicateExists = duplicate.some((holiday) => holiday.id !== id);
+  const duplicateExists = holidaysWithSameDate.some(
+    (holiday) => holiday.id !== id,
+  );
 
   if (duplicateExists) {
     return response(409, {
@@ -350,14 +348,13 @@ const handlePut = async (event: HandlerEvent, id: string) => {
 
 /* ============================================================
    PATCH
-   PATCH /api/admin/holidays/:id
 ============================================================ */
 
 const handlePatch = async (event: HandlerEvent, id: string) => {
   const body = await parseBody<HolidayBody>(event);
 
   /* ----------------------------------------------------------
-     CHECK EXISTING HOLIDAY
+     CHECK HOLIDAY
   ---------------------------------------------------------- */
 
   const existing = await db
@@ -411,12 +408,11 @@ const handlePatch = async (event: HandlerEvent, id: string) => {
 
 /* ============================================================
    DELETE
-   DELETE /api/admin/holidays/:id
 ============================================================ */
 
-const handleDelete = async (_event: HandlerEvent, id: string) => {
+const handleDelete = async (id: string) => {
   /* ----------------------------------------------------------
-     CHECK EXISTING HOLIDAY
+     CHECK HOLIDAY
   ---------------------------------------------------------- */
 
   const existing = await db
@@ -456,7 +452,7 @@ export const handler: Handler = async (event) => {
 
     const id = getPathId(event);
 
-    console.log("Admin holidays API:", {
+    console.log("Admin holidays API request:", {
       method,
       path: event.path,
       id,
@@ -467,14 +463,21 @@ export const handler: Handler = async (event) => {
     -------------------------------------------------------- */
 
     if (method === "GET") {
-      return await handleGet(event, id);
+      return await handleGet(id);
     }
 
     /* --------------------------------------------------------
        POST
     -------------------------------------------------------- */
 
-    if (method === "POST" && !id) {
+    if (method === "POST") {
+      if (id) {
+        return response(400, {
+          success: false,
+          message: "POST does not accept a holiday ID.",
+        });
+      }
+
       return await handlePost(event);
     }
 
@@ -482,7 +485,14 @@ export const handler: Handler = async (event) => {
        PUT
     -------------------------------------------------------- */
 
-    if (method === "PUT" && id) {
+    if (method === "PUT") {
+      if (!id) {
+        return response(400, {
+          success: false,
+          message: "Holiday ID is required.",
+        });
+      }
+
       return await handlePut(event, id);
     }
 
@@ -490,7 +500,14 @@ export const handler: Handler = async (event) => {
        PATCH
     -------------------------------------------------------- */
 
-    if (method === "PATCH" && id) {
+    if (method === "PATCH") {
+      if (!id) {
+        return response(400, {
+          success: false,
+          message: "Holiday ID is required.",
+        });
+      }
+
       return await handlePatch(event, id);
     }
 
@@ -498,12 +515,19 @@ export const handler: Handler = async (event) => {
        DELETE
     -------------------------------------------------------- */
 
-    if (method === "DELETE" && id) {
-      return await handleDelete(event, id);
+    if (method === "DELETE") {
+      if (!id) {
+        return response(400, {
+          success: false,
+          message: "Holiday ID is required.",
+        });
+      }
+
+      return await handleDelete(id);
     }
 
     /* --------------------------------------------------------
-       INVALID REQUEST
+       METHOD NOT ALLOWED
     -------------------------------------------------------- */
 
     return response(405, {

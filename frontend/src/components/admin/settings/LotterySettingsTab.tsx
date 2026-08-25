@@ -36,6 +36,10 @@ type HolidaysData = {
   holidays: Holiday[];
 };
 
+type HolidayResponse = {
+  holiday?: Holiday;
+};
+
 /* ============================================================
    API
 ============================================================ */
@@ -91,7 +95,7 @@ export default function LotterySettingsTab() {
   const [holidaySearch, setHolidaySearch] = useState("");
 
   /* ==========================================================
-     API RESPONSE HELPER
+     API RESPONSE
   ========================================================== */
 
   const readApiResponse = async <T,>(
@@ -108,7 +112,9 @@ export default function LotterySettingsTab() {
       );
 
       throw new Error(
-        `API returned ${response.status} ${response.statusText || ""} instead of JSON.`,
+        `API returned ${response.status} ${
+          response.statusText || ""
+        } instead of JSON.`,
       );
     }
 
@@ -185,18 +191,7 @@ export default function LotterySettingsTab() {
       }
     });
 
-    /*
-     * Always include current year.
-     */
-
     years.add(currentYear);
-
-    /*
-     * Also keep selected year available.
-     * This allows admin to add a holiday
-     * for a year that does not yet have data.
-     */
-
     years.add(holidayYear);
 
     return Array.from(years).sort((a, b) => Number(b) - Number(a));
@@ -222,7 +217,7 @@ export default function LotterySettingsTab() {
   }, [holidays, holidayYear, holidaySearch]);
 
   /* ==========================================================
-     OPEN ADD HOLIDAY
+     OPEN ADD
   ========================================================== */
 
   const openAddHoliday = () => {
@@ -239,7 +234,7 @@ export default function LotterySettingsTab() {
   };
 
   /* ==========================================================
-     OPEN EDIT HOLIDAY
+     OPEN EDIT
   ========================================================== */
 
   const openEditHoliday = (holiday: Holiday) => {
@@ -277,32 +272,22 @@ export default function LotterySettingsTab() {
   };
 
   /* ==========================================================
-     VALIDATE DATE
+     DATE VALIDATION
   ========================================================== */
 
-  const isValidDate = (value: string) => {
+  const isValidDate = (value: string): boolean => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
       return false;
     }
 
-    const parsedDate = new Date(`${value}T00:00:00`);
-
-    if (Number.isNaN(parsedDate.getTime())) {
-      return false;
-    }
-
-    /*
-     * Prevent invalid dates such as:
-     *
-     * 2026-02-31
-     */
-
     const [year, month, day] = value.split("-").map(Number);
 
+    const date = new Date(year, month - 1, day);
+
     return (
-      parsedDate.getFullYear() === year &&
-      parsedDate.getMonth() + 1 === month &&
-      parsedDate.getDate() === day
+      date.getFullYear() === year &&
+      date.getMonth() === month - 1 &&
+      date.getDate() === day
     );
   };
 
@@ -315,10 +300,6 @@ export default function LotterySettingsTab() {
 
     const date = holidayForm.date.trim();
     const name = holidayForm.name.trim();
-
-    /* --------------------------------------------------------
-       VALIDATION
-    -------------------------------------------------------- */
 
     if (!date) {
       setHolidayError("Holiday date is required.");
@@ -372,16 +353,13 @@ export default function LotterySettingsTab() {
         }),
       });
 
-      const result = await readApiResponse(response);
+      const result = await readApiResponse<HolidayResponse>(response);
 
       if (!response.ok || !result.success) {
         throw new Error(result.message || "Failed to save holiday.");
       }
 
-      /*
-       * Close first so the UI does not remain
-       * in editing state.
-       */
+      setHolidayYear(date.substring(0, 4));
 
       setShowHolidayModal(false);
 
@@ -391,16 +369,6 @@ export default function LotterySettingsTab() {
         date: "",
         name: "",
       });
-
-      /*
-       * Switch to the saved holiday's year.
-       */
-
-      setHolidayYear(date.substring(0, 4));
-
-      /*
-       * Reload from database.
-       */
 
       await loadHolidays();
 
@@ -440,8 +408,6 @@ export default function LotterySettingsTab() {
     try {
       const url = `${HOLIDAYS_API}/${encodeURIComponent(holiday.id)}`;
 
-      console.log("Deleting holiday:", url);
-
       const response = await fetch(url, {
         method: "DELETE",
         credentials: "include",
@@ -456,11 +422,9 @@ export default function LotterySettingsTab() {
         throw new Error(result.message || "Failed to delete holiday.");
       }
 
-      /*
-       * Remove immediately from UI.
-       */
-
-      setHolidays((prev) => prev.filter((item) => item.id !== holiday.id));
+      setHolidays((previous) =>
+        previous.filter((item) => item.id !== holiday.id),
+      );
 
       alert("Holiday deleted successfully.");
     } catch (error) {
@@ -475,7 +439,7 @@ export default function LotterySettingsTab() {
   };
 
   /* ==========================================================
-     TOGGLE ACTIVE STATUS
+     TOGGLE STATUS
   ========================================================== */
 
   const toggleHolidayStatus = async (holiday: Holiday) => {
@@ -498,25 +462,18 @@ export default function LotterySettingsTab() {
         }),
       });
 
-      const result = await readApiResponse<{
-        holiday?: Holiday;
-      }>(response);
+      const result = await readApiResponse<HolidayResponse>(response);
 
       if (!response.ok || !result.success) {
         throw new Error(result.message || "Failed to update holiday status.");
       }
 
-      /*
-       * Update locally.
-       */
-
-      setHolidays((prev) =>
-        prev.map((item) =>
+      setHolidays((previous) =>
+        previous.map((item) =>
           item.id === holiday.id
             ? {
                 ...item,
-                isActive: !item.isActive,
-                ...(result.data?.holiday || {}),
+                isActive: result.data?.holiday?.isActive ?? !item.isActive,
               }
             : item,
         ),
@@ -569,12 +526,10 @@ export default function LotterySettingsTab() {
       </div>
 
       {/* ======================================================
-          PUBLIC HOLIDAY MANAGEMENT
+          PUBLIC HOLIDAYS
       ====================================================== */}
 
       <div className="rounded-xl bg-white p-6 shadow">
-        {/* HEADER */}
-
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-800">
@@ -596,8 +551,6 @@ export default function LotterySettingsTab() {
           </Button>
         </div>
 
-        {/* INFORMATION */}
-
         <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
           <div className="flex gap-3">
             <div className="mt-0.5 text-blue-600">ⓘ</div>
@@ -614,8 +567,6 @@ export default function LotterySettingsTab() {
           </div>
         </div>
 
-        {/* ERROR */}
-
         {holidayError && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             <div className="font-medium">Holiday operation failed</div>
@@ -627,8 +578,6 @@ export default function LotterySettingsTab() {
         {/* FILTERS */}
 
         <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-[180px_1fr_auto]">
-          {/* YEAR */}
-
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Year
@@ -637,7 +586,7 @@ export default function LotterySettingsTab() {
             <select
               className="w-full rounded-lg border p-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               value={holidayYear}
-              onChange={(e) => setHolidayYear(e.target.value)}
+              onChange={(event) => setHolidayYear(event.target.value)}
             >
               {availableHolidayYears.map((year) => (
                 <option key={year} value={year}>
@@ -647,8 +596,6 @@ export default function LotterySettingsTab() {
             </select>
           </div>
 
-          {/* SEARCH */}
-
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Search Holiday
@@ -657,13 +604,11 @@ export default function LotterySettingsTab() {
             <input
               type="text"
               value={holidaySearch}
-              onChange={(e) => setHolidaySearch(e.target.value)}
+              onChange={(event) => setHolidaySearch(event.target.value)}
               placeholder="Search holiday name..."
               className="w-full rounded-lg border p-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
           </div>
-
-          {/* COUNT */}
 
           <div className="flex items-end">
             <div className="rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700">
@@ -700,8 +645,6 @@ export default function LotterySettingsTab() {
             </thead>
 
             <tbody className="divide-y">
-              {/* LOADING */}
-
               {loadingHolidays ? (
                 <tr>
                   <td
@@ -716,7 +659,6 @@ export default function LotterySettingsTab() {
                   </td>
                 </tr>
               ) : filteredHolidays.length > 0 ? (
-                /* HOLIDAYS */
                 filteredHolidays.map((holiday, index) => {
                   const date = new Date(`${holiday.date}T00:00:00`);
 
@@ -733,11 +675,7 @@ export default function LotterySettingsTab() {
                       key={holiday.id}
                       className="transition hover:bg-gray-50"
                     >
-                      {/* NUMBER */}
-
                       <td className="px-4 py-4 text-gray-500">{index + 1}</td>
-
-                      {/* DATE */}
 
                       <td className="px-4 py-4">
                         <span className="rounded-md bg-gray-100 px-2.5 py-1 font-mono text-sm text-gray-700">
@@ -745,11 +683,7 @@ export default function LotterySettingsTab() {
                         </span>
                       </td>
 
-                      {/* DAY */}
-
                       <td className="px-4 py-4 text-gray-600">{dayName}</td>
-
-                      {/* NAME */}
 
                       <td className="px-4 py-4">
                         <div className="font-medium text-gray-900">
@@ -766,8 +700,6 @@ export default function LotterySettingsTab() {
                             : "Draws allowed"}
                         </div>
                       </td>
-
-                      {/* STATUS */}
 
                       <td className="px-4 py-4 text-center">
                         <button
@@ -787,8 +719,6 @@ export default function LotterySettingsTab() {
                               : "Inactive"}
                         </button>
                       </td>
-
-                      {/* ACTION */}
 
                       <td className="px-4 py-4">
                         <div className="flex justify-end gap-2">
@@ -813,8 +743,6 @@ export default function LotterySettingsTab() {
                   );
                 })
               ) : (
-                /* EMPTY */
-
                 <tr>
                   <td
                     colSpan={6}
@@ -863,7 +791,7 @@ export default function LotterySettingsTab() {
       </div>
 
       {/* ======================================================
-          ADD / EDIT HOLIDAY MODAL
+          ADD / EDIT MODAL
       ====================================================== */}
 
       <Modal
@@ -876,21 +804,18 @@ export default function LotterySettingsTab() {
         onClose={closeHolidayModal}
       >
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
+          onSubmit={(event) => {
+            event.preventDefault();
+
             void saveHoliday();
           }}
           className="space-y-5"
         >
-          {/* ERROR */}
-
           {holidayError && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {holidayError}
             </div>
           )}
-
-          {/* DATE */}
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -900,10 +825,10 @@ export default function LotterySettingsTab() {
             <input
               type="date"
               value={holidayForm.date}
-              onChange={(e) =>
-                setHolidayForm((prev) => ({
-                  ...prev,
-                  date: e.target.value,
+              onChange={(event) =>
+                setHolidayForm((previous) => ({
+                  ...previous,
+                  date: event.target.value,
                 }))
               }
               className="w-full rounded-lg border p-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -912,15 +837,13 @@ export default function LotterySettingsTab() {
             />
           </div>
 
-          {/* NAME */}
-
           <Input
             label="Holiday Name"
             value={holidayForm.name}
-            onChange={(e) =>
-              setHolidayForm((prev) => ({
-                ...prev,
-                name: e.target.value,
+            onChange={(event) =>
+              setHolidayForm((previous) => ({
+                ...previous,
+                name: event.target.value,
               }))
             }
             placeholder="e.g. Independence Day"
@@ -928,15 +851,11 @@ export default function LotterySettingsTab() {
             disabled={savingHoliday}
           />
 
-          {/* INFORMATION */}
-
           <div className="rounded-lg bg-yellow-50 p-3 text-sm text-yellow-800">
             <strong>Important:</strong> An active holiday will be treated as a
             2D draw off day. Both AM and PM sessions can be blocked for this
             date.
           </div>
-
-          {/* ACTIONS */}
 
           <div className="flex justify-end gap-3 pt-2">
             <Button
