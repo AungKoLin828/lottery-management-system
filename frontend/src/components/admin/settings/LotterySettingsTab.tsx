@@ -95,35 +95,43 @@ export default function LotterySettingsTab() {
   const [holidaySearch, setHolidaySearch] = useState("");
 
   /* ==========================================================
-     API RESPONSE
+     API RESPONSE HELPER
   ========================================================== */
 
   const readApiResponse = async <T,>(
     response: Response,
   ): Promise<ApiResponse<T>> => {
-    const contentType = response.headers.get("content-type") || "";
+    const contentType = (
+      response.headers.get("content-type") || ""
+    ).toLowerCase();
 
-    if (!contentType.toLowerCase().includes("application/json")) {
-      const text = await response.text();
+    const text = await response.text();
 
-      console.error(
-        "Holiday API returned non-JSON response:",
-        text.slice(0, 2000),
-      );
+    if (!contentType.includes("application/json")) {
+      console.error("Holiday API non-JSON response:", {
+        status: response.status,
+        statusText: response.statusText,
+        url: response.url,
+        body: text.slice(0, 2000),
+      });
+
+      if (response.status === 404) {
+        throw new Error(
+          "Holiday API endpoint was not found. Please check the Netlify function and netlify.toml redirect.",
+        );
+      }
 
       throw new Error(
-        `API returned ${response.status} ${
-          response.statusText || ""
-        } instead of JSON.`,
+        `Holiday API returned ${response.status} ${response.statusText || ""} instead of JSON.`,
       );
     }
 
     try {
-      return (await response.json()) as ApiResponse<T>;
+      return JSON.parse(text) as ApiResponse<T>;
     } catch (error) {
-      console.error("Failed to parse holiday API JSON:", error);
+      console.error("Holiday API JSON parse error:", error);
 
-      throw new Error("The server returned an invalid JSON response.");
+      throw new Error("The server returned invalid JSON.");
     }
   };
 
@@ -217,7 +225,7 @@ export default function LotterySettingsTab() {
   }, [holidays, holidayYear, holidaySearch]);
 
   /* ==========================================================
-     OPEN ADD
+     OPEN ADD HOLIDAY
   ========================================================== */
 
   const openAddHoliday = () => {
@@ -234,7 +242,7 @@ export default function LotterySettingsTab() {
   };
 
   /* ==========================================================
-     OPEN EDIT
+     OPEN EDIT HOLIDAY
   ========================================================== */
 
   const openEditHoliday = (holiday: Holiday) => {
@@ -286,7 +294,7 @@ export default function LotterySettingsTab() {
 
     return (
       date.getFullYear() === year &&
-      date.getMonth() === month - 1 &&
+      date.getMonth() + 1 === month &&
       date.getDate() === day
     );
   };
@@ -331,13 +339,6 @@ export default function LotterySettingsTab() {
         : HOLIDAYS_API;
 
       const method = isEditing ? "PUT" : "POST";
-
-      console.log("Saving holiday:", {
-        method,
-        url,
-        date,
-        name,
-      });
 
       const response = await fetch(url, {
         method,
@@ -526,7 +527,7 @@ export default function LotterySettingsTab() {
       </div>
 
       {/* ======================================================
-          PUBLIC HOLIDAYS
+          PUBLIC HOLIDAY MANAGEMENT
       ====================================================== */}
 
       <div className="rounded-xl bg-white p-6 shadow">
@@ -625,19 +626,14 @@ export default function LotterySettingsTab() {
             <thead>
               <tr className="border-b bg-gray-50">
                 <th className="px-4 py-3 font-semibold text-gray-700">#</th>
-
                 <th className="px-4 py-3 font-semibold text-gray-700">Date</th>
-
                 <th className="px-4 py-3 font-semibold text-gray-700">Day</th>
-
                 <th className="px-4 py-3 font-semibold text-gray-700">
                   Holiday
                 </th>
-
                 <th className="px-4 py-3 text-center font-semibold text-gray-700">
                   Status
                 </th>
-
                 <th className="px-4 py-3 text-right font-semibold text-gray-700">
                   Action
                 </th>
@@ -791,7 +787,7 @@ export default function LotterySettingsTab() {
       </div>
 
       {/* ======================================================
-          ADD / EDIT MODAL
+          ADD / EDIT HOLIDAY MODAL
       ====================================================== */}
 
       <Modal
@@ -806,7 +802,6 @@ export default function LotterySettingsTab() {
         <form
           onSubmit={(event) => {
             event.preventDefault();
-
             void saveHoliday();
           }}
           className="space-y-5"

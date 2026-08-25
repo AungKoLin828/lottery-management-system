@@ -1,6 +1,6 @@
 import type { Handler, HandlerEvent } from "@netlify/functions";
 
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 
 import { publicHolidays } from "../../../db/schema/publicHolidays";
 
@@ -33,44 +33,6 @@ const response = <T>(statusCode: number, body: ApiResponse<T>) => {
 };
 
 /* ============================================================
-   PATH ID
-============================================================ */
-
-/**
- * Supports:
- *
- * /api/admin/holidays
- * /api/admin/holidays/:id
- *
- * and:
- *
- * /.netlify/functions/admin/holidays
- * /.netlify/functions/admin/holidays/:id
- *
- * Netlify may also provide the path through
- * event.rawUrl / event.path depending on deployment.
- */
-const getPathId = (event: Parameters<Handler>[0]): string | null => {
-  const paths = [event.path || "", event.rawUrl || ""];
-
-  for (const path of paths) {
-    const parts = path.split("/").filter(Boolean);
-
-    const holidaysIndex = parts.lastIndexOf("holidays");
-
-    if (holidaysIndex !== -1) {
-      const id = parts[holidaysIndex + 1];
-
-      if (id) {
-        return decodeURIComponent(id);
-      }
-    }
-  }
-
-  return null;
-};
-
-/* ============================================================
    DATE VALIDATION
 ============================================================ */
 
@@ -85,22 +47,36 @@ const isValidDate = (value: string): boolean => {
 
   return (
     date.getFullYear() === year &&
-    date.getMonth() === month - 1 &&
+    date.getMonth() + 1 === month &&
     date.getDate() === day
   );
 };
 
 /* ============================================================
-   GET ALL HOLIDAYS
+   GET PATH ID
 ============================================================ */
 
-const handleGet = async (_event: HandlerEvent, id: string | null) => {
-  /* ----------------------------------------------------------
-     GET SINGLE HOLIDAY
-  ---------------------------------------------------------- */
+const getHolidayId = (event: HandlerEvent): string | null => {
+  const path = event.path || "";
 
+  const parts = path.split("/").filter(Boolean);
+
+  const holidaysIndex = parts.lastIndexOf("holidays");
+
+  if (holidaysIndex === -1) {
+    return null;
+  }
+
+  return parts[holidaysIndex + 1] || null;
+};
+
+/* ============================================================
+   GET ALL / SINGLE
+============================================================ */
+
+const handleGet = async (event: HandlerEvent, id: string | null) => {
   if (id) {
-    const holidays = await db
+    const rows = await db
       .select({
         id: publicHolidays.id,
         date: publicHolidays.date,
@@ -113,7 +89,7 @@ const handleGet = async (_event: HandlerEvent, id: string | null) => {
       .where(eq(publicHolidays.id, id))
       .limit(1);
 
-    if (holidays.length === 0) {
+    if (rows.length === 0) {
       return response(404, {
         success: false,
         message: "Holiday not found.",
@@ -123,14 +99,10 @@ const handleGet = async (_event: HandlerEvent, id: string | null) => {
     return response(200, {
       success: true,
       data: {
-        holiday: holidays[0],
+        holiday: rows[0],
       },
     });
   }
-
-  /* ----------------------------------------------------------
-     GET ALL
-  ---------------------------------------------------------- */
 
   const holidays = await db
     .select({
@@ -163,10 +135,6 @@ const handlePost = async (event: HandlerEvent) => {
 
   const name = String(body.name || "").trim();
 
-  /* ----------------------------------------------------------
-     DATE
-  ---------------------------------------------------------- */
-
   if (!date) {
     return response(400, {
       success: false,
@@ -180,10 +148,6 @@ const handlePost = async (event: HandlerEvent) => {
       message: "Invalid holiday date. Use YYYY-MM-DD format.",
     });
   }
-
-  /* ----------------------------------------------------------
-     NAME
-  ---------------------------------------------------------- */
 
   if (!name) {
     return response(400, {
@@ -199,10 +163,6 @@ const handlePost = async (event: HandlerEvent) => {
     });
   }
 
-  /* ----------------------------------------------------------
-     DUPLICATE DATE
-  ---------------------------------------------------------- */
-
   const existing = await db
     .select({
       id: publicHolidays.id,
@@ -217,10 +177,6 @@ const handlePost = async (event: HandlerEvent) => {
       message: "A holiday already exists for this date.",
     });
   }
-
-  /* ----------------------------------------------------------
-     INSERT
-  ---------------------------------------------------------- */
 
   const [holiday] = await db
     .insert(publicHolidays)
@@ -251,10 +207,6 @@ const handlePut = async (event: HandlerEvent, id: string) => {
 
   const name = String(body.name || "").trim();
 
-  /* ----------------------------------------------------------
-     DATE
-  ---------------------------------------------------------- */
-
   if (!date) {
     return response(400, {
       success: false,
@@ -268,10 +220,6 @@ const handlePut = async (event: HandlerEvent, id: string) => {
       message: "Invalid holiday date. Use YYYY-MM-DD format.",
     });
   }
-
-  /* ----------------------------------------------------------
-     NAME
-  ---------------------------------------------------------- */
 
   if (!name) {
     return response(400, {
@@ -287,11 +235,7 @@ const handlePut = async (event: HandlerEvent, id: string) => {
     });
   }
 
-  /* ----------------------------------------------------------
-     CURRENT RECORD
-  ---------------------------------------------------------- */
-
-  const currentHoliday = await db
+  const current = await db
     .select({
       id: publicHolidays.id,
     })
@@ -299,35 +243,27 @@ const handlePut = async (event: HandlerEvent, id: string) => {
     .where(eq(publicHolidays.id, id))
     .limit(1);
 
-  if (currentHoliday.length === 0) {
+  if (current.length === 0) {
     return response(404, {
       success: false,
       message: "Holiday not found.",
     });
   }
 
-  /* ----------------------------------------------------------
-     DUPLICATE DATE
-  ---------------------------------------------------------- */
-
   const duplicate = await db
     .select({
       id: publicHolidays.id,
     })
     .from(publicHolidays)
-    .where(eq(publicHolidays.date, date))
+    .where(and(eq(publicHolidays.date, date), ne(publicHolidays.id, id)))
     .limit(1);
 
-  if (duplicate.length > 0 && duplicate[0].id !== id) {
+  if (duplicate.length > 0) {
     return response(409, {
       success: false,
       message: "A holiday already exists for this date.",
     });
   }
-
-  /* ----------------------------------------------------------
-     UPDATE
-  ---------------------------------------------------------- */
 
   const [holiday] = await db
     .update(publicHolidays)
@@ -356,10 +292,6 @@ const handlePut = async (event: HandlerEvent, id: string) => {
 const handlePatch = async (event: HandlerEvent, id: string) => {
   const body = await parseBody<HolidayBody>(event);
 
-  /* ----------------------------------------------------------
-     EXISTING
-  ---------------------------------------------------------- */
-
   const existing = await db
     .select({
       id: publicHolidays.id,
@@ -374,10 +306,6 @@ const handlePatch = async (event: HandlerEvent, id: string) => {
       message: "Holiday not found.",
     });
   }
-
-  /* ----------------------------------------------------------
-     UPDATE
-  ---------------------------------------------------------- */
 
   if (typeof body.isActive !== "boolean") {
     return response(400, {
@@ -409,10 +337,6 @@ const handlePatch = async (event: HandlerEvent, id: string) => {
 ============================================================ */
 
 const handleDelete = async (_event: HandlerEvent, id: string) => {
-  /* ----------------------------------------------------------
-     EXISTING
-  ---------------------------------------------------------- */
-
   const existing = await db
     .select({
       id: publicHolidays.id,
@@ -428,10 +352,6 @@ const handleDelete = async (_event: HandlerEvent, id: string) => {
     });
   }
 
-  /* ----------------------------------------------------------
-     DELETE
-  ---------------------------------------------------------- */
-
   await db.delete(publicHolidays).where(eq(publicHolidays.id, id));
 
   return response(200, {
@@ -441,65 +361,40 @@ const handleDelete = async (_event: HandlerEvent, id: string) => {
 };
 
 /* ============================================================
-   MAIN HANDLER
+   HANDLER
 ============================================================ */
 
 export const handler: Handler = async (event) => {
   try {
     const method = event.httpMethod.toUpperCase();
 
-    const id = getPathId(event);
+    const id = getHolidayId(event);
 
-    console.log("Admin Holidays API", {
+    console.log("Admin holidays API:", {
       method,
       path: event.path,
-      rawUrl: event.rawUrl,
       id,
     });
-
-    /* ------------------------------------------------------
-         GET
-      ------------------------------------------------------ */
 
     if (method === "GET") {
       return await handleGet(event, id);
     }
 
-    /* ------------------------------------------------------
-         POST
-      ------------------------------------------------------ */
-
     if (method === "POST" && !id) {
       return await handlePost(event);
     }
-
-    /* ------------------------------------------------------
-         PUT
-      ------------------------------------------------------ */
 
     if (method === "PUT" && id) {
       return await handlePut(event, id);
     }
 
-    /* ------------------------------------------------------
-         PATCH
-      ------------------------------------------------------ */
-
     if (method === "PATCH" && id) {
       return await handlePatch(event, id);
     }
 
-    /* ------------------------------------------------------
-         DELETE
-      ------------------------------------------------------ */
-
     if (method === "DELETE" && id) {
       return await handleDelete(event, id);
     }
-
-    /* ------------------------------------------------------
-         METHOD NOT ALLOWED
-      ------------------------------------------------------ */
 
     return response(405, {
       success: false,
