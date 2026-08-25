@@ -124,22 +124,21 @@
 
 [[redirects]]
   from = "/api/admin/holidays"
-  to = "/.netlify/functions/admin/holidays"
+  to = "/.netlify/functions/admin-holidays"
   status = 200
   force = true
 
 [[redirects]]
   from = "/api/admin/holidays/*"
-  to = "/.netlify/functions/admin/holidays/:splat"
+  to = "/.netlify/functions/admin-holidays/:splat"
   status = 200
   force = true
 
-# ============================================================
-# FRONTEND SPA ROUTING
-#
-# Keep this LAST.
-# ============================================================
 
+# Other API redirects should be here...
+
+
+# React SPA fallback MUST be last
 [[redirects]]
   from = "/*"
   to = "/index.html"
