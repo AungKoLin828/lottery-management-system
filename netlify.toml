@@ -125,7 +125,7 @@
 
 [[redirects]]
   from = "/api/admin/holidays/*"
-  to = "/.netlify/functions/admin/holidays"
+  to = "/.netlify/functions/admin/holidays/:splat"
   status = 200
 
 # ============================================================
