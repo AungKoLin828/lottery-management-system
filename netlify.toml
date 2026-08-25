@@ -118,6 +118,16 @@
   to = "/.netlify/functions/results-history"
   status = 200
   
+  [[redirects]]
+  from = "/api/admin/holidays"
+  to = "/.netlify/functions/api/admin/holidays"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/holidays/*"
+  to = "/.netlify/functions/api/admin/holidays"
+  status = 200
+  
 # ============================================================
 # FRONTEND SPA ROUTING
 #

@@ -15,6 +15,7 @@ import * as tickets from "./schema/tickets";
 import * as ticketItems from "./schema/ticketItems";
 import * as settings from "./schema/settings";
 import * as auditLogs from "./schema/auditLogs";
+export * from "./schema/publicHolidays";
 
 import * as relations from "./relations";
 

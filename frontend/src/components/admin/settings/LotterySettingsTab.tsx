@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import Button from "@/components/common/Button";
 import Input from "@/components/common/Input";
@@ -13,63 +13,154 @@ import NumberRestrictions from "@/components/admin/settings/NumberRestrictions";
 ============================================================ */
 
 type Holiday = {
+  id: string;
+  date: string;
+  name: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type HolidayForm = {
   date: string;
   name: string;
 };
 
-/* ============================================================
-   DEFAULT HOLIDAYS
-============================================================ */
-
-const defaultTwoDOffDays: Record<string, string> = {
-  "2026-01-01": "New Year's Day",
-  "2026-01-02": "New Year Holiday",
-  "2026-01-04": "Independence Day",
-
-  "2026-02-12": "Union Day",
-  "2026-02-13": "Union Day Holiday",
-  "2026-02-16": "Chinese New Year",
-  "2026-02-17": "Chinese New Year Holiday",
-
-  "2026-03-27": "Armed Forces Day",
-
-  "2026-05-01": "Labour Day",
-  "2026-05-28": "Eid Al-Adha",
-
-  "2026-07-19": "Martyrs' Day",
-
-  "2026-12-04": "National Day",
-  "2026-12-25": "Christmas Day",
+type ApiResponse<T = unknown> = {
+  success: boolean;
+  message?: string;
+  data?: T;
 };
 
-const defaultHolidays: Holiday[] = Object.entries(defaultTwoDOffDays)
-  .map(([date, name]) => ({
-    date,
-    name,
-  }))
-  .sort((a, b) => a.date.localeCompare(b.date));
+type HolidaysData = {
+  holidays: Holiday[];
+};
 
 /* ============================================================
    COMPONENT
 ============================================================ */
 
 export default function LotterySettingsTab() {
-  const [holidays, setHolidays] = useState<Holiday[]>(defaultHolidays);
+  /* ==========================================================
+     HOLIDAYS
+  ========================================================== */
 
-  const [showHolidayModal, setShowHolidayModal] = useState(false);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
 
-  const [editingHolidayDate, setEditingHolidayDate] = useState<string | null>(
+  const [loadingHolidays, setLoadingHolidays] = useState(true);
+
+  const [savingHoliday, setSavingHoliday] = useState(false);
+
+  const [deletingHolidayId, setDeletingHolidayId] = useState<string | null>(
     null,
   );
 
-  const [holidayForm, setHolidayForm] = useState<Holiday>({
+  const [holidayError, setHolidayError] = useState("");
+
+  /* ==========================================================
+     HOLIDAY MODAL
+  ========================================================== */
+
+  const [showHolidayModal, setShowHolidayModal] = useState(false);
+
+  const [editingHolidayId, setEditingHolidayId] = useState<string | null>(null);
+
+  const [holidayForm, setHolidayForm] = useState<HolidayForm>({
     date: "",
     name: "",
   });
 
-  const [holidayYear, setHolidayYear] = useState("2026");
+  /* ==========================================================
+     FILTER
+  ========================================================== */
+
+  const currentYear = new Date().getFullYear().toString();
+
+  const [holidayYear, setHolidayYear] = useState(currentYear);
 
   const [holidaySearch, setHolidaySearch] = useState("");
+
+  /* ==========================================================
+     LOAD HOLIDAYS
+  ========================================================== */
+
+  const loadHolidays = useCallback(async () => {
+    setLoadingHolidays(true);
+    setHolidayError("");
+
+    try {
+      const response = await fetch("/api/admin/holidays", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      const contentType = response.headers.get("content-type") || "";
+
+      if (!contentType.toLowerCase().includes("application/json")) {
+        const text = await response.text();
+
+        console.error("Holiday API returned non-JSON:", text.slice(0, 1000));
+
+        throw new Error(
+          `API returned ${response.status} ${response.statusText} instead of JSON.`,
+        );
+      }
+
+      const result = (await response.json()) as ApiResponse<HolidaysData>;
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to load public holidays.");
+      }
+
+      const loadedHolidays = Array.isArray(result.data?.holidays)
+        ? result.data.holidays
+        : [];
+
+      setHolidays(loadedHolidays);
+
+      /*
+       * Automatically select the first year available
+       * in the database.
+       */
+
+      if (loadedHolidays.length > 0) {
+        const years = Array.from(
+          new Set(
+            loadedHolidays
+              .map((holiday) => holiday.date.substring(0, 4))
+              .filter(Boolean),
+          ),
+        ).sort((a, b) => Number(b) - Number(a));
+
+        if (years.length > 0 && !years.includes(holidayYear)) {
+          setHolidayYear(years[0]);
+        }
+      }
+    } catch (error) {
+      console.error("Load holidays error:", error);
+
+      setHolidays([]);
+
+      setHolidayError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load public holidays.",
+      );
+    } finally {
+      setLoadingHolidays(false);
+    }
+  }, [holidayYear]);
+
+  /* ==========================================================
+     INITIAL LOAD
+  ========================================================== */
+
+  useEffect(() => {
+    void loadHolidays();
+  }, [loadHolidays]);
 
   /* ==========================================================
      AVAILABLE YEARS
@@ -84,13 +175,18 @@ export default function LotterySettingsTab() {
       }
     });
 
-    years.add(new Date().getFullYear().toString());
+    /*
+     * Always show the current year so admin can
+     * immediately register a holiday.
+     */
+
+    years.add(currentYear);
 
     return Array.from(years).sort((a, b) => Number(b) - Number(a));
-  }, [holidays]);
+  }, [holidays, currentYear]);
 
   /* ==========================================================
-     FILTER
+     FILTERED HOLIDAYS
   ========================================================== */
 
   const filteredHolidays = useMemo(() => {
@@ -109,110 +205,159 @@ export default function LotterySettingsTab() {
   }, [holidays, holidayYear, holidaySearch]);
 
   /* ==========================================================
-     ADD HOLIDAY
+     OPEN ADD
   ========================================================== */
 
   const openAddHoliday = () => {
+    setHolidayError("");
+
+    setEditingHolidayId(null);
+
     setHolidayForm({
       date: `${holidayYear}-01-01`,
       name: "",
     });
 
-    setEditingHolidayDate(null);
     setShowHolidayModal(true);
   };
 
   /* ==========================================================
-     EDIT HOLIDAY
+     OPEN EDIT
   ========================================================== */
 
   const openEditHoliday = (holiday: Holiday) => {
+    setHolidayError("");
+
+    setEditingHolidayId(holiday.id);
+
     setHolidayForm({
       date: holiday.date,
       name: holiday.name,
     });
 
-    setEditingHolidayDate(holiday.date);
-
     setShowHolidayModal(true);
+  };
+
+  /* ==========================================================
+     CLOSE MODAL
+  ========================================================== */
+
+  const closeHolidayModal = () => {
+    if (savingHoliday) {
+      return;
+    }
+
+    setShowHolidayModal(false);
+
+    setEditingHolidayId(null);
+
+    setHolidayForm({
+      date: "",
+      name: "",
+    });
+
+    setHolidayError("");
   };
 
   /* ==========================================================
      SAVE HOLIDAY
   ========================================================== */
 
-  const saveHoliday = () => {
+  const saveHoliday = async () => {
+    setHolidayError("");
+
     const date = holidayForm.date.trim();
 
     const name = holidayForm.name.trim();
 
     if (!date) {
-      alert("Holiday date is required.");
+      setHolidayError("Holiday date is required.");
       return;
     }
 
     if (!name) {
-      alert("Holiday name is required.");
+      setHolidayError("Holiday name is required.");
       return;
     }
 
     const parsedDate = new Date(`${date}T00:00:00`);
 
     if (Number.isNaN(parsedDate.getTime())) {
-      alert("Please enter a valid holiday date.");
+      setHolidayError("Please enter a valid holiday date.");
       return;
     }
 
-    const duplicate = holidays.some(
-      (holiday) => holiday.date === date && holiday.date !== editingHolidayDate,
-    );
+    setSavingHoliday(true);
 
-    if (duplicate) {
-      alert("A holiday already exists for this date.");
-      return;
-    }
+    try {
+      const isEditing = editingHolidayId !== null;
 
-    if (editingHolidayDate !== null) {
-      setHolidays((prev) =>
-        prev.map((holiday) =>
-          holiday.date === editingHolidayDate
-            ? {
-                date,
-                name,
-              }
-            : holiday,
-        ),
-      );
+      const url = isEditing
+        ? `/api/admin/holidays/${encodeURIComponent(editingHolidayId)}`
+        : "/api/admin/holidays";
 
-      alert("Holiday updated successfully.");
-    } else {
-      setHolidays((prev) => [
-        ...prev,
-        {
+      const response = await fetch(url, {
+        method: isEditing ? "PUT" : "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
           date,
           name,
-        },
-      ]);
+          isActive: true,
+        }),
+      });
+
+      const contentType = response.headers.get("content-type") || "";
+
+      if (!contentType.toLowerCase().includes("application/json")) {
+        const text = await response.text();
+
+        console.error(
+          "Save holiday API returned non-JSON:",
+          text.slice(0, 1000),
+        );
+
+        throw new Error(
+          `API returned ${response.status} ${response.statusText} instead of JSON.`,
+        );
+      }
+
+      const result = (await response.json()) as ApiResponse;
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to save holiday.");
+      }
+
+      alert(
+        isEditing
+          ? "Holiday updated successfully."
+          : "Holiday added successfully.",
+      );
 
       setHolidayYear(date.substring(0, 4));
 
-      alert("Holiday added successfully.");
+      closeHolidayModal();
+
+      await loadHolidays();
+    } catch (error) {
+      console.error("Save holiday error:", error);
+
+      setHolidayError(
+        error instanceof Error ? error.message : "Failed to save holiday.",
+      );
+    } finally {
+      setSavingHoliday(false);
     }
-
-    setShowHolidayModal(false);
-    setEditingHolidayDate(null);
-
-    setHolidayForm({
-      date: "",
-      name: "",
-    });
   };
 
   /* ==========================================================
-     DELETE
+     DELETE HOLIDAY
   ========================================================== */
 
-  const deleteHoliday = (holiday: Holiday) => {
+  const deleteHoliday = async (holiday: Holiday) => {
     const confirmed = window.confirm(
       `Are you sure you want to delete "${holiday.name}" on ${holiday.date}?`,
     );
@@ -221,27 +366,96 @@ export default function LotterySettingsTab() {
       return;
     }
 
-    setHolidays((prev) => prev.filter((item) => item.date !== holiday.date));
+    setHolidayError("");
 
-    alert("Holiday deleted successfully.");
+    setDeletingHolidayId(holiday.id);
+
+    try {
+      const response = await fetch(
+        `/api/admin/holidays/${encodeURIComponent(holiday.id)}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+          },
+        },
+      );
+
+      const contentType = response.headers.get("content-type") || "";
+
+      if (!contentType.toLowerCase().includes("application/json")) {
+        const text = await response.text();
+
+        console.error(
+          "Delete holiday API returned non-JSON:",
+          text.slice(0, 1000),
+        );
+
+        throw new Error(
+          `API returned ${response.status} ${response.statusText} instead of JSON.`,
+        );
+      }
+
+      const result = (await response.json()) as ApiResponse;
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to delete holiday.");
+      }
+
+      alert("Holiday deleted successfully.");
+
+      await loadHolidays();
+    } catch (error) {
+      console.error("Delete holiday error:", error);
+
+      setHolidayError(
+        error instanceof Error ? error.message : "Failed to delete holiday.",
+      );
+    } finally {
+      setDeletingHolidayId(null);
+    }
   };
 
   /* ==========================================================
-     SAVE HOLIDAYS
+     TOGGLE ACTIVE
   ========================================================== */
 
-  const saveHolidaySettings = () => {
-    const twoDOffDays: Record<string, string> = {};
+  const toggleHolidayStatus = async (holiday: Holiday) => {
+    setHolidayError("");
 
-    [...holidays]
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .forEach((holiday) => {
-        twoDOffDays[holiday.date] = holiday.name;
-      });
+    try {
+      const response = await fetch(
+        `/api/admin/holidays/${encodeURIComponent(holiday.id)}`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            isActive: !holiday.isActive,
+          }),
+        },
+      );
 
-    console.log("2D Public Holidays:", twoDOffDays);
+      const result = (await response.json()) as ApiResponse;
 
-    alert("2D public holidays saved successfully.");
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to update holiday status.");
+      }
+
+      await loadHolidays();
+    } catch (error) {
+      console.error("Toggle holiday error:", error);
+
+      setHolidayError(
+        error instanceof Error
+          ? error.message
+          : "Failed to update holiday status.",
+      );
+    }
   };
 
   /* ==========================================================
@@ -279,10 +493,12 @@ export default function LotterySettingsTab() {
       </div>
 
       {/* ======================================================
-          HOLIDAY MANAGEMENT
+          PUBLIC HOLIDAYS
       ====================================================== */}
 
       <div className="rounded-xl bg-white p-6 shadow">
+        {/* HEADER */}
+
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-800">
@@ -290,8 +506,8 @@ export default function LotterySettingsTab() {
             </h2>
 
             <p className="mt-1 text-sm text-gray-500">
-              Manage public holidays and off days when 2D draws should not be
-              available.
+              Register and manage public holidays stored in the database. Active
+              holidays prevent 2D AM and PM draws.
             </p>
           </div>
 
@@ -310,12 +526,21 @@ export default function LotterySettingsTab() {
               <p className="font-medium text-blue-800">2D Draw Off Days</p>
 
               <p className="mt-1 text-sm text-blue-700">
-                Dates configured here can be used by the 2D draw schedule to
-                prevent AM and PM draws on public holidays.
+                Holidays registered here are stored in PostgreSQL. When a
+                holiday is active, both 2D AM and PM sessions can be blocked for
+                that date. 3D scheduling remains independent.
               </p>
             </div>
           </div>
         </div>
+
+        {/* ERROR */}
+
+        {holidayError && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {holidayError}
+          </div>
+        )}
 
         {/* FILTERS */}
 
@@ -326,7 +551,7 @@ export default function LotterySettingsTab() {
             </label>
 
             <select
-              className="w-full rounded-lg border p-2.5"
+              className="w-full rounded-lg border p-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               value={holidayYear}
               onChange={(e) => setHolidayYear(e.target.value)}
             >
@@ -363,7 +588,7 @@ export default function LotterySettingsTab() {
         {/* TABLE */}
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px] text-left text-sm">
+          <table className="w-full min-w-[850px] text-left text-sm">
             <thead>
               <tr className="border-b bg-gray-50">
                 <th className="px-4 py-3 font-semibold text-gray-700">#</th>
@@ -376,6 +601,10 @@ export default function LotterySettingsTab() {
                   Holiday
                 </th>
 
+                <th className="px-4 py-3 text-center font-semibold text-gray-700">
+                  Status
+                </th>
+
                 <th className="px-4 py-3 text-right font-semibold text-gray-700">
                   Action
                 </th>
@@ -383,73 +612,105 @@ export default function LotterySettingsTab() {
             </thead>
 
             <tbody className="divide-y">
-              {filteredHolidays.map((holiday, index) => {
-                const date = new Date(`${holiday.date}T00:00:00`);
-
-                const dayName = date.toLocaleDateString("en-US", {
-                  weekday: "long",
-                });
-
-                return (
-                  <tr
-                    key={holiday.date}
-                    className="transition hover:bg-gray-50"
-                  >
-                    <td className="px-4 py-4 text-gray-500">{index + 1}</td>
-
-                    <td className="px-4 py-4">
-                      <span className="rounded-md bg-gray-100 px-2.5 py-1 font-mono text-sm text-gray-700">
-                        {holiday.date}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-4 text-gray-600">{dayName}</td>
-
-                    <td className="px-4 py-4">
-                      <div className="font-medium text-gray-900">
-                        {holiday.name}
-                      </div>
-
-                      <div className="mt-1 text-xs text-red-600">
-                        2D AM / PM Draw Off
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-4">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => openEditHoliday(holiday)}
-                        >
-                          Edit
-                        </Button>
-
-                        <Button
-                          variant="danger"
-                          onClick={() => deleteHoliday(holiday)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {filteredHolidays.length === 0 && (
+              {loadingHolidays ? (
                 <tr>
                   <td
-                    colSpan={5}
-                    className="px-4 py-10 text-center text-gray-500"
+                    colSpan={6}
+                    className="px-4 py-12 text-center text-gray-500"
+                  >
+                    Loading holidays...
+                  </td>
+                </tr>
+              ) : filteredHolidays.length > 0 ? (
+                filteredHolidays.map((holiday, index) => {
+                  const date = new Date(`${holiday.date}T00:00:00`);
+
+                  const dayName = date.toLocaleDateString("en-US", {
+                    weekday: "long",
+                  });
+
+                  const deleting = deletingHolidayId === holiday.id;
+
+                  return (
+                    <tr
+                      key={holiday.id}
+                      className="transition hover:bg-gray-50"
+                    >
+                      <td className="px-4 py-4 text-gray-500">{index + 1}</td>
+
+                      <td className="px-4 py-4">
+                        <span className="rounded-md bg-gray-100 px-2.5 py-1 font-mono text-sm text-gray-700">
+                          {holiday.date}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-4 text-gray-600">{dayName}</td>
+
+                      <td className="px-4 py-4">
+                        <div className="font-medium text-gray-900">
+                          {holiday.name}
+                        </div>
+
+                        <div className="mt-1 text-xs text-red-600">
+                          2D AM / PM Draw Off
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-4 text-center">
+                        <button
+                          type="button"
+                          onClick={() => void toggleHolidayStatus(holiday)}
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            holiday.isActive
+                              ? "bg-green-100 text-green-700"
+                              : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {holiday.isActive ? "Active" : "Inactive"}
+                        </button>
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => openEditHoliday(holiday)}
+                          >
+                            Edit
+                          </Button>
+
+                          <Button
+                            variant="danger"
+                            onClick={() => void deleteHoliday(holiday)}
+                            disabled={deleting}
+                          >
+                            {deleting ? "Deleting..." : "Delete"}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-12 text-center text-gray-500"
                   >
                     <div className="text-base font-medium">
                       No holidays found
                     </div>
 
                     <p className="mt-1 text-sm">
-                      Add a new public holiday or change the selected
-                      year/search.
+                      No holidays are registered in the database for{" "}
+                      {holidayYear}.
                     </p>
+
+                    <div className="mt-4">
+                      <Button variant="success" onClick={openAddHoliday}>
+                        + Register Holiday
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -457,45 +718,58 @@ export default function LotterySettingsTab() {
           </table>
         </div>
 
-        {/* SAVE */}
+        {/* FOOTER */}
 
         <div className="mt-6 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-gray-500">
-            Total configured holidays:{" "}
+            Total database holidays:{" "}
             <span className="font-semibold text-gray-700">
               {holidays.length}
             </span>
           </p>
 
-          <Button variant="success" onClick={saveHolidaySettings}>
-            Save Public Holidays
-          </Button>
+          <button
+            type="button"
+            onClick={() => void loadHolidays()}
+            disabled={loadingHolidays}
+            className="text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
+          >
+            {loadingHolidays ? "Refreshing..." : "Refresh Holidays"}
+          </button>
         </div>
       </div>
 
       {/* ======================================================
-          HOLIDAY MODAL
+          ADD / EDIT HOLIDAY MODAL
       ====================================================== */}
 
       <Modal
         open={showHolidayModal}
         title={
-          editingHolidayDate !== null
+          editingHolidayId !== null
             ? "Edit Public Holiday"
-            : "Add Public Holiday"
+            : "Register Public Holiday"
         }
-        onClose={() => {
-          setShowHolidayModal(false);
-          setEditingHolidayDate(null);
-        }}
+        onClose={closeHolidayModal}
       >
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            saveHoliday();
+
+            void saveHoliday();
           }}
           className="space-y-5"
         >
+          {/* ERROR */}
+
+          {holidayError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {holidayError}
+            </div>
+          )}
+
+          {/* DATE */}
+
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Holiday Date
@@ -515,6 +789,8 @@ export default function LotterySettingsTab() {
             />
           </div>
 
+          {/* NAME */}
+
           <Input
             label="Holiday Name"
             value={holidayForm.name}
@@ -524,29 +800,36 @@ export default function LotterySettingsTab() {
                 name: e.target.value,
               }))
             }
-            placeholder="e.g. New Year's Day"
+            placeholder="e.g. Independence Day"
             required
           />
 
+          {/* INFORMATION */}
+
           <div className="rounded-lg bg-yellow-50 p-3 text-sm text-yellow-800">
-            <strong>Important:</strong> This date will be treated as a 2D draw
-            off day. Both AM and PM sessions can be blocked for this date.
+            <strong>Important:</strong> An active holiday will be treated as a
+            2D draw off day. Both AM and PM sessions can be blocked for this
+            date.
           </div>
+
+          {/* ACTIONS */}
 
           <div className="flex justify-end gap-3 pt-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => {
-                setShowHolidayModal(false);
-                setEditingHolidayDate(null);
-              }}
+              onClick={closeHolidayModal}
+              disabled={savingHoliday}
             >
               Cancel
             </Button>
 
-            <Button type="submit" variant="success">
-              {editingHolidayDate !== null ? "Update Holiday" : "Add Holiday"}
+            <Button type="submit" variant="success" disabled={savingHoliday}>
+              {savingHoliday
+                ? "Saving..."
+                : editingHolidayId !== null
+                  ? "Update Holiday"
+                  : "Register Holiday"}
             </Button>
           </div>
         </form>
