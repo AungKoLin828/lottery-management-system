@@ -1,4 +1,4 @@
-// src/pages/admin/BalanceManagement.tsx
+// src/pages/admin/TransactionManagement.tsx
 
 import { useState } from "react";
 
@@ -17,7 +17,7 @@ import {
   notifyPlayerWithdrawRejected,
 } from "@/services/notificationService";
 
-export default function BalanceManagement() {
+export default function TransactionManagement() {
   /* ============================================================
      STATE
   ============================================================ */
@@ -144,7 +144,7 @@ export default function BalanceManagement() {
 
       /* --------------------------------------------------------
          Add transaction
-         
+
          The real backend should also update the player's wallet.
       -------------------------------------------------------- */
 
@@ -311,7 +311,7 @@ export default function BalanceManagement() {
 
   /* ============================================================
      APPROVE WITHDRAW
-     
+
      IMPORTANT:
      Wallet balance is no longer maintained in this component.
      The backend should:
@@ -344,7 +344,7 @@ export default function BalanceManagement() {
 
       /* --------------------------------------------------------
          Add transaction
-         
+
          The real backend should validate and deduct the wallet.
       -------------------------------------------------------- */
 
@@ -516,7 +516,9 @@ export default function BalanceManagement() {
       ====================================================== */}
 
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Balance Management</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Transaction Management
+        </h1>
 
         <p className="mt-1 text-sm text-gray-500">
           Manage player deposits, withdrawals and transactions.

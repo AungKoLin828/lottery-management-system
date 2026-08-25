@@ -40,7 +40,7 @@ const handleLogout = async () => {
    ├── Dashboard
    ├── Results Management
    ├── User Management
-   ├── Balance Management
+   ├── Transaction Management
    │   ├── Deposit Requests
    │   └── Withdraw Requests
    ├── Reports
@@ -67,7 +67,7 @@ const navigation = [
     icon: Users,
   },
   {
-    label: "Balance Management",
+    label: "Transaction Management",
     path: "/admin/balance",
     icon: Wallet,
   },
@@ -114,7 +114,7 @@ export default function AdminLayout() {
 
   /* ==========================================================
      PAGE TITLE
-     
+
      The page title changes according to the current route.
 
      Deposit Requests:
@@ -173,11 +173,11 @@ export default function AdminLayout() {
     }
 
     /* ========================================================
-       BALANCE MANAGEMENT
+       TRANSACTION MANAGEMENT
     ======================================================== */
 
     if (path.startsWith("/admin/balance")) {
-      return "Balance Management";
+      return "Transaction Management";
     }
 
     /* ========================================================
@@ -211,7 +211,7 @@ export default function AdminLayout() {
     <div className="flex min-h-screen overflow-x-hidden bg-gray-100">
       {/* ======================================================
           MOBILE OVERLAY
-      ====================================================== */}
+      ======================================================= */}
 
       {sidebarOpen && (
         <button
@@ -224,7 +224,7 @@ export default function AdminLayout() {
 
       {/* ======================================================
           SIDEBAR
-      ====================================================== */}
+      ======================================================= */}
 
       <aside
         className={`
@@ -321,7 +321,7 @@ export default function AdminLayout() {
 
       {/* ======================================================
           MAIN AREA
-      ====================================================== */}
+      ======================================================= */}
 
       <main className="flex min-w-0 flex-1 flex-col">
         {/* ==================================================
