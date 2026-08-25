@@ -120,14 +120,14 @@
   
   [[redirects]]
   from = "/api/admin/holidays"
-  to = "/.netlify/functions/api/admin/holidays"
+  to = "/.netlify/functions/admin/holidays"
   status = 200
 
 [[redirects]]
   from = "/api/admin/holidays/*"
-  to = "/.netlify/functions/api/admin/holidays"
+  to = "/.netlify/functions/admin/holidays"
   status = 200
-  
+
 # ============================================================
 # FRONTEND SPA ROUTING
 #
