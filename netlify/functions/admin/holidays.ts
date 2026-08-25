@@ -1,6 +1,6 @@
 import type { Handler, HandlerEvent } from "@netlify/functions";
 
-import { and, asc, eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 
 import { publicHolidays } from "../../../db/schema/publicHolidays";
 
@@ -25,7 +25,7 @@ type ApiResponse<T = unknown> = {
 };
 
 /* ============================================================
-   RESPONSE HELPER
+   RESPONSE
 ============================================================ */
 
 const response = <T>(statusCode: number, body: ApiResponse<T>) => {
@@ -42,31 +42,32 @@ const response = <T>(statusCode: number, body: ApiResponse<T>) => {
  * /api/admin/holidays
  * /api/admin/holidays/:id
  *
+ * and:
+ *
  * /.netlify/functions/admin/holidays
  * /.netlify/functions/admin/holidays/:id
  *
- * The redirect from netlify.toml sends:
- *
- * /api/admin/holidays/:id
- *
- * to:
- *
- * /.netlify/functions/admin/holidays/:id
+ * Netlify may also provide the path through
+ * event.rawUrl / event.path depending on deployment.
  */
-const getPathId = (event: HandlerEvent): string | null => {
-  const path = event.path || "";
+const getPathId = (event: Parameters<Handler>[0]): string | null => {
+  const paths = [event.path || "", event.rawUrl || ""];
 
-  const parts = path.split("/").filter(Boolean);
+  for (const path of paths) {
+    const parts = path.split("/").filter(Boolean);
 
-  const holidaysIndex = parts.lastIndexOf("holidays");
+    const holidaysIndex = parts.lastIndexOf("holidays");
 
-  if (holidaysIndex === -1) {
-    return null;
+    if (holidaysIndex !== -1) {
+      const id = parts[holidaysIndex + 1];
+
+      if (id) {
+        return decodeURIComponent(id);
+      }
+    }
   }
 
-  const id = parts[holidaysIndex + 1];
-
-  return id || null;
+  return null;
 };
 
 /* ============================================================
@@ -90,10 +91,10 @@ const isValidDate = (value: string): boolean => {
 };
 
 /* ============================================================
-   GET ALL / SINGLE
+   GET ALL HOLIDAYS
 ============================================================ */
 
-const handleGet = async (event: HandlerEvent, id: string | null) => {
+const handleGet = async (_event: HandlerEvent, id: string | null) => {
   /* ----------------------------------------------------------
      GET SINGLE HOLIDAY
   ---------------------------------------------------------- */
@@ -128,7 +129,7 @@ const handleGet = async (event: HandlerEvent, id: string | null) => {
   }
 
   /* ----------------------------------------------------------
-     GET ALL HOLIDAYS
+     GET ALL
   ---------------------------------------------------------- */
 
   const holidays = await db
@@ -287,7 +288,7 @@ const handlePut = async (event: HandlerEvent, id: string) => {
   }
 
   /* ----------------------------------------------------------
-     CURRENT HOLIDAY
+     CURRENT RECORD
   ---------------------------------------------------------- */
 
   const currentHoliday = await db
@@ -314,11 +315,10 @@ const handlePut = async (event: HandlerEvent, id: string) => {
       id: publicHolidays.id,
     })
     .from(publicHolidays)
-    .where(and(eq(publicHolidays.date, date)));
+    .where(eq(publicHolidays.date, date))
+    .limit(1);
 
-  const duplicateExists = duplicate.some((holiday) => holiday.id !== id);
-
-  if (duplicateExists) {
+  if (duplicate.length > 0 && duplicate[0].id !== id) {
     return response(409, {
       success: false,
       message: "A holiday already exists for this date.",
@@ -357,7 +357,7 @@ const handlePatch = async (event: HandlerEvent, id: string) => {
   const body = await parseBody<HolidayBody>(event);
 
   /* ----------------------------------------------------------
-     EXISTING HOLIDAY
+     EXISTING
   ---------------------------------------------------------- */
 
   const existing = await db
@@ -376,27 +376,22 @@ const handlePatch = async (event: HandlerEvent, id: string) => {
   }
 
   /* ----------------------------------------------------------
-     UPDATE DATA
-  ---------------------------------------------------------- */
-
-  const updateData: {
-    isActive?: boolean;
-    updatedAt: Date;
-  } = {
-    updatedAt: new Date(),
-  };
-
-  if (typeof body.isActive === "boolean") {
-    updateData.isActive = body.isActive;
-  }
-
-  /* ----------------------------------------------------------
      UPDATE
   ---------------------------------------------------------- */
 
+  if (typeof body.isActive !== "boolean") {
+    return response(400, {
+      success: false,
+      message: "isActive must be a boolean.",
+    });
+  }
+
   const [holiday] = await db
     .update(publicHolidays)
-    .set(updateData)
+    .set({
+      isActive: body.isActive,
+      updatedAt: new Date(),
+    })
     .where(eq(publicHolidays.id, id))
     .returning();
 
@@ -415,7 +410,7 @@ const handlePatch = async (event: HandlerEvent, id: string) => {
 
 const handleDelete = async (_event: HandlerEvent, id: string) => {
   /* ----------------------------------------------------------
-     EXISTING HOLIDAY
+     EXISTING
   ---------------------------------------------------------- */
 
   const existing = await db
@@ -446,7 +441,7 @@ const handleDelete = async (_event: HandlerEvent, id: string) => {
 };
 
 /* ============================================================
-   HANDLER
+   MAIN HANDLER
 ============================================================ */
 
 export const handler: Handler = async (event) => {
@@ -455,10 +450,10 @@ export const handler: Handler = async (event) => {
 
     const id = getPathId(event);
 
-    console.log("Admin holidays API request:", {
+    console.log("Admin Holidays API", {
       method,
       path: event.path,
-      rawPath: event.rawUrl,
+      rawUrl: event.rawUrl,
       id,
     });
 
