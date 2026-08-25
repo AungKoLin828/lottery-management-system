@@ -1,6 +1,6 @@
 import type { Handler, HandlerEvent } from "@netlify/functions";
 
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { publicHolidays } from "../../../db/schema/publicHolidays";
 
@@ -25,7 +25,7 @@ type ApiResponse<T = unknown> = {
 };
 
 /* ============================================================
-   RESPONSE
+   RESPONSE HELPER
 ============================================================ */
 
 const response = <T>(statusCode: number, body: ApiResponse<T>) => {
@@ -33,22 +33,25 @@ const response = <T>(statusCode: number, body: ApiResponse<T>) => {
 };
 
 /* ============================================================
-   PATH HELPERS
+   PATH ID
 ============================================================ */
 
 /**
- * Supported paths:
+ * Supports:
  *
  * /api/admin/holidays
  * /api/admin/holidays/:id
  *
- * Netlify function path:
- *
  * /.netlify/functions/admin/holidays
  * /.netlify/functions/admin/holidays/:id
  *
- * Because the request may arrive through the redirect,
- * we intentionally do not depend on one specific prefix.
+ * The redirect from netlify.toml sends:
+ *
+ * /api/admin/holidays/:id
+ *
+ * to:
+ *
+ * /.netlify/functions/admin/holidays/:id
  */
 const getPathId = (event: HandlerEvent): string | null => {
   const path = event.path || "";
@@ -61,9 +64,9 @@ const getPathId = (event: HandlerEvent): string | null => {
     return null;
   }
 
-  const possibleId = parts[holidaysIndex + 1];
+  const id = parts[holidaysIndex + 1];
 
-  return possibleId || null;
+  return id || null;
 };
 
 /* ============================================================
@@ -87,10 +90,10 @@ const isValidDate = (value: string): boolean => {
 };
 
 /* ============================================================
-   GET ALL / SINGLE HOLIDAY
+   GET ALL / SINGLE
 ============================================================ */
 
-const handleGet = async (id: string | null) => {
+const handleGet = async (event: HandlerEvent, id: string | null) => {
   /* ----------------------------------------------------------
      GET SINGLE HOLIDAY
   ---------------------------------------------------------- */
@@ -156,6 +159,7 @@ const handlePost = async (event: HandlerEvent) => {
   const body = await parseBody<HolidayBody>(event);
 
   const date = String(body.date || "").trim();
+
   const name = String(body.name || "").trim();
 
   /* ----------------------------------------------------------
@@ -243,10 +247,11 @@ const handlePut = async (event: HandlerEvent, id: string) => {
   const body = await parseBody<HolidayBody>(event);
 
   const date = String(body.date || "").trim();
+
   const name = String(body.name || "").trim();
 
   /* ----------------------------------------------------------
-     VALIDATE DATE
+     DATE
   ---------------------------------------------------------- */
 
   if (!date) {
@@ -264,7 +269,7 @@ const handlePut = async (event: HandlerEvent, id: string) => {
   }
 
   /* ----------------------------------------------------------
-     VALIDATE NAME
+     NAME
   ---------------------------------------------------------- */
 
   if (!name) {
@@ -282,7 +287,7 @@ const handlePut = async (event: HandlerEvent, id: string) => {
   }
 
   /* ----------------------------------------------------------
-     CHECK CURRENT HOLIDAY
+     CURRENT HOLIDAY
   ---------------------------------------------------------- */
 
   const currentHoliday = await db
@@ -301,19 +306,17 @@ const handlePut = async (event: HandlerEvent, id: string) => {
   }
 
   /* ----------------------------------------------------------
-     CHECK DUPLICATE DATE
+     DUPLICATE DATE
   ---------------------------------------------------------- */
 
-  const holidaysWithSameDate = await db
+  const duplicate = await db
     .select({
       id: publicHolidays.id,
     })
     .from(publicHolidays)
-    .where(eq(publicHolidays.date, date));
+    .where(and(eq(publicHolidays.date, date)));
 
-  const duplicateExists = holidaysWithSameDate.some(
-    (holiday) => holiday.id !== id,
-  );
+  const duplicateExists = duplicate.some((holiday) => holiday.id !== id);
 
   if (duplicateExists) {
     return response(409, {
@@ -354,7 +357,7 @@ const handlePatch = async (event: HandlerEvent, id: string) => {
   const body = await parseBody<HolidayBody>(event);
 
   /* ----------------------------------------------------------
-     CHECK HOLIDAY
+     EXISTING HOLIDAY
   ---------------------------------------------------------- */
 
   const existing = await db
@@ -410,9 +413,9 @@ const handlePatch = async (event: HandlerEvent, id: string) => {
    DELETE
 ============================================================ */
 
-const handleDelete = async (id: string) => {
+const handleDelete = async (_event: HandlerEvent, id: string) => {
   /* ----------------------------------------------------------
-     CHECK HOLIDAY
+     EXISTING HOLIDAY
   ---------------------------------------------------------- */
 
   const existing = await db
@@ -455,80 +458,53 @@ export const handler: Handler = async (event) => {
     console.log("Admin holidays API request:", {
       method,
       path: event.path,
+      rawPath: event.rawUrl,
       id,
     });
 
-    /* --------------------------------------------------------
-       GET
-    -------------------------------------------------------- */
+    /* ------------------------------------------------------
+         GET
+      ------------------------------------------------------ */
 
     if (method === "GET") {
-      return await handleGet(id);
+      return await handleGet(event, id);
     }
 
-    /* --------------------------------------------------------
-       POST
-    -------------------------------------------------------- */
+    /* ------------------------------------------------------
+         POST
+      ------------------------------------------------------ */
 
-    if (method === "POST") {
-      if (id) {
-        return response(400, {
-          success: false,
-          message: "POST does not accept a holiday ID.",
-        });
-      }
-
+    if (method === "POST" && !id) {
       return await handlePost(event);
     }
 
-    /* --------------------------------------------------------
-       PUT
-    -------------------------------------------------------- */
+    /* ------------------------------------------------------
+         PUT
+      ------------------------------------------------------ */
 
-    if (method === "PUT") {
-      if (!id) {
-        return response(400, {
-          success: false,
-          message: "Holiday ID is required.",
-        });
-      }
-
+    if (method === "PUT" && id) {
       return await handlePut(event, id);
     }
 
-    /* --------------------------------------------------------
-       PATCH
-    -------------------------------------------------------- */
+    /* ------------------------------------------------------
+         PATCH
+      ------------------------------------------------------ */
 
-    if (method === "PATCH") {
-      if (!id) {
-        return response(400, {
-          success: false,
-          message: "Holiday ID is required.",
-        });
-      }
-
+    if (method === "PATCH" && id) {
       return await handlePatch(event, id);
     }
 
-    /* --------------------------------------------------------
-       DELETE
-    -------------------------------------------------------- */
+    /* ------------------------------------------------------
+         DELETE
+      ------------------------------------------------------ */
 
-    if (method === "DELETE") {
-      if (!id) {
-        return response(400, {
-          success: false,
-          message: "Holiday ID is required.",
-        });
-      }
-
-      return await handleDelete(id);
+    if (method === "DELETE" && id) {
+      return await handleDelete(event, id);
     }
 
-    /* --------------------------------------------------------
-       METHOD NOT ALLOWED
-    -------------------------------------------------------- */
+    /* ------------------------------------------------------
+         METHOD NOT ALLOWED
+      ------------------------------------------------------ */
 
     return response(405, {
       success: false,
