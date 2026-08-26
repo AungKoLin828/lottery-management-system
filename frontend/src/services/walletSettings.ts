@@ -2,79 +2,133 @@ import type { PaymentMethod } from "@/types/settings";
 
 /*
  * ============================================================
+ * PLAYER WALLET PAYMENT METHOD TYPE
+ * ============================================================
+ *
+ * The shared PaymentMethod type is used by admin settings.
+ *
+ * Player wallet payment methods additionally need:
+ *   - logo
+ *
+ * QR code has been completely removed.
+ *
+ * We also keep id as number because the current wallet settings
+ * and allowedPaymentMethods use numeric IDs.
+ */
+
+export type WalletPaymentMethod = Omit<
+  PaymentMethod,
+  "id" | "logo" | "qrCode"
+> & {
+  id: number;
+  logo?: string;
+};
+
+/*
+ * ============================================================
  * PLAYER WALLET PAYMENT METHODS
  * ============================================================
  *
- * qrCode:
- *   - Can contain a public image path
- *   - Example: "/payment-qr/kbzpay.png"
- *   - Or an external image URL
+ * logo:
+ *   - Public image path
+ *   - Example: "/payment-logos/kbzpay.png"
  *
  * accountNumber:
- *   - Phone number for KPay / WavePay / AYA Pay
- *   - Bank account number for bank transfer
+ *   - Payment account / phone number for deposits
+ *   - Admin's configured account is displayed for deposits
+ *   - Withdrawal page asks the player for their own account
  *
+ * QR CODE:
+ *   - Removed completely.
+ *   - No qrCode property is used anymore.
  */
 
-export const walletPaymentMethods: PaymentMethod[] = [
+export const walletPaymentMethods: WalletPaymentMethod[] = [
   {
     id: 1,
+
     name: "KBZPay",
+
     type: "Both",
+
     enabled: true,
+
     logo: "/payment-logos/kbzpay.png",
-    qrCode: "/payment-qr/kbzpay.png",
+
     accountName: "Lottery Admin",
+
     accountNumber: "09123456789",
+
     bankName: "",
+
     branch: "",
+
     displayOrder: 1,
   },
 
   {
     id: 2,
+
     name: "WavePay",
-    /*
-     * Changed from "Deposit" to "Both"
-     * so WavePay can be used for both
-     * deposit and withdrawal.
-     */
+
     type: "Both",
+
     enabled: true,
+
     logo: "/payment-logos/wavepay.png",
-    qrCode: "/payment-qr/wavepay.png",
+
     accountName: "Lottery Admin",
+
     accountNumber: "09987654321",
+
     bankName: "",
+
     branch: "",
+
     displayOrder: 2,
   },
 
   {
     id: 3,
+
     name: "AYA Pay",
+
     type: "Both",
+
     enabled: false,
+
     logo: "/payment-logos/ayapay.png",
-    qrCode: "/payment-qr/ayapay.png",
+
     accountName: "Lottery Admin",
+
     accountNumber: "09777777777",
+
     bankName: "",
+
     branch: "",
+
     displayOrder: 3,
   },
 
   {
     id: 4,
+
     name: "Bank Transfer",
+
     type: "Withdraw",
+
     enabled: true,
+
     logo: "/payment-logos/bank.png",
-    qrCode: "",
+
     accountName: "Lottery Company",
+
     accountNumber: "1234567890",
+
     bankName: "KBZ Bank",
+
     branch: "Yangon Main Branch",
+
     displayOrder: 4,
   },
 ];
@@ -132,8 +186,8 @@ export const withdrawSettings = {
    * 1 = KBZPay
    * 2 = WavePay
    *
-   * Bank Transfer (4) is intentionally removed
-   * from the player withdrawal methods.
+   * Bank Transfer is intentionally not available
+   * on the player withdrawal page.
    */
   allowedPaymentMethods: [1, 2],
 

@@ -413,21 +413,6 @@ export default function Settings() {
   };
 
   /* ==========================================================
-     PAYMENT METHODS UPDATED
-     
-     This helper is useful if another child component changes
-     the shared payment method list.
-  ========================================================== */
-
-  const handlePaymentMethodsChange = (methods: PaymentMethod[]) => {
-    const normalizedMethods = methods.map(normalizePaymentMethod);
-
-    normalizedMethods.sort((a, b) => a.displayOrder - b.displayOrder);
-
-    setPaymentMethods(normalizedMethods);
-  };
-
-  /* ==========================================================
      RENDER
   ========================================================== */
 

@@ -23,7 +23,23 @@ import { notifyAdminWithdrawRequest } from "@/services/notificationService";
    TYPES
 ============================================================ */
 
+/*
+ * walletPaymentMethods may not currently define a `logo`
+ * property in its TypeScript type.
+ *
+ * This extended type allows the UI to safely support:
+ *
+ *   logo
+ *   logoUrl
+ *
+ * without requiring changes to the backend.
+ */
 type PaymentMethod = (typeof walletPaymentMethods)[number];
+
+type PaymentMethodWithLogo = PaymentMethod & {
+  logo?: string | null;
+  logoUrl?: string | null;
+};
 
 /* ============================================================
    CONSTANTS
@@ -32,6 +48,53 @@ type PaymentMethod = (typeof walletPaymentMethods)[number];
 const FIRST_WITHDRAWAL_WAIT_HOURS = 24;
 
 const FIRST_WITHDRAWAL_KEY = "lottery_first_withdrawal_completed";
+
+/* ============================================================
+   HELPERS
+============================================================ */
+
+/**
+ * Safely get payment method logo.
+ *
+ * Supports:
+ * - logo
+ * - logoUrl
+ *
+ * If neither exists, returns an empty string.
+ */
+const getPaymentMethodLogo = (method: PaymentMethod): string => {
+  const paymentMethod = method as PaymentMethodWithLogo;
+
+  return paymentMethod.logo?.trim() || paymentMethod.logoUrl?.trim() || "";
+};
+
+/**
+ * Normalize payment method name.
+ */
+const normalizePaymentMethodName = (name: unknown): string => {
+  return String(name ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[-_]/g, " ")
+    .replace(/\s+/g, " ");
+};
+
+/**
+ * Convert payment method ID to a number.
+ *
+ * This prevents problems when the API/database returns:
+ *
+ *   1
+ *
+ * or:
+ *
+ *   "1"
+ */
+const normalizePaymentMethodId = (id: unknown): number => {
+  const numericId = Number(id);
+
+  return Number.isFinite(numericId) ? numericId : 0;
+};
 
 /* ============================================================
    COMPONENT
@@ -60,7 +123,7 @@ export default function Withdraw() {
      DEMO WALLET BALANCE
 
      Replace this with the logged-in player's wallet balance
-     when your backend wallet API is connected.
+     API when the wallet balance API is connected.
   ========================================================== */
 
   const balance = 125000;
@@ -93,18 +156,12 @@ export default function Withdraw() {
        KBZ Pay
        WavePay
        Wave Pay
-
-     Other payment methods will NOT be displayed.
   ========================================================== */
 
   const paymentMethods = useMemo(() => {
     return walletPaymentMethods
       .filter((method) => {
-        const methodName = String(method.name ?? "")
-          .trim()
-          .toLowerCase()
-          .replace(/[-_]/g, " ")
-          .replace(/\s+/g, " ");
+        const methodName = normalizePaymentMethodName(method.name);
 
         const isKPay =
           methodName === "kpay" ||
@@ -118,19 +175,24 @@ export default function Withdraw() {
         const supportedType =
           method.type === "Withdraw" || method.type === "Both";
 
-        const allowed = withdrawSettings.allowedPaymentMethods.includes(
-          method.id,
+        /*
+         * Normalize both sides of the ID comparison.
+         *
+         * This avoids:
+         *
+         * number 1 !== string "1"
+         */
+        const methodId = normalizePaymentMethodId(method.id);
+
+        const allowed = withdrawSettings.allowedPaymentMethods.some(
+          (allowedId) => normalizePaymentMethodId(allowedId) === methodId,
         );
 
         return method.enabled && supportedMethod && supportedType && allowed;
       })
       .sort((a, b) => {
         const getPriority = (name: string) => {
-          const normalized = name
-            .trim()
-            .toLowerCase()
-            .replace(/[-_]/g, " ")
-            .replace(/\s+/g, " ");
+          const normalized = normalizePaymentMethodName(name);
 
           if (
             normalized === "kpay" ||
@@ -153,7 +215,7 @@ export default function Withdraw() {
           return priorityDifference;
         }
 
-        return a.displayOrder - b.displayOrder;
+        return Number(a.displayOrder ?? 0) - Number(b.displayOrder ?? 0);
       });
   }, []);
 
@@ -162,11 +224,7 @@ export default function Withdraw() {
   ========================================================== */
 
   const getPaymentMethodDisplayName = (method: PaymentMethod) => {
-    const normalizedName = String(method.name ?? "")
-      .trim()
-      .toLowerCase()
-      .replace(/[-_]/g, " ")
-      .replace(/\s+/g, " ");
+    const normalizedName = normalizePaymentMethodName(method.name);
 
     if (
       normalizedName === "kpay" ||
@@ -180,7 +238,7 @@ export default function Withdraw() {
       return "WavePay";
     }
 
-    return method.name;
+    return String(method.name ?? "");
   };
 
   /* ==========================================================
@@ -188,7 +246,7 @@ export default function Withdraw() {
   ========================================================== */
 
   const selectedMethod = paymentMethods.find(
-    (method) => method.id === paymentMethodId,
+    (method) => normalizePaymentMethodId(method.id) === paymentMethodId,
   );
 
   const selectedPaymentMethodName = selectedMethod
@@ -201,25 +259,27 @@ export default function Withdraw() {
 
   const numericAmount = Number(amount);
 
-  const fee = withdrawSettings.withdrawFee;
+  const fee = Number(withdrawSettings.withdrawFee) || 0;
 
-  const totalDeduction = numericAmount + fee;
+  const totalDeduction = numericAmount > 0 ? numericAmount + fee : 0;
 
-  const netAmount = numericAmount - fee;
+  const netAmount = numericAmount > 0 ? numericAmount - fee : 0;
 
   /* ==========================================================
      SELECT PAYMENT METHOD
-
-     IMPORTANT:
-     We do NOT automatically copy the admin's configured
-     payment account into the player's withdrawal account.
-
-     The player must enter their own KPay/WavePay number.
   ========================================================== */
 
-  const handleSelectPaymentMethod = (methodId: number) => {
-    setPaymentMethodId(methodId);
+  const handleSelectPaymentMethod = (methodId: unknown) => {
+    const normalizedId = normalizePaymentMethodId(methodId);
 
+    setPaymentMethodId(normalizedId || null);
+
+    /*
+     * Do not automatically copy the admin's configured
+     * payment account.
+     *
+     * Player enters their own account.
+     */
     setAccountNumber("");
 
     setError("");
@@ -240,6 +300,7 @@ export default function Withdraw() {
 
     if (!numericAmount || numericAmount <= 0) {
       setError("Please enter a valid withdrawal amount.");
+
       return;
     }
 
@@ -247,6 +308,7 @@ export default function Withdraw() {
       setError(
         `Minimum withdrawal is ${withdrawSettings.minimumWithdraw.toLocaleString()} MMK.`,
       );
+
       return;
     }
 
@@ -254,17 +316,19 @@ export default function Withdraw() {
       setError(
         `Maximum withdrawal is ${withdrawSettings.maximumWithdraw.toLocaleString()} MMK.`,
       );
+
       return;
     }
 
     /* --------------------------------------------------------
-       BALANCE
+       FEE / BALANCE
     -------------------------------------------------------- */
 
     if (totalDeduction > balance) {
       setError(
         `Insufficient wallet balance. Available balance is ${balance.toLocaleString()} MMK.`,
       );
+
       return;
     }
 
@@ -274,6 +338,7 @@ export default function Withdraw() {
 
     if (!paymentMethodId || !selectedMethod) {
       setError("Please select KPay or WavePay.");
+
       return;
     }
 
@@ -283,6 +348,7 @@ export default function Withdraw() {
 
     if (!accountName.trim()) {
       setError("Account name is required.");
+
       return;
     }
 
@@ -294,6 +360,7 @@ export default function Withdraw() {
       setError(
         `Please enter your ${selectedPaymentMethodName} account number.`,
       );
+
       return;
     }
 
@@ -322,7 +389,7 @@ export default function Withdraw() {
 
       netAmount,
 
-      paymentMethodId: selectedMethod.id,
+      paymentMethodId: normalizePaymentMethodId(selectedMethod.id),
 
       paymentMethodName: selectedPaymentMethodName,
 
@@ -333,8 +400,7 @@ export default function Withdraw() {
       note: note.trim() || undefined,
 
       /*
-       * Always keep the withdrawal request
-       * pending until admin approval.
+       * Withdrawal must remain pending until admin approval.
        */
       status: "PENDING",
 
@@ -373,7 +439,7 @@ export default function Withdraw() {
     }
 
     /* --------------------------------------------------------
-       SHOW SUCCESS
+       SUCCESS
     -------------------------------------------------------- */
 
     setSubmitted(true);
@@ -559,6 +625,7 @@ export default function Withdraw() {
             value={amount}
             onChange={(event) => {
               setAmount(event.target.value);
+
               setError("");
             }}
             placeholder="Enter amount"
@@ -566,8 +633,9 @@ export default function Withdraw() {
           />
 
           <p className="mt-2 text-xs text-slate-400">
-            Min: {withdrawSettings.minimumWithdraw.toLocaleString()} MMK · Max:{" "}
-            {withdrawSettings.maximumWithdraw.toLocaleString()} MMK
+            Min: {withdrawSettings.minimumWithdraw.toLocaleString()} MMK
+            {" · "}
+            Max: {withdrawSettings.maximumWithdraw.toLocaleString()} MMK
           </p>
         </div>
 
@@ -582,15 +650,27 @@ export default function Withdraw() {
 
           <div className="grid gap-3 sm:grid-cols-2">
             {paymentMethods.map((method) => {
-              const selected = paymentMethodId === method.id;
+              const methodId = normalizePaymentMethodId(method.id);
+
+              const selected = paymentMethodId === methodId;
 
               const displayName = getPaymentMethodDisplayName(method);
 
+              /*
+               * IMPORTANT:
+               *
+               * Do not access method.logo directly.
+               *
+               * The current PaymentMethod type may not contain
+               * a logo property.
+               */
+              const logo = getPaymentMethodLogo(method);
+
               return (
                 <button
-                  key={method.id}
+                  key={methodId}
                   type="button"
-                  onClick={() => handleSelectPaymentMethod(method.id)}
+                  onClick={() => handleSelectPaymentMethod(methodId)}
                   className={`relative rounded-xl border p-4 text-left transition-all ${
                     selected
                       ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100"
@@ -611,13 +691,27 @@ export default function Withdraw() {
                     {/* LOGO */}
 
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
-                      {method.logo ? (
+                      {logo ? (
                         <img
-                          src={method.logo}
+                          src={logo}
                           alt={`${displayName} logo`}
                           className="h-full w-full object-contain p-1.5"
                           onError={(event) => {
+                            /*
+                             * Hide broken image and show the
+                             * fallback icon.
+                             */
                             event.currentTarget.style.display = "none";
+
+                            const parent = event.currentTarget.parentElement;
+
+                            if (parent) {
+                              parent.classList.add(
+                                "flex",
+                                "items-center",
+                                "justify-center",
+                              );
+                            }
                           }}
                         />
                       ) : (
@@ -715,6 +809,7 @@ export default function Withdraw() {
             value={accountName}
             onChange={(event) => {
               setAccountName(event.target.value);
+
               setError("");
             }}
             placeholder="Enter account holder name"
@@ -741,6 +836,7 @@ export default function Withdraw() {
             value={accountNumber}
             onChange={(event) => {
               setAccountNumber(event.target.value);
+
               setError("");
             }}
             placeholder={
