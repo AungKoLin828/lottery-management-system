@@ -175,6 +175,18 @@
   status = 200
   force = true
 
+  [[redirects]]
+  from = "/api/player/payment-methods"
+  to = "/.netlify/functions/player-payment-methods"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/player/deposit-settings"
+  to = "/.netlify/functions/player-deposit-settings"
+  status = 200
+  force = true
+
 # Other API redirects should be here...
 
 
