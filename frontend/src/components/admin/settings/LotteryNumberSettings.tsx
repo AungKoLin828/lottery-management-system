@@ -47,29 +47,319 @@ interface LotterySettingsResponse {
   threeD?: LotterySettings | null;
 }
 
+interface SaveSettingsResponse {
+  setting?: LotterySettings;
+}
+
 /* ============================================================
    DEFAULT VALUES
 ============================================================ */
 
 const DEFAULT_2D: LotterySettings = {
   lotteryType: "2D",
+
   enabled: true,
+
   numberLength: 2,
+
   minBet: 100,
+
   maxBet: 100000,
+
   maxNumberLimit: 10,
+
   allowDuplicateNumbers: false,
 };
 
 const DEFAULT_3D: LotterySettings = {
   lotteryType: "3D",
+
   enabled: true,
+
   numberLength: 3,
+
   minBet: 100,
+
   maxBet: 100000,
+
   maxNumberLimit: 10,
+
   allowDuplicateNumbers: false,
 };
+
+/* ============================================================
+   API ENDPOINTS
+============================================================ */
+
+/*
+ * Primary endpoint.
+ *
+ * This should normally be:
+ *
+ * /api/admin/lottery-number-settings
+ *
+ * The fallback endpoints make the frontend work even when
+ * the corresponding Netlify redirect has not been configured.
+ */
+const API_ENDPOINTS = [
+  "/api/admin/lottery-number-settings",
+
+  "/.netlify/functions/lottery-number-settings",
+
+  "/.netlify/functions/admin-lottery-number-settings",
+] as const;
+
+/* ============================================================
+   API ERROR
+============================================================ */
+
+class ApiError extends Error {
+  status: number;
+
+  statusText: string;
+
+  responseBody: string;
+
+  constructor(
+    message: string,
+    status: number,
+    statusText: string,
+    responseBody: string,
+  ) {
+    super(message);
+
+    this.name = "ApiError";
+
+    this.status = status;
+
+    this.statusText = statusText;
+
+    this.responseBody = responseBody;
+  }
+}
+
+/* ============================================================
+   READ API RESPONSE
+============================================================ */
+
+/**
+ * Safely reads an API response.
+ *
+ * The server may return:
+ *
+ * - JSON
+ * - HTML 404 page
+ * - HTML redirect page
+ * - plain text
+ *
+ * Therefore we must NOT blindly call response.json().
+ */
+async function readApiResponse<T>(response: Response): Promise<{
+  result: ApiResponse<T> | null;
+
+  rawText: string;
+}> {
+  const rawText = await response.text();
+
+  const contentType = response.headers.get("content-type") || "";
+
+  /*
+   * ----------------------------------------------------------
+   * JSON RESPONSE
+   * ----------------------------------------------------------
+   */
+
+  if (contentType.toLowerCase().includes("application/json")) {
+    try {
+      const result = JSON.parse(rawText) as ApiResponse<T>;
+
+      return {
+        result,
+
+        rawText,
+      };
+    } catch {
+      throw new ApiError(
+        "The API returned invalid JSON.",
+        response.status,
+        response.statusText,
+        rawText.slice(0, 1000),
+      );
+    }
+  }
+
+  /*
+   * ----------------------------------------------------------
+   * SOMETIMES SERVER DOES NOT SET CONTENT-TYPE CORRECTLY
+   *
+   * Try JSON parsing anyway.
+   * ----------------------------------------------------------
+   */
+
+  if (rawText.trim()) {
+    try {
+      const result = JSON.parse(rawText) as ApiResponse<T>;
+
+      return {
+        result,
+
+        rawText,
+      };
+    } catch {
+      // Not JSON. Continue below.
+    }
+  }
+
+  /*
+   * ----------------------------------------------------------
+   * NON-JSON RESPONSE
+   * ----------------------------------------------------------
+   */
+
+  throw new ApiError(
+    `API returned ${response.status} ${response.statusText} instead of JSON.`,
+    response.status,
+    response.statusText,
+    rawText.slice(0, 1000),
+  );
+}
+
+/* ============================================================
+   API REQUEST
+============================================================ */
+
+/**
+ * Sends an authenticated API request.
+ *
+ * The primary /api route is tried first.
+ *
+ * If the server returns a non-JSON 404/405 response,
+ * fallback Netlify Function URLs are tried.
+ */
+async function apiRequest<T>(
+  method: "GET" | "PUT",
+  body?: unknown,
+): Promise<ApiResponse<T>> {
+  let lastError: unknown = null;
+
+  for (let index = 0; index < API_ENDPOINTS.length; index += 1) {
+    const endpoint = API_ENDPOINTS[index];
+
+    try {
+      const response = await fetch(endpoint, {
+        method,
+
+        credentials: "include",
+
+        headers: {
+          Accept: "application/json",
+
+          ...(body !== undefined
+            ? {
+                "Content-Type": "application/json",
+              }
+            : {}),
+        },
+
+        ...(body !== undefined
+          ? {
+              body: JSON.stringify(body),
+            }
+          : {}),
+      });
+
+      /*
+       * ------------------------------------------------------
+       * READ RESPONSE
+       * ------------------------------------------------------
+       */
+
+      const { result } = await readApiResponse<T>(response);
+
+      /*
+       * ------------------------------------------------------
+       * SERVER RETURNED JSON
+       * ------------------------------------------------------
+       */
+
+      if (!result) {
+        throw new ApiError(
+          "API returned an empty response.",
+          response.status,
+          response.statusText,
+          "",
+        );
+      }
+
+      /*
+       * If this is a real API response, return it.
+       */
+      return result;
+    } catch (requestError) {
+      lastError = requestError;
+
+      /*
+       * ------------------------------------------------------
+       * FALLBACK ONLY FOR ROUTING ERRORS
+       * ------------------------------------------------------
+       *
+       * Do not hide authentication errors or database errors.
+       *
+       * For example:
+       *
+       * 401 JSON -> return it
+       * 400 JSON -> return it
+       * 500 JSON -> return it
+       *
+       * Only continue to another endpoint when the response
+       * was a non-JSON routing-style error.
+       */
+
+      if (requestError instanceof ApiError) {
+        const isRoutingError =
+          requestError.status === 404 ||
+          requestError.status === 405 ||
+          requestError.status === 301 ||
+          requestError.status === 302 ||
+          requestError.status === 307 ||
+          requestError.status === 308;
+
+        if (!isRoutingError) {
+          throw requestError;
+        }
+
+        console.warn(
+          `API endpoint unavailable: ${endpoint}`,
+          requestError.responseBody,
+        );
+
+        /*
+         * Try next endpoint.
+         */
+        continue;
+      }
+
+      /*
+       * Network error.
+       *
+       * Try fallback endpoint.
+       */
+      console.warn(`API request failed for ${endpoint}:`, requestError);
+    }
+  }
+
+  /*
+   * ----------------------------------------------------------
+   * ALL ENDPOINTS FAILED
+   * ----------------------------------------------------------
+   */
+
+  if (lastError instanceof Error) {
+    throw lastError;
+  }
+
+  throw new Error("Unable to connect to lottery number settings API.");
+}
 
 /* ============================================================
    COMPONENT
@@ -77,15 +367,7 @@ const DEFAULT_3D: LotterySettings = {
 
 export default function LotteryNumberSettings() {
   /* ==========================================================
-     GLOBAL LOTTERY STATUS
-  ========================================================== */
-
-  const [enable2D, setEnable2D] = useState(DEFAULT_2D.enabled);
-
-  const [enable3D, setEnable3D] = useState(DEFAULT_3D.enabled);
-
-  /* ==========================================================
-     LOTTERY SETTINGS
+     SETTINGS
   ========================================================== */
 
   const [twoD, setTwoD] = useState<LotterySettings>(DEFAULT_2D);
@@ -102,11 +384,23 @@ export default function LotteryNumberSettings() {
 
   const [saving3D, setSaving3D] = useState(false);
 
-  const [savingGlobal, setSavingGlobal] = useState(false);
+  const [savingGlobal2D, setSavingGlobal2D] = useState(false);
+
+  const [savingGlobal3D, setSavingGlobal3D] = useState(false);
 
   const [error, setError] = useState("");
 
   const [success, setSuccess] = useState("");
+
+  /* ==========================================================
+     CLEAR MESSAGES
+  ========================================================== */
+
+  const clearMessages = useCallback(() => {
+    setError("");
+
+    setSuccess("");
+  }, []);
 
   /* ==========================================================
      LOAD SETTINGS
@@ -118,91 +412,85 @@ export default function LotteryNumberSettings() {
     setError("");
 
     try {
-      const response = await fetch("/api/admin/lottery-number-settings", {
-        method: "GET",
+      const result = await apiRequest<LotterySettingsResponse>("GET");
 
-        credentials: "include",
+      /*
+       * ------------------------------------------------------
+       * CHECK API SUCCESS
+       * ------------------------------------------------------
+       */
 
-        headers: {
-          Accept: "application/json",
-        },
-      });
-
-      const contentType = response.headers.get("content-type") || "";
-
-      if (!contentType.toLowerCase().includes("application/json")) {
-        const text = await response.text();
-
-        console.error(
-          "Lottery number settings API returned non-JSON:",
-          text.slice(0, 1000),
-        );
-
-        throw new Error(
-          `API returned ${response.status} ${response.statusText} instead of JSON.`,
-        );
-      }
-
-      const result =
-        (await response.json()) as ApiResponse<LotterySettingsResponse>;
-
-      if (!response.ok || !result.success) {
+      if (!result.success) {
         throw new Error(
           result.message || "Failed to load lottery number settings.",
         );
       }
 
-      const loaded2D = result.data?.twoD;
-
-      const loaded3D = result.data?.threeD;
-
       /*
-       * --------------------------------------------------------
-       * 2D
-       * --------------------------------------------------------
+       * ------------------------------------------------------
+       * LOAD 2D
+       * ------------------------------------------------------
        */
+
+      const loaded2D = result.data?.twoD;
 
       if (loaded2D) {
         setTwoD({
           ...DEFAULT_2D,
+
           ...loaded2D,
+
           lotteryType: "2D",
         });
-
-        setEnable2D(loaded2D.enabled);
       } else {
-        setTwoD(DEFAULT_2D);
-
-        setEnable2D(DEFAULT_2D.enabled);
+        setTwoD({
+          ...DEFAULT_2D,
+        });
       }
 
       /*
-       * --------------------------------------------------------
-       * 3D
-       * --------------------------------------------------------
+       * ------------------------------------------------------
+       * LOAD 3D
+       * ------------------------------------------------------
        */
+
+      const loaded3D = result.data?.threeD;
 
       if (loaded3D) {
         setThreeD({
           ...DEFAULT_3D,
+
           ...loaded3D,
+
           lotteryType: "3D",
         });
-
-        setEnable3D(loaded3D.enabled);
       } else {
-        setThreeD(DEFAULT_3D);
-
-        setEnable3D(DEFAULT_3D.enabled);
+        setThreeD({
+          ...DEFAULT_3D,
+        });
       }
     } catch (loadError) {
       console.error("Load lottery number settings error:", loadError);
 
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Failed to load lottery number settings.",
-      );
+      if (loadError instanceof ApiError) {
+        /*
+         * Show useful routing information.
+         */
+
+        if (loadError.status === 404 || loadError.status === 405) {
+          setError(
+            `Lottery settings API route was not found (${loadError.status}). Check your Netlify function/redirect configuration.`,
+          );
+        } else {
+          setError(loadError.message);
+        }
+      } else {
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Failed to load lottery number settings.",
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -217,16 +505,106 @@ export default function LotteryNumberSettings() {
   }, [loadSettings]);
 
   /* ==========================================================
-     CLEAR MESSAGE
+     VALIDATE SETTINGS
   ========================================================== */
 
-  const clearMessages = () => {
-    setError("");
-    setSuccess("");
+  const validateSettings = (
+    settings: LotterySettings,
+    type: LotteryType,
+  ): string | null => {
+    /*
+     * --------------------------------------------------------
+     * NUMBER LENGTH
+     * --------------------------------------------------------
+     */
+
+    if (
+      !Number.isInteger(settings.numberLength) ||
+      settings.numberLength <= 0
+    ) {
+      return `${type} number length must be a positive integer.`;
+    }
+
+    /*
+     * --------------------------------------------------------
+     * 2D
+     * --------------------------------------------------------
+     */
+
+    if (type === "2D" && settings.numberLength !== 2) {
+      return "2D number length must be 2.";
+    }
+
+    /*
+     * --------------------------------------------------------
+     * 3D
+     * --------------------------------------------------------
+     */
+
+    if (type === "3D" && settings.numberLength !== 3) {
+      return "3D number length must be 3.";
+    }
+
+    /*
+     * --------------------------------------------------------
+     * MINIMUM BET
+     * --------------------------------------------------------
+     */
+
+    if (!Number.isInteger(settings.minBet) || settings.minBet <= 0) {
+      return `${type} minimum bet must be greater than 0.`;
+    }
+
+    /*
+     * --------------------------------------------------------
+     * MAXIMUM BET
+     * --------------------------------------------------------
+     */
+
+    if (!Number.isInteger(settings.maxBet) || settings.maxBet <= 0) {
+      return `${type} maximum bet must be greater than 0.`;
+    }
+
+    /*
+     * --------------------------------------------------------
+     * BET RANGE
+     * --------------------------------------------------------
+     */
+
+    if (settings.minBet > settings.maxBet) {
+      return `${type} minimum bet cannot exceed maximum bet.`;
+    }
+
+    /*
+     * --------------------------------------------------------
+     * MAX NUMBER LIMIT
+     * --------------------------------------------------------
+     */
+
+    if (
+      !Number.isInteger(settings.maxNumberLimit) ||
+      settings.maxNumberLimit <= 0
+    ) {
+      return `${type} maximum number limit must be greater than 0.`;
+    }
+
+    /*
+     * --------------------------------------------------------
+     * MAXIMUM POSSIBLE NUMBER
+     * --------------------------------------------------------
+     */
+
+    const maximumPossibleNumbers = Math.pow(10, settings.numberLength);
+
+    if (settings.maxNumberLimit > maximumPossibleNumbers) {
+      return `${type} maximum number limit cannot exceed ${maximumPossibleNumbers}.`;
+    }
+
+    return null;
   };
 
   /* ==========================================================
-     SAVE SINGLE SETTING
+     SAVE SETTINGS
   ========================================================== */
 
   const saveLotterySettings = async (
@@ -236,63 +614,23 @@ export default function LotteryNumberSettings() {
     clearMessages();
 
     /*
-     * --------------------------------------------------------
-     * CLIENT VALIDATION
-     * --------------------------------------------------------
+     * ------------------------------------------------------
+     * VALIDATION
+     * ------------------------------------------------------
      */
 
-    if (
-      !Number.isInteger(settings.numberLength) ||
-      settings.numberLength <= 0
-    ) {
-      setError(`${type} number length must be a positive integer.`);
+    const validationError = validateSettings(settings, type);
 
-      return;
-    }
-
-    if (!Number.isInteger(settings.minBet) || settings.minBet <= 0) {
-      setError(`${type} minimum bet must be greater than 0.`);
-
-      return;
-    }
-
-    if (!Number.isInteger(settings.maxBet) || settings.maxBet <= 0) {
-      setError(`${type} maximum bet must be greater than 0.`);
-
-      return;
-    }
-
-    if (settings.minBet > settings.maxBet) {
-      setError(`${type} minimum bet cannot exceed maximum bet.`);
-
-      return;
-    }
-
-    if (
-      !Number.isInteger(settings.maxNumberLimit) ||
-      settings.maxNumberLimit <= 0
-    ) {
-      setError(`${type} maximum number limit must be greater than 0.`);
-
-      return;
-    }
-
-    if (type === "2D" && settings.numberLength !== 2) {
-      setError("2D number length must be 2.");
-
-      return;
-    }
-
-    if (type === "3D" && settings.numberLength !== 3) {
-      setError("3D number length must be 3.");
+    if (validationError) {
+      setError(validationError);
 
       return;
     }
 
     /*
-     * --------------------------------------------------------
-     * SAVING INDICATOR
-     * --------------------------------------------------------
+     * ------------------------------------------------------
+     * SAVE INDICATOR
+     * ------------------------------------------------------
      */
 
     if (type === "2D") {
@@ -302,19 +640,11 @@ export default function LotteryNumberSettings() {
     }
 
     try {
-      const response = await fetch("/api/admin/lottery-number-settings", {
-        method: "PUT",
+      const result = await apiRequest<SaveSettingsResponse>(
+        "PUT",
 
-        credentials: "include",
-
-        headers: {
-          "Content-Type": "application/json",
-
-          Accept: "application/json",
-        },
-
-        body: JSON.stringify({
-          lotteryType: settings.lotteryType,
+        {
+          lotteryType: type,
 
           enabled: settings.enabled,
 
@@ -327,36 +657,23 @@ export default function LotteryNumberSettings() {
           maxNumberLimit: settings.maxNumberLimit,
 
           allowDuplicateNumbers: settings.allowDuplicateNumbers,
-        }),
-      });
+        },
+      );
 
-      const contentType = response.headers.get("content-type") || "";
+      /*
+       * ------------------------------------------------------
+       * API SUCCESS CHECK
+       * ------------------------------------------------------
+       */
 
-      if (!contentType.toLowerCase().includes("application/json")) {
-        const text = await response.text();
-
-        console.error(
-          "Save lottery number settings returned non-JSON:",
-          text.slice(0, 1000),
-        );
-
-        throw new Error(
-          `API returned ${response.status} ${response.statusText} instead of JSON.`,
-        );
-      }
-
-      const result = (await response.json()) as ApiResponse<{
-        setting?: LotterySettings;
-      }>;
-
-      if (!response.ok || !result.success) {
+      if (!result.success) {
         throw new Error(result.message || `Failed to save ${type} settings.`);
       }
 
       /*
-       * --------------------------------------------------------
-       * Update local state using database response
-       * --------------------------------------------------------
+       * ------------------------------------------------------
+       * DATABASE RESPONSE
+       * ------------------------------------------------------
        */
 
       const savedSetting = result.data?.setting;
@@ -364,20 +681,28 @@ export default function LotteryNumberSettings() {
       if (savedSetting) {
         if (type === "2D") {
           setTwoD({
+            ...DEFAULT_2D,
+
             ...savedSetting,
+
             lotteryType: "2D",
           });
-
-          setEnable2D(savedSetting.enabled);
         } else {
           setThreeD({
+            ...DEFAULT_3D,
+
             ...savedSetting,
+
             lotteryType: "3D",
           });
-
-          setEnable3D(savedSetting.enabled);
         }
       }
+
+      /*
+       * ------------------------------------------------------
+       * SUCCESS
+       * ------------------------------------------------------
+       */
 
       setSuccess(`${type} settings saved successfully.`);
     } catch (saveError) {
@@ -402,13 +727,7 @@ export default function LotteryNumberSettings() {
   ========================================================== */
 
   const handleSave2D = async () => {
-    await saveLotterySettings(
-      {
-        ...twoD,
-        enabled: enable2D,
-      },
-      "2D",
-    );
+    await saveLotterySettings(twoD, "2D");
   };
 
   /* ==========================================================
@@ -416,49 +735,43 @@ export default function LotteryNumberSettings() {
   ========================================================== */
 
   const handleSave3D = async () => {
-    await saveLotterySettings(
-      {
-        ...threeD,
-        enabled: enable3D,
-      },
-      "3D",
-    );
+    await saveLotterySettings(threeD, "3D");
   };
 
   /* ==========================================================
-     GLOBAL LOTTERY STATUS
-     
-     The enable/disable controls are also persisted.
-     
-     We save the corresponding existing 2D/3D records instead
-     of introducing another table.
+     TOGGLE 2D
   ========================================================== */
 
   const handleGlobal2DChange = async (enabled: boolean) => {
-    setEnable2D(enabled);
-
-    setTwoD((prev) => ({
-      ...prev,
-      enabled,
-    }));
+    if (savingGlobal2D) {
+      return;
+    }
 
     clearMessages();
 
-    setSavingGlobal(true);
+    /*
+     * Save the OLD value in case we need to revert.
+     */
+
+    const previous = twoD.enabled;
+
+    /*
+     * Optimistic UI update.
+     */
+
+    setTwoD((current) => ({
+      ...current,
+
+      enabled,
+    }));
+
+    setSavingGlobal2D(true);
 
     try {
-      const response = await fetch("/api/admin/lottery-number-settings", {
-        method: "PUT",
+      const result = await apiRequest<SaveSettingsResponse>(
+        "PUT",
 
-        credentials: "include",
-
-        headers: {
-          "Content-Type": "application/json",
-
-          Accept: "application/json",
-        },
-
-        body: JSON.stringify({
+        {
           lotteryType: "2D",
 
           enabled,
@@ -472,73 +785,91 @@ export default function LotteryNumberSettings() {
           maxNumberLimit: twoD.maxNumberLimit,
 
           allowDuplicateNumbers: twoD.allowDuplicateNumbers,
-        }),
-      });
+        },
+      );
 
-      const result = (await response.json()) as ApiResponse;
-
-      if (!response.ok || !result.success) {
+      if (!result.success) {
         throw new Error(
           result.message || "Failed to update 2D lottery status.",
         );
       }
 
+      /*
+       * Use actual database response.
+       */
+
+      const savedSetting = result.data?.setting;
+
+      if (savedSetting) {
+        setTwoD({
+          ...DEFAULT_2D,
+
+          ...savedSetting,
+
+          lotteryType: "2D",
+        });
+      }
+
       setSuccess(
         `2D lottery ${enabled ? "enabled" : "disabled"} successfully.`,
       );
-    } catch (saveError) {
-      console.error("Update 2D lottery status error:", saveError);
+    } catch (toggleError) {
+      console.error("Update 2D lottery status error:", toggleError);
 
       /*
-       * Revert UI when database update fails.
+       * Revert UI.
        */
 
-      setEnable2D(twoD.enabled);
+      setTwoD((current) => ({
+        ...current,
 
-      setTwoD((prev) => ({
-        ...prev,
-        enabled: twoD.enabled,
+        enabled: previous,
       }));
 
       setError(
-        saveError instanceof Error
-          ? saveError.message
+        toggleError instanceof Error
+          ? toggleError.message
           : "Failed to update 2D lottery status.",
       );
     } finally {
-      setSavingGlobal(false);
+      setSavingGlobal2D(false);
     }
   };
 
   /* ==========================================================
-     GLOBAL 3D STATUS
+     TOGGLE 3D
   ========================================================== */
 
   const handleGlobal3DChange = async (enabled: boolean) => {
-    setEnable3D(enabled);
-
-    setThreeD((prev) => ({
-      ...prev,
-      enabled,
-    }));
+    if (savingGlobal3D) {
+      return;
+    }
 
     clearMessages();
 
-    setSavingGlobal(true);
+    /*
+     * Save old value for rollback.
+     */
+
+    const previous = threeD.enabled;
+
+    /*
+     * Optimistic UI update.
+     */
+
+    setThreeD((current) => ({
+      ...current,
+
+      enabled,
+    }));
+
+    setSavingGlobal3D(true);
 
     try {
-      const response = await fetch("/api/admin/lottery-number-settings", {
-        method: "PUT",
+      const result = await apiRequest<SaveSettingsResponse>(
+        "PUT",
 
-        credentials: "include",
-
-        headers: {
-          "Content-Type": "application/json",
-
-          Accept: "application/json",
-        },
-
-        body: JSON.stringify({
+        {
           lotteryType: "3D",
 
           enabled,
@@ -552,37 +883,54 @@ export default function LotteryNumberSettings() {
           maxNumberLimit: threeD.maxNumberLimit,
 
           allowDuplicateNumbers: threeD.allowDuplicateNumbers,
-        }),
-      });
+        },
+      );
 
-      const result = (await response.json()) as ApiResponse;
-
-      if (!response.ok || !result.success) {
+      if (!result.success) {
         throw new Error(
           result.message || "Failed to update 3D lottery status.",
         );
       }
 
+      /*
+       * Use actual database response.
+       */
+
+      const savedSetting = result.data?.setting;
+
+      if (savedSetting) {
+        setThreeD({
+          ...DEFAULT_3D,
+
+          ...savedSetting,
+
+          lotteryType: "3D",
+        });
+      }
+
       setSuccess(
         `3D lottery ${enabled ? "enabled" : "disabled"} successfully.`,
       );
-    } catch (saveError) {
-      console.error("Update 3D lottery status error:", saveError);
+    } catch (toggleError) {
+      console.error("Update 3D lottery status error:", toggleError);
 
-      setEnable3D(threeD.enabled);
+      /*
+       * Revert UI.
+       */
 
-      setThreeD((prev) => ({
-        ...prev,
-        enabled: threeD.enabled,
+      setThreeD((current) => ({
+        ...current,
+
+        enabled: previous,
       }));
 
       setError(
-        saveError instanceof Error
-          ? saveError.message
+        toggleError instanceof Error
+          ? toggleError.message
           : "Failed to update 3D lottery status.",
       );
     } finally {
-      setSavingGlobal(false);
+      setSavingGlobal3D(false);
     }
   };
 
@@ -611,7 +959,7 @@ export default function LotteryNumberSettings() {
   return (
     <div className="space-y-6">
       {/* ======================================================
-          GLOBAL MESSAGE
+          ERROR
       ======================================================= */}
 
       {error && (
@@ -619,6 +967,10 @@ export default function LotteryNumberSettings() {
           {error}
         </div>
       )}
+
+      {/* ======================================================
+          SUCCESS
+      ======================================================= */}
 
       {success && (
         <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
@@ -634,7 +986,9 @@ export default function LotteryNumberSettings() {
         <h2 className="mb-4 text-xl font-bold">Lottery Types</h2>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {/* 2D */}
+          {/* ==================================================
+              2D
+          =================================================== */}
 
           <div className="flex items-center justify-between rounded-lg border p-4">
             <div>
@@ -647,16 +1001,18 @@ export default function LotteryNumberSettings() {
 
             <input
               type="checkbox"
-              checked={enable2D}
-              disabled={savingGlobal}
-              onChange={(event) =>
-                void handleGlobal2DChange(event.target.checked)
-              }
+              checked={twoD.enabled}
+              disabled={savingGlobal2D || saving2D}
+              onChange={(event) => {
+                void handleGlobal2DChange(event.target.checked);
+              }}
               className="h-5 w-5"
             />
           </div>
 
-          {/* 3D */}
+          {/* ==================================================
+              3D
+          =================================================== */}
 
           <div className="flex items-center justify-between rounded-lg border p-4">
             <div>
@@ -669,11 +1025,11 @@ export default function LotteryNumberSettings() {
 
             <input
               type="checkbox"
-              checked={enable3D}
-              disabled={savingGlobal}
-              onChange={(event) =>
-                void handleGlobal3DChange(event.target.checked)
-              }
+              checked={threeD.enabled}
+              disabled={savingGlobal3D || saving3D}
+              onChange={(event) => {
+                void handleGlobal3DChange(event.target.checked);
+              }}
               className="h-5 w-5"
             />
           </div>
@@ -697,10 +1053,11 @@ export default function LotteryNumberSettings() {
           <input
             type="checkbox"
             checked={twoD.enabled}
-            disabled={saving2D}
+            disabled={saving2D || savingGlobal2D}
             onChange={(event) =>
-              setTwoD((prev) => ({
-                ...prev,
+              setTwoD((current) => ({
+                ...current,
+
                 enabled: event.target.checked,
               }))
             }
@@ -709,18 +1066,23 @@ export default function LotteryNumberSettings() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Number Length */}
+
           <Input
             label="Number Length"
             type="number"
             value={twoD.numberLength}
             min={1}
             onChange={(event) =>
-              setTwoD((prev) => ({
-                ...prev,
+              setTwoD((current) => ({
+                ...current,
+
                 numberLength: Number(event.target.value),
               }))
             }
           />
+
+          {/* Minimum Bet */}
 
           <Input
             label="Minimum Bet (MMK)"
@@ -728,12 +1090,15 @@ export default function LotteryNumberSettings() {
             value={twoD.minBet}
             min={1}
             onChange={(event) =>
-              setTwoD((prev) => ({
-                ...prev,
+              setTwoD((current) => ({
+                ...current,
+
                 minBet: Number(event.target.value),
               }))
             }
           />
+
+          {/* Maximum Bet */}
 
           <Input
             label="Maximum Bet (MMK)"
@@ -741,12 +1106,15 @@ export default function LotteryNumberSettings() {
             value={twoD.maxBet}
             min={1}
             onChange={(event) =>
-              setTwoD((prev) => ({
-                ...prev,
+              setTwoD((current) => ({
+                ...current,
+
                 maxBet: Number(event.target.value),
               }))
             }
           />
+
+          {/* Maximum Number Limit */}
 
           <Input
             label="Maximum Number Limit"
@@ -754,13 +1122,16 @@ export default function LotteryNumberSettings() {
             value={twoD.maxNumberLimit}
             min={1}
             onChange={(event) =>
-              setTwoD((prev) => ({
-                ...prev,
+              setTwoD((current) => ({
+                ...current,
+
                 maxNumberLimit: Number(event.target.value),
               }))
             }
           />
         </div>
+
+        {/* Duplicate Numbers */}
 
         <label className="mt-5 flex items-center gap-2">
           <input
@@ -768,8 +1139,9 @@ export default function LotteryNumberSettings() {
             checked={twoD.allowDuplicateNumbers}
             disabled={saving2D}
             onChange={(event) =>
-              setTwoD((prev) => ({
-                ...prev,
+              setTwoD((current) => ({
+                ...current,
+
                 allowDuplicateNumbers: event.target.checked,
               }))
             }
@@ -779,11 +1151,15 @@ export default function LotteryNumberSettings() {
           <span className="text-sm">Allow Duplicate Numbers</span>
         </label>
 
+        {/* Save */}
+
         <div className="mt-5 flex justify-end">
           <Button
             variant="success"
-            disabled={saving2D}
-            onClick={() => void handleSave2D()}
+            disabled={saving2D || savingGlobal2D}
+            onClick={() => {
+              void handleSave2D();
+            }}
           >
             {saving2D ? "Saving..." : "Save 2D Settings"}
           </Button>
@@ -807,10 +1183,11 @@ export default function LotteryNumberSettings() {
           <input
             type="checkbox"
             checked={threeD.enabled}
-            disabled={saving3D}
+            disabled={saving3D || savingGlobal3D}
             onChange={(event) =>
-              setThreeD((prev) => ({
-                ...prev,
+              setThreeD((current) => ({
+                ...current,
+
                 enabled: event.target.checked,
               }))
             }
@@ -819,18 +1196,23 @@ export default function LotteryNumberSettings() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Number Length */}
+
           <Input
             label="Number Length"
             type="number"
             value={threeD.numberLength}
             min={1}
             onChange={(event) =>
-              setThreeD((prev) => ({
-                ...prev,
+              setThreeD((current) => ({
+                ...current,
+
                 numberLength: Number(event.target.value),
               }))
             }
           />
+
+          {/* Minimum Bet */}
 
           <Input
             label="Minimum Bet (MMK)"
@@ -838,12 +1220,15 @@ export default function LotteryNumberSettings() {
             value={threeD.minBet}
             min={1}
             onChange={(event) =>
-              setThreeD((prev) => ({
-                ...prev,
+              setThreeD((current) => ({
+                ...current,
+
                 minBet: Number(event.target.value),
               }))
             }
           />
+
+          {/* Maximum Bet */}
 
           <Input
             label="Maximum Bet (MMK)"
@@ -851,12 +1236,15 @@ export default function LotteryNumberSettings() {
             value={threeD.maxBet}
             min={1}
             onChange={(event) =>
-              setThreeD((prev) => ({
-                ...prev,
+              setThreeD((current) => ({
+                ...current,
+
                 maxBet: Number(event.target.value),
               }))
             }
           />
+
+          {/* Maximum Number Limit */}
 
           <Input
             label="Maximum Number Limit"
@@ -864,13 +1252,16 @@ export default function LotteryNumberSettings() {
             value={threeD.maxNumberLimit}
             min={1}
             onChange={(event) =>
-              setThreeD((prev) => ({
-                ...prev,
+              setThreeD((current) => ({
+                ...current,
+
                 maxNumberLimit: Number(event.target.value),
               }))
             }
           />
         </div>
+
+        {/* Duplicate Numbers */}
 
         <label className="mt-5 flex items-center gap-2">
           <input
@@ -878,8 +1269,9 @@ export default function LotteryNumberSettings() {
             checked={threeD.allowDuplicateNumbers}
             disabled={saving3D}
             onChange={(event) =>
-              setThreeD((prev) => ({
-                ...prev,
+              setThreeD((current) => ({
+                ...current,
+
                 allowDuplicateNumbers: event.target.checked,
               }))
             }
@@ -889,11 +1281,15 @@ export default function LotteryNumberSettings() {
           <span className="text-sm">Allow Duplicate Numbers</span>
         </label>
 
+        {/* Save */}
+
         <div className="mt-5 flex justify-end">
           <Button
             variant="success"
-            disabled={saving3D}
-            onClick={() => void handleSave3D()}
+            disabled={saving3D || savingGlobal3D}
+            onClick={() => {
+              void handleSave3D();
+            }}
           >
             {saving3D ? "Saving..." : "Save 3D Settings"}
           </Button>

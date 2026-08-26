@@ -58,7 +58,6 @@
   from = "/api/admin/lottery-number-settings"
   to = "/.netlify/functions/admin-lottery-number-settings"
   status = 200
-  force = true
   
 # ============================================================
 # ADMIN USER BALANCE API
