@@ -53,6 +53,12 @@
   to = "/.netlify/functions/admin-results"
   status = 200
   force = true
+
+  [[redirects]]
+  from = "/api/admin/lottery-number-settings"
+  to = "/.netlify/functions/admin-lottery-number-settings"
+  status = 200
+  force = true
   
 # ============================================================
 # ADMIN USER BALANCE API
@@ -158,7 +164,7 @@
   to = "/.netlify/functions/admin-draw-settings"
   status = 200
   force = true
-  
+
 # Other API redirects should be here...
 
 

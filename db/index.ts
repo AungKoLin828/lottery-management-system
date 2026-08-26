@@ -19,6 +19,7 @@ import * as auditLogs from "./schema/auditLogs";
 import * as publicHolidays from "./schema/publicHolidays";
 import * as numberRestrictions from "./schema/numberRestrictions";
 import * as drawSettings from "./schema/drawSettings";
+import * as lotteryNumberSettings from "./schema/lotteryNumberSettings";
 
 import * as relations from "./relations";
 
@@ -80,6 +81,7 @@ export const db = drizzle(pool, {
     ...drawSettings,
     ...publicHolidays,
     ...numberRestrictions,
+    ...lotteryNumberSettings,
 
     /* ========================================================
        RELATIONS
@@ -115,5 +117,6 @@ export { auditLogs };
 export { publicHolidays };
 export { numberRestrictions };
 export { drawSettings };
+export { lotteryNumberSettings };
 
 export { relations };
