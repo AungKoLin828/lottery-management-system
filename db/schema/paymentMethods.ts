@@ -8,11 +8,19 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
+/* ============================================================
+   PAYMENT METHOD ENUM
+============================================================ */
+
 export const paymentMethodTypeEnum = pgEnum("payment_method_type", [
-  "Deposit",
-  "Withdraw",
-  "Both",
+  "DEPOSIT",
+  "WITHDRAW",
+  "BOTH",
 ]);
+
+/* ============================================================
+   PAYMENT METHODS
+============================================================ */
 
 export const paymentMethods = pgTable("payment_methods", {
   id: uuid("id").defaultRandom().primaryKey(),
