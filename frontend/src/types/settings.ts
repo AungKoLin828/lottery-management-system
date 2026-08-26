@@ -37,7 +37,7 @@ export interface GeneralSettings {
 export type PaymentMethodType = "Deposit" | "Withdraw" | "Both";
 
 export interface PaymentMethod {
-  id: string;
+  id: number;
 
   name: string;
 

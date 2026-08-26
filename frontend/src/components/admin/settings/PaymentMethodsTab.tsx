@@ -194,7 +194,7 @@ export default function PaymentMethodsTab({
     return {
       ...method,
 
-      id: String(method.id),
+      id: method.id,
 
       name: method.name ?? "",
 

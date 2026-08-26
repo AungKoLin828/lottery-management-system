@@ -1,15 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ArrowDownToLine,
-  Check,
-  CheckCircle2,
-  Copy,
-  CreditCard,
-  Download,
-  QrCode,
-  ScanLine,
-  X,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowDownToLine, Check, Copy, CreditCard } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import Button from "@/components/common/Button";
@@ -36,10 +26,6 @@ export default function Deposit() {
     );
   }, []);
 
-  /*
-   * Default selected amount:
-   * Select the first available preset automatically.
-   */
   const [amount, setAmount] = useState(() => {
     const firstPreset = [5000, 10000, 50000, 100000].find(
       (value) =>
@@ -50,7 +36,11 @@ export default function Deposit() {
     return firstPreset ? String(firstPreset) : "";
   });
 
-  const [paymentMethodId, setPaymentMethodId] = useState<number | null>(null);
+  /* ============================================================
+     PAYMENT METHOD
+  ============================================================ */
+
+  const [paymentMethodId, setPaymentMethodId] = useState<string | null>(null);
 
   const [transactionNumber, setTransactionNumber] = useState("");
 
@@ -67,22 +57,6 @@ export default function Deposit() {
   const [copied, setCopied] = useState(false);
 
   /* ============================================================
-     QR SCANNER STATE
-  ============================================================ */
-
-  const [scannerOpen, setScannerOpen] = useState(false);
-
-  const [scanResult, setScanResult] = useState("");
-
-  const [scanError, setScanError] = useState("");
-
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  const streamRef = useRef<MediaStream | null>(null);
-
-  const scanAnimationRef = useRef<number | null>(null);
-
-  /* ============================================================
      PAYMENT METHODS
   ============================================================ */
 
@@ -92,9 +66,11 @@ export default function Deposit() {
         (method) =>
           method.enabled &&
           (method.type === "Deposit" || method.type === "Both") &&
-          depositSettings.allowedPaymentMethods.includes(method.id),
+          depositSettings.allowedPaymentMethods.some(
+            (allowedId) => String(allowedId) === String(method.id),
+          ),
       )
-      .sort((a, b) => a.displayOrder - b.displayOrder);
+      .sort((a, b) => Number(a.displayOrder) - Number(b.displayOrder));
   }, []);
 
   /* ============================================================
@@ -102,16 +78,19 @@ export default function Deposit() {
   ============================================================ */
 
   const selectedMethod = paymentMethods.find(
-    (method) => method.id === paymentMethodId,
+    (method) => String(method.id) === String(paymentMethodId),
   );
 
   /* ============================================================
-     PAYMENT PHONE / ACCOUNT NUMBER
+     PAYMENT NUMBER
      
      Supports:
-     - phoneNumber
      - accountNumber
+     - phoneNumber
      - phone
+     
+     accountNumber is the primary field used by
+     the current payment-method database.
   ============================================================ */
 
   const paymentNumber = useMemo(() => {
@@ -119,29 +98,8 @@ export default function Deposit() {
       return "";
     }
 
-    const method = selectedMethod as typeof selectedMethod & {
-      phoneNumber?: string;
-      accountNumber?: string;
-      phone?: string;
-    };
-
-    return method.phoneNumber || method.accountNumber || method.phone || "";
+    return selectedMethod.accountNumber?.trim() || "";
   }, [selectedMethod]);
-
-  /* ============================================================
-     MOBILE CHECK
-     
-     Used only for scanner behavior.
-     CSS md:hidden also controls visibility.
-  ============================================================ */
-
-  const isMobileDevice = () => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    return window.matchMedia("(max-width: 767px)").matches;
-  };
 
   /* ============================================================
      COPY PAYMENT NUMBER
@@ -155,279 +113,43 @@ export default function Deposit() {
     setError("");
 
     try {
-      await navigator.clipboard.writeText(paymentNumber);
-
-      setCopied(true);
-
-      window.setTimeout(() => {
-        setCopied(false);
-      }, 2000);
-    } catch {
-      /*
-       * Fallback for browsers where Clipboard API is unavailable.
-       */
-      try {
+      if (
+        navigator.clipboard &&
+        typeof navigator.clipboard.writeText === "function"
+      ) {
+        await navigator.clipboard.writeText(paymentNumber);
+      } else {
         const textArea = document.createElement("textarea");
 
         textArea.value = paymentNumber;
 
         textArea.style.position = "fixed";
-        textArea.style.opacity = "0";
+        textArea.style.left = "-9999px";
+        textArea.style.top = "-9999px";
 
         document.body.appendChild(textArea);
 
         textArea.focus();
         textArea.select();
 
-        document.execCommand("copy");
+        const successful = document.execCommand("copy");
 
         document.body.removeChild(textArea);
 
-        setCopied(true);
-
-        window.setTimeout(() => {
-          setCopied(false);
-        }, 2000);
-      } catch {
-        setError("Unable to copy the payment number.");
-      }
-    }
-  };
-
-  /* ============================================================
-     DOWNLOAD QR CODE
-  ============================================================ */
-
-  const handleDownloadQr = async () => {
-    if (!selectedMethod?.qrCode) {
-      return;
-    }
-
-    try {
-      const response = await fetch(selectedMethod.qrCode);
-
-      if (!response.ok) {
-        throw new Error("Unable to download QR code.");
-      }
-
-      const blob = await response.blob();
-
-      const url = URL.createObjectURL(blob);
-
-      const link = document.createElement("a");
-
-      link.href = url;
-
-      link.download = `${selectedMethod.name
-        .replace(/\s+/g, "-")
-        .toLowerCase()}-qr.png`;
-
-      document.body.appendChild(link);
-
-      link.click();
-
-      document.body.removeChild(link);
-
-      URL.revokeObjectURL(url);
-    } catch {
-      /*
-       * Fallback for external QR URLs.
-       */
-      const link = document.createElement("a");
-
-      link.href = selectedMethod.qrCode;
-
-      link.target = "_blank";
-
-      link.rel = "noopener noreferrer";
-
-      link.download = `${selectedMethod.name
-        .replace(/\s+/g, "-")
-        .toLowerCase()}-qr`;
-
-      document.body.appendChild(link);
-
-      link.click();
-
-      document.body.removeChild(link);
-    }
-  };
-
-  /* ============================================================
-     STOP QR SCANNER
-  ============================================================ */
-
-  const stopQrScanner = () => {
-    if (scanAnimationRef.current !== null) {
-      cancelAnimationFrame(scanAnimationRef.current);
-
-      scanAnimationRef.current = null;
-    }
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => {
-        track.stop();
-      });
-
-      streamRef.current = null;
-    }
-
-    if (videoRef.current) {
-      videoRef.current.pause();
-
-      videoRef.current.srcObject = null;
-    }
-
-    setScannerOpen(false);
-  };
-
-  /* ============================================================
-     CLEANUP CAMERA WHEN COMPONENT UNMOUNTS
-  ============================================================ */
-
-  useEffect(() => {
-    return () => {
-      if (scanAnimationRef.current !== null) {
-        cancelAnimationFrame(scanAnimationRef.current);
-      }
-
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => {
-          track.stop();
-        });
-      }
-    };
-  }, []);
-
-  /* ============================================================
-     QR SCANNER
-     
-     IMPORTANT:
-     This function can only start on mobile screen sizes.
-  ============================================================ */
-
-  const startQrScanner = async () => {
-    setScanError("");
-
-    setScanResult("");
-
-    /*
-     * Do not allow QR scanning on desktop.
-     */
-    if (!isMobileDevice()) {
-      setScanError("QR scanning is available on mobile devices only.");
-
-      return;
-    }
-
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setScannerOpen(true);
-
-      setScanError(
-        "Camera scanning is not supported by this browser. Please use a supported mobile browser.",
-      );
-
-      return;
-    }
-
-    /*
-     * BarcodeDetector is supported by many modern Chromium browsers.
-     */
-    const BarcodeDetectorClass = (
-      window as Window & {
-        BarcodeDetector?: new (options?: { formats?: string[] }) => {
-          detect: (
-            source: ImageBitmapSource,
-          ) => Promise<Array<{ rawValue?: string }>>;
-        };
-      }
-    ).BarcodeDetector;
-
-    if (!BarcodeDetectorClass) {
-      setScannerOpen(true);
-
-      setScanError(
-        "QR scanning is not supported by this browser. Please use Chrome or Edge on a supported mobile device.",
-      );
-
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: {
-            ideal: "environment",
-          },
-        },
-        audio: false,
-      });
-
-      streamRef.current = stream;
-
-      setScannerOpen(true);
-
-      /*
-       * Wait until React renders the video element.
-       */
-      window.setTimeout(() => {
-        if (!videoRef.current || !streamRef.current) {
-          return;
+        if (!successful) {
+          throw new Error("Copy failed.");
         }
+      }
 
-        videoRef.current.srcObject = streamRef.current;
+      setCopied(true);
 
-        videoRef.current
-          .play()
-          .then(() => {
-            const detector = new BarcodeDetectorClass({
-              formats: ["qr_code"],
-            });
+      window.setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (copyError) {
+      console.error("Copy payment number error:", copyError);
 
-            const scan = async () => {
-              if (!videoRef.current || !streamRef.current) {
-                return;
-              }
-
-              try {
-                const results = await detector.detect(videoRef.current);
-
-                if (results.length > 0 && results[0].rawValue) {
-                  const value = results[0].rawValue;
-
-                  setScanResult(value);
-
-                  stopQrScanner();
-
-                  return;
-                }
-              } catch {
-                /*
-                 * Continue scanning.
-                 */
-              }
-
-              scanAnimationRef.current = requestAnimationFrame(scan);
-            };
-
-            scanAnimationRef.current = requestAnimationFrame(scan);
-          })
-          .catch(() => {
-            setScanError("Unable to start the camera.");
-
-            stopQrScanner();
-
-            setScannerOpen(true);
-          });
-      }, 150);
-    } catch (cameraError) {
-      console.error(cameraError);
-
-      setScannerOpen(true);
-
-      setScanError(
-        "Camera permission was denied or the camera is unavailable. Please allow camera access and try again.",
-      );
+      setError("Unable to copy the payment number.");
     }
   };
 
@@ -435,18 +157,18 @@ export default function Deposit() {
      SUBMIT
   ============================================================ */
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     setError("");
-
-    const numericAmount = Number(amount);
 
     /* ----------------------------------------------------------
        AMOUNT VALIDATION
     ---------------------------------------------------------- */
 
-    if (!numericAmount || numericAmount <= 0) {
+    const numericAmount = Number(amount);
+
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       setError("Please enter a valid deposit amount.");
 
       return;
@@ -482,13 +204,15 @@ export default function Deposit() {
        TRANSACTION NUMBER
     ---------------------------------------------------------- */
 
-    if (!transactionNumber.trim()) {
+    const normalizedTransactionNumber = transactionNumber.trim();
+
+    if (!normalizedTransactionNumber) {
       setError("Transaction number is required.");
 
       return;
     }
 
-    if (!/^\d{6}$/.test(transactionNumber.trim())) {
+    if (!/^\d{6}$/.test(normalizedTransactionNumber)) {
       setError("Please enter the last 6 digits of your transaction number.");
 
       return;
@@ -513,7 +237,7 @@ export default function Deposit() {
 
       paymentMethodName: selectedMethod.name,
 
-      transactionNumber: transactionNumber.trim(),
+      transactionNumber: normalizedTransactionNumber,
 
       note: note.trim() || undefined,
 
@@ -548,7 +272,7 @@ export default function Deposit() {
       <div className="mx-auto max-w-xl py-10">
         <div className="rounded-2xl border border-emerald-200 bg-white p-8 text-center shadow-sm">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-            <CheckCircle2 size={32} />
+            <Check size={32} />
           </div>
 
           <h1 className="mt-5 text-2xl font-bold text-slate-900">
@@ -626,121 +350,112 @@ export default function Deposit() {
             Select Deposit Method
           </label>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            {paymentMethods.map((method) => {
-              const selected = paymentMethodId === method.id;
+          {paymentMethods.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {paymentMethods.map((method) => {
+                const selected = String(paymentMethodId) === String(method.id);
 
-              return (
-                <button
-                  key={method.id}
-                  type="button"
-                  onClick={() => {
-                    setPaymentMethodId(method.id);
+                return (
+                  <button
+                    key={String(method.id)}
+                    type="button"
+                    onClick={() => {
+                      setPaymentMethodId(String(method.id));
 
-                    setError("");
+                      setError("");
 
-                    setCopied(false);
-
-                    setScanResult("");
-
-                    if (scannerOpen) {
-                      stopQrScanner();
-                    }
-                  }}
-                  className={`relative flex min-h-[92px] items-center gap-4 rounded-xl border p-4 text-left transition-all ${
-                    selected
-                      ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100"
-                      : "border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50"
-                  }`}
-                >
-                  {/* RADIO */}
-
-                  <div
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-                      selected ? "border-indigo-600" : "border-slate-300"
+                      setCopied(false);
+                    }}
+                    className={`relative flex min-h-[92px] items-center gap-4 rounded-xl border p-4 text-left transition-all ${
+                      selected
+                        ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100"
+                        : "border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50"
                     }`}
                   >
-                    {selected && (
-                      <div className="h-2.5 w-2.5 rounded-full bg-indigo-600" />
-                    )}
-                  </div>
+                    {/* RADIO */}
 
-                  {/* LOGO */}
-
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                    {method.logo ? (
-                      <img
-                        src={method.logo}
-                        alt={`${method.name} logo`}
-                        className="h-full w-full object-contain p-2"
-                        onError={(event) => {
-                          event.currentTarget.style.display = "none";
-                        }}
-                      />
-                    ) : (
-                      <CreditCard className="h-7 w-7 text-slate-400" />
-                    )}
-                  </div>
-
-                  {/* METHOD INFORMATION */}
-
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className={`truncate text-sm font-bold ${
-                        selected ? "text-indigo-700" : "text-slate-800"
+                    <div
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                        selected ? "border-indigo-600" : "border-slate-300"
                       }`}
                     >
-                      {method.name}
-                    </p>
-
-                    {method.bankName && (
-                      <p className="mt-1 truncate text-xs text-slate-500">
-                        {method.bankName}
-                      </p>
-                    )}
-
-                    <p className="mt-1 text-xs text-slate-400">
-                      {method.qrCode
-                        ? "QR payment available"
-                        : "Payment method"}
-                    </p>
-                  </div>
-
-                  {/* SELECTED CHECK */}
-
-                  {selected && (
-                    <div className="absolute right-3 top-3">
-                      <CheckCircle2 className="h-5 w-5 text-indigo-600" />
+                      {selected && (
+                        <div className="h-2.5 w-2.5 rounded-full bg-indigo-600" />
+                      )}
                     </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
 
-          {/* ======================================================
+                    {/* PAYMENT ICON */}
+
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
+                      <CreditCard className="h-7 w-7 text-indigo-500" />
+                    </div>
+
+                    {/* METHOD INFORMATION */}
+
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className={`truncate text-sm font-bold ${
+                          selected ? "text-indigo-700" : "text-slate-800"
+                        }`}
+                      >
+                        {method.name}
+                      </p>
+
+                      {method.bankName && (
+                        <p className="mt-1 truncate text-xs text-slate-500">
+                          {method.bankName}
+                        </p>
+                      )}
+
+                      {method.accountName && (
+                        <p className="mt-1 truncate text-xs text-slate-400">
+                          {method.accountName}
+                        </p>
+                      )}
+
+                      <p className="mt-1 text-xs text-slate-400">
+                        Deposit payment method
+                      </p>
+                    </div>
+
+                    {/* SELECTED CHECK */}
+
+                    {selected && (
+                      <div className="absolute right-3 top-3">
+                        <Check className="h-5 w-5 text-indigo-600" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-center">
+              <p className="text-sm font-medium text-slate-700">
+                No deposit payment methods are currently available.
+              </p>
+
+              <p className="mt-1 text-xs text-slate-500">
+                Please try again later.
+              </p>
+            </div>
+          )}
+
+          {/* ====================================================
               SELECTED PAYMENT DETAILS
-          ====================================================== */}
+          ==================================================== */}
 
           {selectedMethod && (
             <div className="mt-4 overflow-hidden rounded-xl border border-indigo-100 bg-indigo-50">
               {/* HEADER */}
 
               <div className="flex items-center gap-3 border-b border-indigo-100 px-4 py-3">
-                <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-white">
-                  {selectedMethod.logo ? (
-                    <img
-                      src={selectedMethod.logo}
-                      alt={`${selectedMethod.name} logo`}
-                      className="h-full w-full object-contain p-1"
-                    />
-                  ) : (
-                    <CreditCard className="h-5 w-5 text-indigo-500" />
-                  )}
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white">
+                  <CreditCard className="h-5 w-5 text-indigo-500" />
                 </div>
 
-                <div>
-                  <p className="text-sm font-bold text-indigo-800">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-indigo-800">
                     {selectedMethod.name}
                   </p>
 
@@ -751,7 +466,25 @@ export default function Deposit() {
               </div>
 
               {/* ==================================================
-                  PAYMENT PHONE / ACCOUNT NUMBER
+                  ACCOUNT NAME
+              ================================================== */}
+
+              {selectedMethod.accountName && (
+                <div className="border-b border-indigo-100 px-4 py-4">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                    Account Name
+                  </p>
+
+                  <div className="rounded-xl border border-indigo-100 bg-white px-4 py-3 shadow-sm">
+                    <p className="text-base font-bold tracking-wide text-slate-800">
+                      {selectedMethod.accountName}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ==================================================
+                  ACCOUNT NUMBER
               ================================================== */}
 
               {paymentNumber && (
@@ -797,93 +530,42 @@ export default function Deposit() {
               )}
 
               {/* ==================================================
-                  QR CODE
+                  BANK INFORMATION
               ================================================== */}
 
-              {selectedMethod.qrCode && (
-                <div className="flex flex-col items-center px-4 py-5">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
-                    <QrCode className="h-4 w-4 text-indigo-600" />
-                    Payment QR Code
-                  </div>
-
-                  {/* QR IMAGE */}
-
-                  <div className="flex h-52 w-52 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                    <img
-                      src={selectedMethod.qrCode}
-                      alt={`${selectedMethod.name} payment QR code`}
-                      className="h-full w-full object-contain"
-                    />
-                  </div>
-
-                  {/* ==================================================
-                      QR ACTIONS
-
-                      Download = Desktop + Mobile
-                      Scan = MOBILE ONLY
-                  ================================================== */}
-
-                  <div className="mt-4 flex flex-wrap justify-center gap-2">
-                    {/* DOWNLOAD QR
-                        
-                        Available on desktop and mobile.
-                    */}
-
-                    <button
-                      type="button"
-                      onClick={handleDownloadQr}
-                      className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50"
-                    >
-                      <Download className="h-4 w-4" />
-                      Download QR
-                    </button>
-
-                    {/* ==================================================
-                        SCAN QR
-
-                        IMPORTANT:
-                        md:hidden = only mobile/tablet.
-                    ================================================== */}
-
-                    <button
-                      type="button"
-                      onClick={startQrScanner}
-                      className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 md:hidden"
-                    >
-                      <ScanLine className="h-4 w-4" />
-                      Scan QR
-                    </button>
-                  </div>
-
-                  <p className="mt-3 max-w-md text-center text-xs text-slate-500">
-                    Scan the QR code to make your payment, or download it for
-                    use in another device.
-                  </p>
-                </div>
-              )}
-
-              {/* ==================================================
-                  SCANNED RESULT
-              ================================================== */}
-
-              {scanResult && (
-                <div className="border-t border-indigo-100 px-4 py-4">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                    QR Scan Result
+              {(selectedMethod.bankName || selectedMethod.branch) && (
+                <div className="border-b border-indigo-100 px-4 py-4">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                    Bank Information
                   </p>
 
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                    <p className="break-all text-sm font-medium text-emerald-800">
-                      {scanResult}
-                    </p>
+                  <div className="space-y-2 rounded-xl border border-indigo-100 bg-white p-4 shadow-sm">
+                    {selectedMethod.bankName && (
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-xs text-slate-500">Bank</span>
+
+                        <span className="text-sm font-semibold text-slate-800">
+                          {selectedMethod.bankName}
+                        </span>
+                      </div>
+                    )}
+
+                    {selectedMethod.branch && (
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-xs text-slate-500">Branch</span>
+
+                        <span className="text-right text-sm font-semibold text-slate-800">
+                          {selectedMethod.branch}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
 
               {/* PAYMENT INSTRUCTION */}
 
-              <div className="border-t border-indigo-100 px-4 py-3">
+              <div className="px-4 py-3">
                 <p className="text-xs leading-5 text-slate-500">
                   After completing your payment, enter the last 6 digits of your
                   transaction number below.
@@ -901,12 +583,6 @@ export default function Deposit() {
           <label className="mb-2 block text-sm font-semibold text-slate-700">
             Deposit Amount
           </label>
-
-          {/* ======================================================
-              PRESET AMOUNTS
-
-              First valid amount is selected by default.
-          ====================================================== */}
 
           {presetAmounts.length > 0 && (
             <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -943,8 +619,6 @@ export default function Deposit() {
               })}
             </div>
           )}
-
-          {/* CUSTOM AMOUNT */}
 
           <input
             type="number"
@@ -1059,136 +733,6 @@ export default function Deposit() {
           </Button>
         </div>
       </form>
-
-      {/* ==========================================================
-          MOBILE QR SCANNER MODAL
-
-          md:hidden = modal only exists visually on mobile/tablet.
-      ========================================================== */}
-
-      {scannerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 md:hidden">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
-            {/* ==================================================
-                MODAL HEADER
-            ================================================== */}
-
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
-                  <ScanLine className="h-5 w-5" />
-                </div>
-
-                <div>
-                  <h2 className="text-base font-bold text-slate-900">
-                    Scan QR Code
-                  </h2>
-
-                  <p className="text-xs text-slate-500">
-                    Point your camera at a QR code
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={stopQrScanner}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* ==================================================
-                CAMERA
-            ================================================== */}
-
-            <div className="relative aspect-square w-full overflow-hidden bg-slate-950">
-              <video
-                ref={videoRef}
-                muted
-                playsInline
-                autoPlay
-                className="h-full w-full object-cover"
-              />
-
-              {/* SCAN FRAME */}
-
-              {!scanError && (
-                <>
-                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <div className="relative h-56 w-56 rounded-2xl border-2 border-white/80">
-                      <span className="absolute left-0 top-0 h-6 w-6 border-l-4 border-t-4 border-indigo-400" />
-
-                      <span className="absolute right-0 top-0 h-6 w-6 border-r-4 border-t-4 border-indigo-400" />
-
-                      <span className="absolute bottom-0 left-0 h-6 w-6 border-b-4 border-l-4 border-indigo-400" />
-
-                      <span className="absolute bottom-0 right-0 h-6 w-6 border-b-4 border-r-4 border-indigo-400" />
-                    </div>
-                  </div>
-
-                  <div className="pointer-events-none absolute bottom-5 left-0 right-0 text-center">
-                    <span className="rounded-full bg-black/60 px-4 py-2 text-xs font-medium text-white">
-                      Position QR code inside the frame
-                    </span>
-                  </div>
-                </>
-              )}
-
-              {/* SCAN ERROR */}
-
-              {scanError && (
-                <div className="absolute inset-0 flex items-center justify-center p-6">
-                  <div className="rounded-2xl bg-white p-5 text-center shadow-lg">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
-                      <QrCode className="h-6 w-6" />
-                    </div>
-
-                    <p className="mt-3 text-sm font-semibold text-slate-800">
-                      Unable to scan QR code
-                    </p>
-
-                    <p className="mt-2 text-xs leading-5 text-slate-500">
-                      {scanError}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ==================================================
-                MODAL FOOTER
-            ================================================== */}
-
-            <div className="flex justify-end gap-2 px-5 py-4">
-              <button
-                type="button"
-                onClick={stopQrScanner}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-              >
-                Close
-              </button>
-
-              {scanError && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    stopQrScanner();
-
-                    window.setTimeout(() => {
-                      startQrScanner();
-                    }, 100);
-                  }}
-                  className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
-                >
-                  Try Again
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

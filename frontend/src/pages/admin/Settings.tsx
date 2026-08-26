@@ -214,7 +214,7 @@ const normalizePaymentMethod = (method: PaymentMethod): PaymentMethod => {
      *
      * Always keep it as string.
      */
-    id: String(method.id),
+    id: method.id,
 
     name: method.name ?? "",
 
