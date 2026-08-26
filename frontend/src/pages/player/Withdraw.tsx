@@ -374,52 +374,52 @@ export default function Withdraw() {
        CREATE REQUEST
     -------------------------------------------------------- */
 
-    const withdrawId = `WDR-${Date.now()}`;
+    // const withdrawId = `WDR-${Date.now()}`;
 
-    const request = createWithdrawRequest({
-      id: withdrawId,
+    // const request = createWithdrawRequest({
+    //   id: withdrawId,
 
-      playerId: "PLAYER-001",
+    //   playerId: "PLAYER-001",
 
-      playerName: "Player",
+    //   playerName: "Player",
 
-      amount: numericAmount,
+    //   amount: numericAmount,
 
-      fee,
+    //   fee,
 
-      netAmount,
+    //   netAmount,
 
-      paymentMethodId: normalizePaymentMethodId(selectedMethod.id),
+    //   paymentMethodId: normalizePaymentMethodId(selectedMethod.id),
 
-      paymentMethodName: selectedPaymentMethodName,
+    //   paymentMethodName: selectedPaymentMethodName,
 
-      accountName: accountName.trim(),
+    //   accountName: accountName.trim(),
 
-      accountNumber: accountNumber.trim(),
+    //   accountNumber: accountNumber.trim(),
 
-      note: note.trim() || undefined,
+    //   note: note.trim() || undefined,
 
-      /*
-       * Withdrawal must remain pending until admin approval.
-       */
-      status: "PENDING",
+    //   /*
+    //    * Withdrawal must remain pending until admin approval.
+    //    */
+    //   status: "PENDING",
 
-      createdAt: new Date().toISOString(),
-    });
+    //   createdAt: new Date().toISOString(),
+    // });
 
     /* --------------------------------------------------------
        NOTIFY ADMIN
     -------------------------------------------------------- */
 
-    notifyAdminWithdrawRequest({
-      withdrawId: request.id,
+    // notifyAdminWithdrawRequest({
+    //   withdrawId: request.id,
 
-      playerId: request.playerId,
+    //   playerId: request.playerId,
 
-      playerName: request.playerName,
+    //   playerName: request.playerName,
 
-      amount: request.amount,
-    });
+    //   amount: request.amount,
+    // });
 
     /* --------------------------------------------------------
        MARK FIRST WITHDRAWAL AS COMPLETED
