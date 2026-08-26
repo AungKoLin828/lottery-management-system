@@ -15,10 +15,6 @@ import {
   withdrawSettings,
 } from "@/services/walletSettings";
 
-import { createWithdrawRequest } from "@/services/walletService";
-
-import { notifyAdminWithdrawRequest } from "@/services/notificationService";
-
 /* ============================================================
    TYPES
 ============================================================ */
