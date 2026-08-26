@@ -1,11 +1,18 @@
 import {
   boolean,
   integer,
+  pgEnum,
   pgTable,
   timestamp,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+
+export const paymentMethodTypeEnum = pgEnum("payment_method_type", [
+  "Deposit",
+  "Withdraw",
+  "Both",
+]);
 
 export const paymentMethods = pgTable("payment_methods", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -14,9 +21,7 @@ export const paymentMethods = pgTable("payment_methods", {
     length: 100,
   }).notNull(),
 
-  type: varchar("type", {
-    length: 20,
-  }).notNull(),
+  type: paymentMethodTypeEnum("type").notNull(),
 
   enabled: boolean("enabled").notNull().default(true),
 
