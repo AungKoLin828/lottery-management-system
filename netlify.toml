@@ -169,6 +169,12 @@
   to = "/.netlify/functions/admin-payment-methods"
   status = 200
 
+  [[redirects]]
+  from = "/api/player/deposit-request"
+  to = "/.netlify/functions/player-deposit-request"
+  status = 200
+  force = true
+
 # Other API redirects should be here...
 
 
