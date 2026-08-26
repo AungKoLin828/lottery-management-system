@@ -1,18 +1,11 @@
 import {
-  pgEnum,
-  pgTable,
-  uuid,
-  varchar,
   boolean,
   integer,
+  pgTable,
   timestamp,
+  uuid,
+  varchar,
 } from "drizzle-orm/pg-core";
-
-export const paymentMethodTypeEnum = pgEnum("payment_method_type", [
-  "DEPOSIT",
-  "WITHDRAW",
-  "BOTH",
-]);
 
 export const paymentMethods = pgTable("payment_methods", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -21,15 +14,19 @@ export const paymentMethods = pgTable("payment_methods", {
     length: 100,
   }).notNull(),
 
-  type: paymentMethodTypeEnum("type").notNull().default("BOTH"),
+  type: varchar("type", {
+    length: 20,
+  }).notNull(),
+
+  enabled: boolean("enabled").notNull().default(true),
 
   accountName: varchar("account_name", {
     length: 150,
-  }),
+  }).notNull(),
 
   accountNumber: varchar("account_number", {
     length: 100,
-  }),
+  }).notNull(),
 
   bankName: varchar("bank_name", {
     length: 150,
@@ -39,13 +36,7 @@ export const paymentMethods = pgTable("payment_methods", {
     length: 150,
   }),
 
-  qrCode: varchar("qr_code", {
-    length: 500,
-  }),
-
-  enabled: boolean("enabled").notNull().default(true),
-
-  displayOrder: integer("display_order").notNull().default(0),
+  displayOrder: integer("display_order").notNull().default(1),
 
   createdAt: timestamp("created_at", {
     withTimezone: true,

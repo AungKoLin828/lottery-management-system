@@ -164,6 +164,11 @@
   status = 200
   force = true
 
+  [[redirects]]
+  from = "/api/admin/payment-methods"
+  to = "/.netlify/functions/admin-payment-methods"
+  status = 200
+
 # Other API redirects should be here...
 
 

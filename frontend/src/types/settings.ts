@@ -37,34 +37,13 @@ export interface GeneralSettings {
 export type PaymentMethodType = "Deposit" | "Withdraw" | "Both";
 
 export interface PaymentMethod {
-  id: number;
+  id: string;
 
   name: string;
 
   type: PaymentMethodType;
 
   enabled: boolean;
-
-  /*
-   * Payment method logo
-   *
-   * Example:
-   * /payment-logos/kbzpay.png
-   * /payment-logos/wavepay.png
-   * /payment-logos/ayapay.png
-   *
-   * Optional so existing payment methods
-   * are not affected.
-   */
-  logo?: string;
-
-  /*
-   * Payment QR code
-   *
-   * Example:
-   * /payment-qr/kbzpay.png
-   */
-  qrCode: string;
 
   accountName: string;
 
@@ -75,6 +54,10 @@ export interface PaymentMethod {
   branch: string;
 
   displayOrder: number;
+
+  createdAt?: string;
+
+  updatedAt?: string;
 }
 
 /* ============================================================
