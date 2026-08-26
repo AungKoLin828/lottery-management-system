@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import Button from "@/components/common/Button";
 import Input from "@/components/common/Input";
@@ -87,6 +87,18 @@ const emptyPaymentMethod: PaymentMethodForm = {
 };
 
 /* ============================================================
+   API CONFIGURATION
+============================================================ */
+
+/*
+ * Prevent an API request from hanging forever.
+ *
+ * If the Netlify function / database becomes unavailable,
+ * the UI will stop loading after this amount of time.
+ */
+const API_TIMEOUT_MS = 15000;
+
+/* ============================================================
    API HELPER
 ============================================================ */
 
@@ -95,16 +107,6 @@ async function parseApiResponse<T>(
 ): Promise<ApiResponse<T>> {
   const contentType = response.headers.get("content-type") || "";
 
-  /*
-   * Always read the response as text first.
-   *
-   * This prevents:
-   *
-   * Unexpected token '<'
-   *
-   * when Netlify/Vite returns an HTML
-   * error page instead of JSON.
-   */
   const text = await response.text();
 
   if (!text.trim()) {
@@ -113,27 +115,95 @@ async function parseApiResponse<T>(
     );
   }
 
-  if (!contentType.toLowerCase().includes("application/json")) {
-    console.error(
-      "Payment methods API returned non-JSON:",
-      text.slice(0, 2000),
-    );
-
-    throw new Error(
-      `API returned ${response.status} ${response.statusText} instead of JSON.`,
-    );
-  }
-
+  /*
+   * Some servers may return JSON with a slightly different
+   * content-type. Try JSON parsing first instead of immediately
+   * rejecting it.
+   */
   try {
     return JSON.parse(text) as ApiResponse<T>;
   } catch (error) {
-    console.error(
-      "Failed to parse payment methods API JSON:",
-      error,
-      text.slice(0, 2000),
-    );
+    console.error("Failed to parse payment methods API response:", error, {
+      status: response.status,
+      statusText: response.statusText,
+      contentType,
+      body: text.slice(0, 2000),
+    });
+
+    if (!contentType.toLowerCase().includes("application/json")) {
+      throw new Error(
+        `API returned ${response.status} ${response.statusText} instead of JSON.`,
+      );
+    }
 
     throw new Error("The payment methods API returned invalid JSON.");
+  }
+}
+
+/* ============================================================
+   FETCH WITH TIMEOUT
+============================================================ */
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = API_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const externalSignal = init.signal;
+
+  /*
+   * If the caller already has an AbortSignal, abort this
+   * request when the caller aborts.
+   */
+  const handleExternalAbort = () => {
+    controller.abort();
+  };
+
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      controller.abort();
+    } else {
+      externalSignal.addEventListener("abort", handleExternalAbort, {
+        once: true,
+      });
+    }
+  }
+
+  timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      /*
+       * Distinguish timeout from normal external cancellation.
+       */
+      if (!externalSignal?.aborted) {
+        throw new Error(
+          "The payment methods request timed out. Please try again.",
+        );
+      }
+    }
+
+    throw error;
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+
+    if (externalSignal) {
+      externalSignal.removeEventListener("abort", handleExternalAbort);
+    }
   }
 }
 
@@ -146,6 +216,16 @@ export default function PaymentMethodsTab({
   setPaymentMethods,
   onDelete,
 }: PaymentMethodsTabProps) {
+  /* ==========================================================
+     COMPONENT LIFECYCLE
+  ========================================================== */
+
+  const mountedRef = useRef(true);
+
+  const loadingRequestRef = useRef<AbortController | null>(null);
+
+  const loadingInProgressRef = useRef(false);
+
   /* ==========================================================
      MODAL
   ========================================================== */
@@ -160,7 +240,19 @@ export default function PaymentMethodsTab({
      LOADING / SAVING
   ========================================================== */
 
-  const [loading, setLoading] = useState(true);
+  /*
+   * IMPORTANT:
+   *
+   * initialLoading controls only the first page load.
+   *
+   * refreshing is used for subsequent DB reloads.
+   *
+   * Therefore save/toggle/delete will NOT replace the entire
+   * table with an infinite/full-page spinner.
+   */
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  const [refreshing, setRefreshing] = useState(false);
 
   const [saving, setSaving] = useState(false);
 
@@ -177,10 +269,36 @@ export default function PaymentMethodsTab({
   const [success, setSuccess] = useState("");
 
   /* ==========================================================
+     MOUNT / UNMOUNT
+  ========================================================== */
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+
+      /*
+       * Cancel an active loading request when the component
+       * is removed.
+       */
+      loadingRequestRef.current?.abort();
+
+      loadingRequestRef.current = null;
+
+      loadingInProgressRef.current = false;
+    };
+  }, []);
+
+  /* ==========================================================
      CLEAR MESSAGES
   ========================================================== */
 
   const clearMessages = () => {
+    if (!mountedRef.current) {
+      return;
+    }
+
     setError("");
 
     setSuccess("");
@@ -198,7 +316,12 @@ export default function PaymentMethodsTab({
 
       name: method.name ?? "",
 
-      type: method.type ?? "Both",
+      type:
+        method.type === "Deposit" ||
+        method.type === "Withdraw" ||
+        method.type === "Both"
+          ? method.type
+          : "Both",
 
       enabled: method.enabled !== false,
 
@@ -218,23 +341,73 @@ export default function PaymentMethodsTab({
      LOAD PAYMENT METHODS
   ========================================================== */
 
-  const loadPaymentMethods = useCallback(async () => {
-    setLoading(true);
+  const loadPaymentMethods = async (
+    options: {
+      initial?: boolean;
+      showError?: boolean;
+    } = {},
+  ): Promise<boolean> => {
+    const { initial = false, showError = true } = options;
 
-    setError("");
+    /*
+     * Prevent duplicate simultaneous GET requests.
+     *
+     * This is especially important during React development
+     * where effects can be invoked more than once.
+     */
+    if (loadingInProgressRef.current) {
+      return false;
+    }
+
+    loadingInProgressRef.current = true;
+
+    /*
+     * Cancel any previous request.
+     */
+    loadingRequestRef.current?.abort();
+
+    const controller = new AbortController();
+
+    loadingRequestRef.current = controller;
+
+    if (mountedRef.current) {
+      if (initial) {
+        setInitialLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+
+      if (showError) {
+        setError("");
+      }
+    }
 
     try {
-      const response = await fetch("/api/admin/payment-methods", {
-        method: "GET",
+      const response = await fetchWithTimeout(
+        "/api/admin/payment-methods",
+        {
+          method: "GET",
 
-        credentials: "include",
+          credentials: "include",
 
-        headers: {
-          Accept: "application/json",
+          headers: {
+            Accept: "application/json",
+          },
+
+          cache: "no-store",
+
+          signal: controller.signal,
         },
+        API_TIMEOUT_MS,
+      );
 
-        cache: "no-store",
-      });
+      /*
+       * If component was unmounted or request was cancelled,
+       * do not update React state.
+       */
+      if (!mountedRef.current || controller.signal.aborted) {
+        return false;
+      }
 
       const result = await parseApiResponse<PaymentMethodsResponse>(response);
 
@@ -262,27 +435,68 @@ export default function PaymentMethodsTab({
 
       const normalizedMethods = methods.map(normalizePaymentMethod);
 
-      setPaymentMethods(normalizedMethods);
+      if (mountedRef.current) {
+        setPaymentMethods(normalizedMethods);
+      }
+
+      return true;
     } catch (loadError) {
+      /*
+       * Abort errors caused by component unmount/request
+       * cancellation should not be displayed to the user.
+       */
+      if (controller.signal.aborted || !mountedRef.current) {
+        return false;
+      }
+
       console.error("Load payment methods error:", loadError);
 
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Failed to load payment methods.",
-      );
+      if (showError) {
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Failed to load payment methods.",
+        );
+      }
+
+      return false;
     } finally {
-      setLoading(false);
+      if (loadingRequestRef.current === controller) {
+        loadingRequestRef.current = null;
+      }
+
+      loadingInProgressRef.current = false;
+
+      if (mountedRef.current) {
+        if (initial) {
+          setInitialLoading(false);
+        } else {
+          setRefreshing(false);
+        }
+      }
     }
-  }, [setPaymentMethods]);
+  };
 
   /* ==========================================================
      INITIAL LOAD
   ========================================================== */
 
   useEffect(() => {
-    void loadPaymentMethods();
-  }, [loadPaymentMethods]);
+    /*
+     * Intentionally run only once.
+     *
+     * Do NOT put loadPaymentMethods in this dependency array.
+     *
+     * This prevents the repeated loading loop caused by a
+     * callback being recreated by parent renders.
+     */
+    void loadPaymentMethods({
+      initial: true,
+      showError: true,
+    });
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* ==========================================================
      OPEN ADD
@@ -309,18 +523,6 @@ export default function PaymentMethodsTab({
   const openEdit = (method: PaymentMethod) => {
     clearMessages();
 
-    /*
-     * IMPORTANT:
-     *
-     * Always convert the DB ID to string.
-     *
-     * This prevents:
-     *
-     * number !== string
-     *
-     * comparison problems when the DB returns
-     * UUID/string IDs.
-     */
     const id = String(method.id);
 
     setEditingId(id);
@@ -434,6 +636,10 @@ export default function PaymentMethodsTab({
       return;
     }
 
+    if (saving) {
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -468,19 +674,23 @@ export default function PaymentMethodsTab({
         payload,
       );
 
-      const response = await fetch("/api/admin/payment-methods", {
-        method: isEditing ? "PUT" : "POST",
+      const response = await fetchWithTimeout(
+        "/api/admin/payment-methods",
+        {
+          method: isEditing ? "PUT" : "POST",
 
-        credentials: "include",
+          credentials: "include",
 
-        headers: {
-          "Content-Type": "application/json",
+          headers: {
+            "Content-Type": "application/json",
 
-          Accept: "application/json",
+            Accept: "application/json",
+          },
+
+          body: JSON.stringify(payload),
         },
-
-        body: JSON.stringify(payload),
-      });
+        API_TIMEOUT_MS,
+      );
 
       const result = await parseApiResponse<PaymentMethodResponse>(response);
 
@@ -492,48 +702,66 @@ export default function PaymentMethodsTab({
       }
 
       /*
-       * Try to get the payment method
-       * returned by the API.
+       * Extract API response if available.
        */
       const savedMethod = extractPaymentMethod(result.data);
 
       /*
-       * Close modal first.
+       * Close modal immediately after successful DB
+       * operation.
        */
-      setShowModal(false);
+      if (mountedRef.current) {
+        setShowModal(false);
 
-      setEditingId(null);
+        setEditingId(null);
 
-      setForm({
-        ...emptyPaymentMethod,
-      });
+        setForm({
+          ...emptyPaymentMethod,
+        });
+      }
 
       /*
-       * IMPORTANT:
+       * Refresh DB data.
        *
-       * Reload directly from DB.
-       *
-       * This guarantees the frontend is
-       * synchronized with PostgreSQL even
-       * if the API response format changes.
+       * This uses "refreshing", NOT "initialLoading",
+       * so the table remains visible while refreshing.
        */
-      await loadPaymentMethods();
+      const refreshed = await loadPaymentMethods({
+        initial: false,
+        showError: true,
+      });
 
-      if (savedMethod) {
-        setSuccess(
-          isEditing
-            ? "Payment method updated successfully."
-            : "Payment method added successfully.",
-        );
-      } else {
-        setSuccess(
-          isEditing
-            ? "Payment method updated successfully."
-            : "Payment method added successfully.",
-        );
+      if (!mountedRef.current) {
+        return;
       }
+
+      if (!refreshed) {
+        /*
+         * The save itself succeeded even if the subsequent
+         * GET refresh failed.
+         */
+        setSuccess(
+          isEditing
+            ? "Payment method updated successfully, but the list could not be refreshed."
+            : "Payment method added successfully, but the list could not be refreshed.",
+        );
+
+        return;
+      }
+
+      setSuccess(
+        savedMethod || isEditing
+          ? isEditing
+            ? "Payment method updated successfully."
+            : "Payment method added successfully."
+          : "Payment method added successfully.",
+      );
     } catch (saveError) {
       console.error("Save payment method error:", saveError);
+
+      if (!mountedRef.current) {
+        return;
+      }
 
       setError(
         saveError instanceof Error
@@ -541,7 +769,9 @@ export default function PaymentMethodsTab({
           : "Failed to save payment method.",
       );
     } finally {
-      setSaving(false);
+      if (mountedRef.current) {
+        setSaving(false);
+      }
     }
   };
 
@@ -552,42 +782,50 @@ export default function PaymentMethodsTab({
   const togglePaymentMethod = async (method: PaymentMethod) => {
     const id = String(method.id);
 
+    if (togglingId !== null || saving) {
+      return;
+    }
+
     clearMessages();
 
     setTogglingId(id);
 
     try {
-      const response = await fetch("/api/admin/payment-methods", {
-        method: "PUT",
+      const response = await fetchWithTimeout(
+        "/api/admin/payment-methods",
+        {
+          method: "PUT",
 
-        credentials: "include",
+          credentials: "include",
 
-        headers: {
-          "Content-Type": "application/json",
+          headers: {
+            "Content-Type": "application/json",
 
-          Accept: "application/json",
+            Accept: "application/json",
+          },
+
+          body: JSON.stringify({
+            id,
+
+            name: method.name,
+
+            type: method.type,
+
+            enabled: !method.enabled,
+
+            accountName: method.accountName,
+
+            accountNumber: method.accountNumber,
+
+            bankName: method.bankName,
+
+            branch: method.branch,
+
+            displayOrder: method.displayOrder,
+          }),
         },
-
-        body: JSON.stringify({
-          id,
-
-          name: method.name,
-
-          type: method.type,
-
-          enabled: !method.enabled,
-
-          accountName: method.accountName,
-
-          accountNumber: method.accountNumber,
-
-          bankName: method.bankName,
-
-          branch: method.branch,
-
-          displayOrder: method.displayOrder,
-        }),
-      });
+        API_TIMEOUT_MS,
+      );
 
       const result = await parseApiResponse<PaymentMethodResponse>(response);
 
@@ -598,9 +836,27 @@ export default function PaymentMethodsTab({
       }
 
       /*
-       * Reload from real database.
+       * Refresh from PostgreSQL without replacing the
+       * current table with the initial loading screen.
        */
-      await loadPaymentMethods();
+      const refreshed = await loadPaymentMethods({
+        initial: false,
+        showError: true,
+      });
+
+      if (!mountedRef.current) {
+        return;
+      }
+
+      if (!refreshed) {
+        setSuccess(
+          `${method.name} ${
+            !method.enabled ? "enabled" : "disabled"
+          } successfully, but the list could not be refreshed.`,
+        );
+
+        return;
+      }
 
       setSuccess(
         `${method.name} ${
@@ -610,13 +866,19 @@ export default function PaymentMethodsTab({
     } catch (toggleError) {
       console.error("Toggle payment method error:", toggleError);
 
+      if (!mountedRef.current) {
+        return;
+      }
+
       setError(
         toggleError instanceof Error
           ? toggleError.message
           : "Failed to update payment method status.",
       );
     } finally {
-      setTogglingId(null);
+      if (mountedRef.current) {
+        setTogglingId(null);
+      }
     }
   };
 
@@ -639,26 +901,34 @@ export default function PaymentMethodsTab({
       return;
     }
 
+    if (deletingId !== null || saving) {
+      return;
+    }
+
     clearMessages();
 
     setDeletingId(id);
 
     try {
-      const response = await fetch("/api/admin/payment-methods", {
-        method: "DELETE",
+      const response = await fetchWithTimeout(
+        "/api/admin/payment-methods",
+        {
+          method: "DELETE",
 
-        credentials: "include",
+          credentials: "include",
 
-        headers: {
-          "Content-Type": "application/json",
+          headers: {
+            "Content-Type": "application/json",
 
-          Accept: "application/json",
+            Accept: "application/json",
+          },
+
+          body: JSON.stringify({
+            id,
+          }),
         },
-
-        body: JSON.stringify({
-          id,
-        }),
-      });
+        API_TIMEOUT_MS,
+      );
 
       const result = await parseApiResponse(response);
 
@@ -667,18 +937,37 @@ export default function PaymentMethodsTab({
       }
 
       /*
-       * Reload from PostgreSQL.
+       * Refresh from PostgreSQL.
        */
-      await loadPaymentMethods();
+      const refreshed = await loadPaymentMethods({
+        initial: false,
+        showError: true,
+      });
+
+      if (!mountedRef.current) {
+        return;
+      }
 
       /*
        * Keep parent callback compatibility.
        */
       onDelete?.(id);
 
+      if (!refreshed) {
+        setSuccess(
+          "Payment method deleted successfully, but the list could not be refreshed.",
+        );
+
+        return;
+      }
+
       setSuccess("Payment method deleted successfully.");
     } catch (deleteError) {
       console.error("Delete payment method error:", deleteError);
+
+      if (!mountedRef.current) {
+        return;
+      }
 
       setError(
         deleteError instanceof Error
@@ -686,7 +975,9 @@ export default function PaymentMethodsTab({
           : "Failed to delete payment method.",
       );
     } finally {
-      setDeletingId(null);
+      if (mountedRef.current) {
+        setDeletingId(null);
+      }
     }
   };
 
@@ -699,10 +990,10 @@ export default function PaymentMethodsTab({
     .sort((a, b) => a.displayOrder - b.displayOrder);
 
   /* ==========================================================
-     LOADING
+     INITIAL LOADING
   ========================================================== */
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="rounded-xl bg-white p-8 shadow">
         <div className="flex flex-col items-center justify-center">
@@ -711,6 +1002,12 @@ export default function PaymentMethodsTab({
           <p className="mt-4 text-sm text-gray-500">
             Loading payment methods...
           </p>
+
+          {error && (
+            <div className="mt-4 max-w-lg rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-700">
+              {error}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -728,13 +1025,35 @@ export default function PaymentMethodsTab({
 
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          <div className="flex items-start justify-between gap-4">
+            <span>{error}</span>
+
+            <button
+              type="button"
+              onClick={() => setError("")}
+              className="shrink-0 text-red-500 hover:text-red-700"
+              aria-label="Close error"
+            >
+              ×
+            </button>
+          </div>
         </div>
       )}
 
       {success && (
         <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-          {success}
+          <div className="flex items-start justify-between gap-4">
+            <span>{success}</span>
+
+            <button
+              type="button"
+              onClick={() => setSuccess("")}
+              className="shrink-0 text-green-500 hover:text-green-700"
+              aria-label="Close success message"
+            >
+              ×
+            </button>
+          </div>
         </div>
       )}
 
@@ -747,7 +1066,17 @@ export default function PaymentMethodsTab({
 
         <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-bold">Payment Methods</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-bold">Payment Methods</h2>
+
+              {refreshing && (
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-indigo-600" />
+
+                  <span>Refreshing...</span>
+                </div>
+              )}
+            </div>
 
             <p className="text-sm text-gray-500">
               Manage deposit and withdraw payment methods.
@@ -757,7 +1086,9 @@ export default function PaymentMethodsTab({
           <Button
             variant="success"
             onClick={openAdd}
-            disabled={saving || deletingId !== null || togglingId !== null}
+            disabled={
+              saving || deletingId !== null || togglingId !== null || refreshing
+            }
           >
             + Add Payment Method
           </Button>
@@ -765,7 +1096,7 @@ export default function PaymentMethodsTab({
 
         {/* ====================================================
             TABLE
-        ==================================================== */}
+        ===================================================== */}
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px]">
@@ -827,7 +1158,9 @@ export default function PaymentMethodsTab({
                       <td className="p-3">
                         <button
                           type="button"
-                          disabled={isDeleting || isToggling || saving}
+                          disabled={
+                            isDeleting || isToggling || saving || refreshing
+                          }
                           onClick={() => void togglePaymentMethod(method)}
                           className={`rounded-full px-3 py-1 text-sm transition ${
                             method.enabled
@@ -851,7 +1184,9 @@ export default function PaymentMethodsTab({
 
                           <Button
                             variant="outline"
-                            disabled={isDeleting || isToggling || saving}
+                            disabled={
+                              isDeleting || isToggling || saving || refreshing
+                            }
                             onClick={() => openEdit(method)}
                           >
                             Edit
@@ -861,7 +1196,9 @@ export default function PaymentMethodsTab({
 
                           <Button
                             variant="danger"
-                            disabled={isDeleting || isToggling || saving}
+                            disabled={
+                              isDeleting || isToggling || saving || refreshing
+                            }
                             onClick={() => void deletePaymentMethod(id)}
                           >
                             {isDeleting ? "Deleting..." : "Delete"}
@@ -916,6 +1253,7 @@ export default function PaymentMethodsTab({
             onChange={(event) =>
               setForm((previous) => ({
                 ...previous,
+
                 name: event.target.value,
               }))
             }
