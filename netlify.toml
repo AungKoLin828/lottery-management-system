@@ -3,15 +3,41 @@
   publish = "frontend/dist"
   command = "npm run build"
 
-
 [functions]
   directory = "netlify/functions"
-
 
 [dev]
   command = "npm run dev --prefix frontend"
   targetPort = 5173
   port = 8888
+
+
+# ============================================================
+# PWA / STATIC FILES
+# ============================================================
+
+[[headers]]
+  for = "/manifest.webmanifest"
+
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+
+[[headers]]
+  for = "/sw.js"
+
+  [headers.values]
+    Content-Type = "application/javascript"
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+
+[[headers]]
+  for = "/registerSW.js"
+
+  [headers.values]
+    Content-Type = "application/javascript"
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 
 # ============================================================
@@ -42,6 +68,11 @@
   status = 200
   force = true
 
+
+# ============================================================
+# ADMIN RESULTS API
+# ============================================================
+
 [[redirects]]
   from = "/api/admin/results"
   to = "/.netlify/functions/admin-results"
@@ -54,16 +85,20 @@
   status = 200
   force = true
 
-  [[redirects]]
+
+# ============================================================
+# ADMIN LOTTERY NUMBER SETTINGS
+# ============================================================
+
+[[redirects]]
   from = "/api/admin/lottery-number-settings"
   to = "/.netlify/functions/admin-lottery-number-settings"
   status = 200
-  
+  force = true
+
+
 # ============================================================
 # ADMIN USER BALANCE API
-#
-# IMPORTANT:
-# This route MUST come before the generic user/:userId route.
 # ============================================================
 
 [[redirects]]
@@ -72,12 +107,9 @@
   status = 200
   force = true
 
+
 # ============================================================
 # PLAYER DASHBOARD API
-#
-# GET /api/player/dashboard
-#
-# This MUST be before the frontend SPA fallback.
 # ============================================================
 
 [[redirects]]
@@ -85,6 +117,7 @@
   to = "/.netlify/functions/player-dashboard"
   status = 200
   force = true
+
 
 # ============================================================
 # PLAYER TRANSACTIONS API
@@ -96,33 +129,35 @@
   status = 200
   force = true
 
+
 # ============================================================
 # ADMIN USERS API
 # ============================================================
 
-# GET /api/admin/users
-# POST /api/admin/users
 [[redirects]]
   from = "/api/admin/users"
   to = "/.netlify/functions/admin-users"
   status = 200
   force = true
 
-
-# GET /api/admin/users/:userId
-# PUT /api/admin/users/:userId
-# PATCH /api/admin/users/:userId
 [[redirects]]
   from = "/api/admin/users/:userId"
   to = "/.netlify/functions/admin-users?userId=:userId"
   status = 200
   force = true
 
+
+# ============================================================
+# RESULTS HISTORY API
+# ============================================================
+
 [[redirects]]
   from = "/api/results-history"
   to = "/.netlify/functions/results-history"
   status = 200
-  
+  force = true
+
+
 # ============================================================
 # ADMIN HOLIDAYS API
 # ============================================================
@@ -139,6 +174,11 @@
   status = 200
   force = true
 
+
+# ============================================================
+# ADMIN NUMBER RESTRICTIONS API
+# ============================================================
+
 [[redirects]]
   from = "/api/admin/number-restrictions"
   to = "/.netlify/functions/admin-number-restrictions"
@@ -152,7 +192,11 @@
   force = true
 
 
-  [[redirects]]
+# ============================================================
+# ADMIN DRAW SETTINGS API
+# ============================================================
+
+[[redirects]]
   from = "/api/admin/draw-settings"
   to = "/.netlify/functions/admin-draw-settings"
   status = 200
@@ -164,22 +208,34 @@
   status = 200
   force = true
 
-  [[redirects]]
+
+# ============================================================
+# ADMIN PAYMENT METHODS API
+# ============================================================
+
+[[redirects]]
   from = "/api/admin/payment-methods"
   to = "/.netlify/functions/admin-payment-methods"
   status = 200
 
-  [[redirects]]
+
+# ============================================================
+# PLAYER DEPOSIT API
+# ============================================================
+
+[[redirects]]
   from = "/api/player/deposit-request"
   to = "/.netlify/functions/player-deposit-request"
   status = 200
   force = true
 
-  [[redirects]]
+
+[[redirects]]
   from = "/api/player/payment-methods"
   to = "/.netlify/functions/player-payment-methods"
   status = 200
   force = true
+
 
 [[redirects]]
   from = "/api/player/deposit-settings"
@@ -187,10 +243,13 @@
   status = 200
   force = true
 
-# Other API redirects should be here...
 
+# ============================================================
+# REACT SPA FALLBACK
+#
+# MUST BE LAST
+# ============================================================
 
-# React SPA fallback MUST be last
 [[redirects]]
   from = "/*"
   to = "/index.html"
