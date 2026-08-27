@@ -13,34 +13,6 @@
 
 
 # ============================================================
-# PWA / STATIC FILES
-# ============================================================
-
-[[headers]]
-  for = "/manifest.webmanifest"
-
-  [headers.values]
-    Content-Type = "application/manifest+json"
-    Cache-Control = "public, max-age=0, must-revalidate"
-
-
-[[headers]]
-  for = "/sw.js"
-
-  [headers.values]
-    Content-Type = "application/javascript"
-    Cache-Control = "public, max-age=0, must-revalidate"
-
-
-[[headers]]
-  for = "/registerSW.js"
-
-  [headers.values]
-    Content-Type = "application/javascript"
-    Cache-Control = "public, max-age=0, must-revalidate"
-
-
-# ============================================================
 # AUTH API
 # ============================================================
 
@@ -229,13 +201,11 @@
   status = 200
   force = true
 
-
 [[redirects]]
   from = "/api/player/payment-methods"
   to = "/.netlify/functions/player-payment-methods"
   status = 200
   force = true
-
 
 [[redirects]]
   from = "/api/player/deposit-settings"

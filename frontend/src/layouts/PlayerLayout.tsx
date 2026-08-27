@@ -61,6 +61,16 @@ type WalletBalanceResponse = {
    WALLET BALANCE UPDATE EVENT
 ============================================================ */
 
+/*
+ * Other wallet pages can call:
+ *
+ * window.dispatchEvent(new Event("wallet-balance-updated"));
+ *
+ * after a successful deposit / withdraw / wallet transaction.
+ *
+ * PlayerLayout listens for this event and reloads the balance
+ * without refreshing the page.
+ */
 export const WALLET_BALANCE_UPDATED_EVENT = "wallet-balance-updated";
 
 /* ============================================================
@@ -205,6 +215,12 @@ export default function PlayerLayout() {
 
       const contentType = response.headers.get("content-type") || "";
 
+      /*
+       * Read as text first.
+       *
+       * This prevents JSON parsing errors when Netlify
+       * temporarily returns HTML or another response.
+       */
       const rawResponse = await response.text();
 
       if (!rawResponse.trim()) {
@@ -231,6 +247,9 @@ export default function PlayerLayout() {
         return;
       }
 
+      /*
+       * API error.
+       */
       if (!response.ok || result.success === false) {
         console.error("Failed to load player wallet balance", {
           status: response.status,
@@ -240,6 +259,10 @@ export default function PlayerLayout() {
 
         return;
       }
+
+      /* ========================================================
+         GET BALANCE
+      ======================================================== */
 
       const balance =
         result.data?.stats?.walletBalance ??
@@ -263,8 +286,18 @@ export default function PlayerLayout() {
         return;
       }
 
+      /*
+       * IMPORTANT:
+       *
+       * React state update immediately updates the existing
+       * Balance display without refreshing the page.
+       */
       setWalletBalance(numericBalance);
     } catch (error) {
+      /*
+       * Do not break PlayerLayout if the wallet API
+       * temporarily fails.
+       */
       console.error("Wallet balance loading error:", error);
     }
   }, []);
@@ -329,6 +362,14 @@ export default function PlayerLayout() {
      WALLET BALANCE FALLBACK REFRESH
   ============================================================ */
 
+  /*
+   * This is a fallback for cases where another page updates
+   * the database but does not dispatch the custom event.
+   *
+   * It does NOT refresh the browser page.
+   *
+   * It only requests the latest wallet balance from the API.
+   */
   useEffect(() => {
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") {
@@ -654,79 +695,21 @@ export default function PlayerLayout() {
   ============================================================ */
 
   return (
-    <div
-      className="
-        min-h-screen
-        w-full
-        max-w-full
-        overflow-x-hidden
-        bg-slate-50
-        text-slate-900
-      "
-    >
+    <div className="min-h-screen bg-slate-50 text-slate-900">
       {/* ======================================================
           HEADER
       ======================================================= */}
 
-      <header
-        className="
-          sticky
-          top-0
-          z-50
-          border-b
-          border-slate-700/80
-          bg-slate-900/95
-          backdrop-blur-xl
-          supports-[backdrop-filter]:bg-slate-900/90
-        "
-      >
-        <div
-          className="
-            mx-auto
-            flex
-            h-[64px]
-            max-w-7xl
-            items-center
-            justify-between
-            gap-2
-            px-3
-            sm:h-[72px]
-            sm:gap-3
-            sm:px-6
-            lg:px-8
-          "
-        >
-          {/* ==================================================
-              LOGO
-          =================================================== */}
+      <header className="sticky top-0 z-50 border-b border-slate-700/80 bg-slate-900/95 backdrop-blur-xl">
+        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+          {/* LOGO */}
 
           <NavLink
             to="/player"
             onClick={closeAllMenus}
-            className="group flex min-w-0 shrink-0 items-center gap-2 sm:gap-2.5"
+            className="group flex shrink-0 items-center gap-2.5"
           >
-            <div
-              className="
-                flex
-                h-9
-                w-9
-                shrink-0
-                items-center
-                justify-center
-                rounded-xl
-                bg-gradient-to-br
-                from-indigo-600
-                to-violet-600
-                text-white
-                shadow-md
-                shadow-indigo-900/30
-                transition-transform
-                duration-200
-                group-hover:scale-105
-                sm:h-9
-                sm:w-9
-              "
-            >
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30 transition-transform duration-200 group-hover:scale-105">
               <Ticket className="h-5 w-5" />
             </div>
 
@@ -741,9 +724,7 @@ export default function PlayerLayout() {
             </div>
           </NavLink>
 
-          {/* ==================================================
-              DESKTOP NAVIGATION
-          =================================================== */}
+          {/* DESKTOP NAVIGATION */}
 
           <nav className="hidden min-w-0 items-center justify-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 lg:flex">
             {/* DASHBOARD */}
@@ -858,6 +839,20 @@ export default function PlayerLayout() {
 
             {/* WALLET */}
 
+            {/*
+             * IMPORTANT:
+             *
+             * The balance amount is intentionally NOT displayed
+             * inside this Wallet menu item.
+             *
+             * The existing desktop Balance box on the right is
+             * the single desktop balance display.
+             *
+             * This prevents the desktop navigation from becoming
+             * too wide and hiding/squeezing the existing Balance
+             * display.
+             */}
+
             <NavLink to="/player/wallet" className={navClass}>
               <WalletCards size={17} />
               Wallet
@@ -925,11 +920,9 @@ export default function PlayerLayout() {
             </div>
           </nav>
 
-          {/* ==================================================
-              RIGHT SIDE
-          =================================================== */}
+          {/* RIGHT SIDE */}
 
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {/* EXISTING DESKTOP BALANCE */}
 
             <NavLink
@@ -1043,64 +1036,12 @@ export default function PlayerLayout() {
               )}
             </div>
 
-            {/* MOBILE BALANCE */}
-
-            <NavLink
-              to="/player/wallet"
-              onClick={closeAllMenus}
-              className="
-                flex
-                h-10
-                max-w-[132px]
-                shrink-0
-                items-center
-                gap-1.5
-                rounded-xl
-                border
-                border-emerald-500/25
-                bg-emerald-500/10
-                px-2
-                text-emerald-300
-                transition-all
-                active:scale-95
-                sm:hidden
-              "
-              aria-label="Open wallet"
-            >
-              <WalletCards className="h-4 w-4 shrink-0 text-emerald-400" />
-
-              <span className="truncate text-[11px] font-bold">
-                {formattedWalletBalance}
-              </span>
-            </NavLink>
-
-            {/* MOBILE NOTIFICATION */}
-
-            <div className="flex shrink-0 sm:hidden">
-              <div
-                className="
-                  flex
-                  h-10
-                  w-10
-                  items-center
-                  justify-center
-                  rounded-xl
-                  border
-                  border-slate-700
-                  bg-slate-800
-                  text-slate-300
-                "
-              >
-                <NotificationBell role="PLAYER" />
-              </div>
-            </div>
-
             {/* MOBILE MENU BUTTON */}
 
             <button
               type="button"
               onClick={toggleMobileMenu}
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-all duration-200 lg:hidden ${
+              className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 lg:hidden ${
                 mobileMenuOpen
                   ? "border-indigo-500 bg-indigo-500/20 text-indigo-300"
                   : "border-slate-700 bg-slate-800 text-slate-300 hover:border-indigo-500 hover:bg-indigo-500/20 hover:text-white"
@@ -1119,21 +1060,10 @@ export default function PlayerLayout() {
           </div>
         </div>
 
-        {/* ======================================================
-            MOBILE NAVIGATION
-        ======================================================= */}
+        {/* MOBILE NAVIGATION */}
 
         {mobileMenuOpen && (
-          <div
-            className="
-              border-t
-              border-slate-700
-              bg-slate-900
-              shadow-xl
-              shadow-slate-950/30
-              lg:hidden
-            "
-          >
+          <div className="border-t border-slate-700 bg-slate-900 lg:hidden">
             <nav className="mx-auto max-w-7xl space-y-1 px-3 py-3 sm:px-5">
               {/* DASHBOARD */}
 
@@ -1142,7 +1072,7 @@ export default function PlayerLayout() {
                 end
                 onClick={handleMobileNavigation}
                 className={({ isActive }) =>
-                  `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all active:scale-[0.99] ${
+                  `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
                     isActive
                       ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-950/30"
                       : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
@@ -1170,7 +1100,7 @@ export default function PlayerLayout() {
                   onClick={toggleMobilePlay}
                   aria-haspopup="menu"
                   aria-expanded={mobilePlayOpen}
-                  className={`flex min-h-11 w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition-all active:scale-[0.99] ${
+                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition-all ${
                     isPlayActive
                       ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm"
                       : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
@@ -1219,7 +1149,7 @@ export default function PlayerLayout() {
                       to="/player/play-2d"
                       onClick={handleMobileNavigation}
                       className={({ isActive }) =>
-                        `group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 transition active:scale-[0.99] ${
+                        `group flex items-center gap-3 rounded-xl px-3 py-2.5 transition ${
                           isActive
                             ? "bg-indigo-500/20 text-indigo-300"
                             : "text-slate-300 hover:bg-slate-700/60 hover:text-white"
@@ -1247,7 +1177,7 @@ export default function PlayerLayout() {
                       to="/player/play-3d"
                       onClick={handleMobileNavigation}
                       className={({ isActive }) =>
-                        `group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 transition active:scale-[0.99] ${
+                        `group flex items-center gap-3 rounded-xl px-3 py-2.5 transition ${
                           isActive
                             ? "bg-violet-500/20 text-violet-300"
                             : "text-slate-300 hover:bg-slate-700/60 hover:text-white"
@@ -1278,7 +1208,7 @@ export default function PlayerLayout() {
                 to="/player/tickets"
                 onClick={handleMobileNavigation}
                 className={({ isActive }) =>
-                  `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all active:scale-[0.99] ${
+                  `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
                     isActive
                       ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-950/30"
                       : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
@@ -1298,7 +1228,7 @@ export default function PlayerLayout() {
                 to="/player/wallet"
                 onClick={handleMobileNavigation}
                 className={({ isActive }) =>
-                  `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all active:scale-[0.99] ${
+                  `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
                     isActive
                       ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-950/30"
                       : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
@@ -1311,7 +1241,7 @@ export default function PlayerLayout() {
 
                 <span>Wallet</span>
 
-                <span className="ml-auto max-w-[130px] truncate rounded-md bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-400">
+                <span className="ml-auto rounded-md bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-400">
                   {formattedWalletBalance} MMK
                 </span>
               </NavLink>
@@ -1330,7 +1260,7 @@ export default function PlayerLayout() {
                       to={item.path}
                       onClick={handleMobileNavigation}
                       className={({ isActive }) =>
-                        `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all active:scale-[0.99] ${
+                        `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
                           isActive
                             ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-950/30"
                             : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
@@ -1429,7 +1359,7 @@ export default function PlayerLayout() {
                   to="/player/profile"
                   onClick={handleMobileNavigation}
                   className={({ isActive }) =>
-                    `mt-1 flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all active:scale-[0.99] ${
+                    `mt-1 flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
                       isActive
                         ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-950/30"
                         : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
@@ -1466,7 +1396,6 @@ export default function PlayerLayout() {
                     duration-200
                     hover:bg-red-500/10
                     hover:text-red-300
-                    active:scale-[0.99]
                   "
                 >
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-500/10">
@@ -1486,7 +1415,7 @@ export default function PlayerLayout() {
       ======================================================= */}
 
       <div
-        className={`fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-4 z-[60] lg:hidden ${
+        className={`fixed bottom-5 right-4 z-[60] lg:hidden ${
           showBackButton
             ? "translate-y-0 opacity-100"
             : "pointer-events-none translate-y-6 opacity-0"
@@ -1566,23 +1495,7 @@ export default function PlayerLayout() {
           MAIN CONTENT
       ======================================================= */}
 
-      <main
-        className="
-          mx-auto
-          min-h-[calc(100vh-4rem)]
-          w-full
-          max-w-7xl
-          overflow-x-hidden
-          px-3
-          py-4
-          pb-[calc(5rem+env(safe-area-inset-bottom))]
-          sm:px-6
-          sm:py-6
-          sm:pb-6
-          lg:px-8
-          lg:py-8
-        "
-      >
+      <main className="mx-auto min-h-[calc(100vh-4.5rem)] max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <Outlet />
       </main>
     </div>
