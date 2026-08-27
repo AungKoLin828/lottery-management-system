@@ -23,29 +23,22 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
 
-      includeAssets: ["favicon.svg", "apple-touch-icon.png"],
+      includeAssets: [
+        "pwa-192x192.png",
+        "pwa-512x512.png",
+        "apple-touch-icon.png",
+      ],
 
       manifest: {
-        id: "/",
-
         name: "Lottery Management System",
-
         short_name: "Lottery",
-
-        description:
-          "Lottery Management System for players and administrators.",
-
-        start_url: "/",
-
-        scope: "/",
-
-        display: "standalone",
-
-        orientation: "portrait-primary",
-
+        description: "Lottery Management System",
         theme_color: "#0f172a",
-
-        background_color: "#0f172a",
+        background_color: "#f8fafc",
+        display: "standalone",
+        orientation: "portrait",
+        start_url: "/",
+        scope: "/",
 
         icons: [
           {
@@ -53,30 +46,12 @@ export default defineConfig({
             sizes: "192x192",
             type: "image/png",
           },
-
           {
             src: "/pwa-512x512.png",
             sizes: "512x512",
             type: "image/png",
-          },
-
-          {
-            src: "/pwa-512x512.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "any maskable",
           },
         ],
-      },
-
-      workbox: {
-        cleanupOutdatedCaches: true,
-
-        clientsClaim: true,
-
-        skipWaiting: true,
-
-        navigateFallbackDenylist: [/^\/api\//],
       },
     }),
   ],
