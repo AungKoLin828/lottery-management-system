@@ -21,23 +21,47 @@ export default defineConfig({
     tailwindcss(),
 
     VitePWA({
-      /*
-       * ==========================================================
+      /* ==========================================================
        * PWA REGISTRATION
        * ==========================================================
        *
        * Automatically registers the service worker.
        *
-       * We do NOT need to manually create sw.js or registerSW.js.
+       * The service worker will automatically update when a new
+       * version of the application is deployed.
        */
+
       registerType: "autoUpdate",
 
       injectRegister: "auto",
 
-      /*
+      /* ==========================================================
+       * PWA ASSETS
        * ==========================================================
+       *
+       * These files must exist inside:
+       *
+       * public/
+       *
+       * Required:
+       *   public/pwa-192x192.png
+       *   public/pwa-512x512.png
+       *   public/apple-touch-icon.png
+       */
+
+      includeAssets: [
+        "favicon.ico",
+        "apple-touch-icon.png",
+        "pwa-192x192.png",
+        "pwa-512x512.png",
+      ],
+
+      /* ==========================================================
        * PWA MANIFEST
        * ==========================================================
+       *
+       * This manifest is generated automatically by
+       * vite-plugin-pwa during production build.
        */
 
       manifest: {
@@ -45,7 +69,7 @@ export default defineConfig({
 
         short_name: "Lottery",
 
-        description: "Lottery Management System",
+        description: "Lottery Management System for 2D and 3D lottery.",
 
         start_url: "/",
 
@@ -66,62 +90,108 @@ export default defineConfig({
             src: "/pwa-192x192.png",
             sizes: "192x192",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "any",
           },
-
           {
             src: "/pwa-512x512.png",
             sizes: "512x512",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "any",
+          },
+          {
+            src: "/pwa-192x192.png",
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "maskable",
+          },
+          {
+            src: "/pwa-512x512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
           },
         ],
       },
 
-      /*
-       * ==========================================================
+      /* ==========================================================
        * SERVICE WORKER
        * ==========================================================
+       *
+       * Static frontend assets can be cached.
+       *
+       * API requests are NOT cached so the lottery application
+       * continues using live database/API data.
        */
 
       workbox: {
-        /*
-         * Cache the application's generated assets.
-         */
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,jpg,jpeg}"],
 
-        /*
-         * Do not aggressively cache API responses.
+        /* --------------------------------------------------------
+         * React Router fallback
+         * --------------------------------------------------------
          *
-         * Your lottery data, wallet balance, deposits,
-         * withdrawals, etc. must continue using the live API.
+         * Allows routes such as:
+         *
+         * /results-history
+         * /about
+         * /login
+         * /register
+         *
+         * to work when the PWA is opened directly.
          */
+
         navigateFallback: "/index.html",
 
-        navigateFallbackDenylist: [/^\/api\//],
+        /* --------------------------------------------------------
+         * Never use index.html fallback for API requests.
+         *
+         * This is important for:
+         *
+         * /api/auth/*
+         * /api/player/*
+         * /api/admin/*
+         * /api/report/*
+         * etc.
+         */
+
+        navigateFallbackDenylist: [/^\/api(?:\/|$)/],
+
+        /* --------------------------------------------------------
+         * Cache maintenance
+         * ------------------------------------------------------ */
 
         cleanupOutdatedCaches: true,
+
+        /* --------------------------------------------------------
+         * Activate updated service worker immediately
+         * ------------------------------------------------------ */
 
         clientsClaim: true,
 
         skipWaiting: true,
       },
 
-      /*
-       * ==========================================================
+      /* ==========================================================
        * DEVELOPMENT
        * ==========================================================
        *
-       * Keep PWA disabled during normal `npm run dev`.
+       * Keep PWA disabled during:
        *
-       * This avoids service-worker caching interfering with
-       * your development environment.
+       * npm run dev
+       *
+       * This prevents service-worker caching from interfering
+       * with development.
        */
+
       devOptions: {
         enabled: false,
       },
     }),
   ],
+
+  /* ============================================================
+   * PATH ALIAS
+   * ============================================================ */
 
   resolve: {
     alias: {

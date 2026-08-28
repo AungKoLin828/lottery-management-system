@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { useEffect, useRef, useState } from "react";
+import PWAInstallButton from "@/components/PWAInstallButton";
 
 /* ============================================================
    PUBLIC PLAY NAVIGATION
@@ -1026,6 +1027,7 @@ export default function PublicLayout() {
           </div>
         </div>
       </footer>
+      <PWAInstallButton />
     </div>
   );
 }
