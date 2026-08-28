@@ -51,64 +51,6 @@ function isPublicPath(path: string) {
 }
 
 /* ============================================================
-   NAV ITEM TYPES
-============================================================ */
-
-type NavItemProps = {
-  to: string;
-  label: string;
-  icon: React.ReactNode;
-  active: boolean;
-  onClick?: () => void;
-  mobile?: boolean;
-};
-
-/* ============================================================
-   NAV ITEM
-============================================================ */
-
-function NavItem({
-  to,
-  label,
-  icon,
-  active,
-  onClick,
-  mobile = false,
-}: NavItemProps) {
-  return (
-    <Link
-      to={to}
-      onClick={onClick}
-      className={`group relative flex items-center ${
-        mobile
-          ? "gap-2.5 rounded-lg px-3 py-2.5 text-[13px]"
-          : "gap-2 rounded-xl px-3.5 py-2.5 text-sm"
-      } font-semibold transition-all duration-200 ${
-        active
-          ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
-          : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
-      }`}
-    >
-      <span
-        className={`shrink-0 transition-all duration-200 ${
-          active
-            ? "text-white"
-            : "text-slate-400 group-hover:scale-105 group-hover:text-indigo-300"
-        }`}
-      >
-        {icon}
-      </span>
-
-      <span>{label}</span>
-
-      {active && !mobile && (
-        <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
-      )}
-    </Link>
-  );
-}
-
-/* ============================================================
    COMPONENT
 ============================================================ */
 
