@@ -25,10 +25,10 @@ export default defineConfig({
        * PWA REGISTRATION
        * ==========================================================
        *
-       * Automatically registers the service worker.
+       * vite-plugin-pwa automatically registers the service worker
+       * in the production build.
        *
-       * The service worker will automatically update when a new
-       * version of the application is deployed.
+       * The service worker automatically checks for new versions.
        */
 
       registerType: "autoUpdate",
@@ -44,9 +44,10 @@ export default defineConfig({
        * public/
        *
        * Required:
-       *   public/pwa-192x192.png
-       *   public/pwa-512x512.png
-       *   public/apple-touch-icon.png
+       *
+       * public/pwa-192x192.png
+       * public/pwa-512x512.png
+       * public/apple-touch-icon.png
        */
 
       includeAssets: [
@@ -60,14 +61,17 @@ export default defineConfig({
        * PWA MANIFEST
        * ==========================================================
        *
-       * This manifest is generated automatically by
-       * vite-plugin-pwa during production build.
+       * vite-plugin-pwa generates:
+       *
+       * /manifest.webmanifest
+       *
+       * during npm run build.
        */
 
       manifest: {
         name: "Lottery Management System",
 
-        short_name: "Lottery",
+        short_name: "Lottery2D",
 
         description: "Lottery Management System for 2D and 3D lottery.",
 
@@ -92,18 +96,21 @@ export default defineConfig({
             type: "image/png",
             purpose: "any",
           },
+
           {
             src: "/pwa-512x512.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "any",
           },
+
           {
             src: "/pwa-192x192.png",
             sizes: "192x192",
             type: "image/png",
             purpose: "maskable",
           },
+
           {
             src: "/pwa-512x512.png",
             sizes: "512x512",
@@ -114,57 +121,76 @@ export default defineConfig({
       },
 
       /* ==========================================================
-       * SERVICE WORKER
+       * SERVICE WORKER / WORKBOX
        * ==========================================================
        *
-       * Static frontend assets can be cached.
+       * Static frontend assets are cached.
        *
-       * API requests are NOT cached so the lottery application
-       * continues using live database/API data.
+       * API requests continue using the live API/database.
+       *
+       * We intentionally do NOT cache HTML through globPatterns.
+       * Vite-generated JS/CSS assets contain hashes, so new builds
+       * automatically receive new filenames.
        */
 
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,jpg,jpeg}"],
-
         /* --------------------------------------------------------
-         * React Router fallback
+         * STATIC ASSETS
          * --------------------------------------------------------
          *
-         * Allows routes such as:
+         * HTML is intentionally excluded.
+         */
+
+        globPatterns: ["**/*.{js,css,ico,png,svg,webp,jpg,jpeg}"],
+
+        /* --------------------------------------------------------
+         * REACT ROUTER FALLBACK
+         * --------------------------------------------------------
          *
+         * Allows direct access to:
+         *
+         * /
          * /results-history
          * /about
          * /login
          * /register
          *
-         * to work when the PWA is opened directly.
+         * and other React routes.
          */
 
         navigateFallback: "/index.html",
 
         /* --------------------------------------------------------
-         * Never use index.html fallback for API requests.
+         * API ROUTES
+         * --------------------------------------------------------
          *
-         * This is important for:
+         * Never return index.html for API requests.
+         *
+         * This protects:
          *
          * /api/auth/*
          * /api/player/*
          * /api/admin/*
          * /api/report/*
-         * etc.
          */
 
         navigateFallbackDenylist: [/^\/api(?:\/|$)/],
 
         /* --------------------------------------------------------
-         * Cache maintenance
-         * ------------------------------------------------------ */
+         * CACHE MAINTENANCE
+         * --------------------------------------------------------
+         *
+         * Remove caches created by older service workers.
+         */
 
         cleanupOutdatedCaches: true,
 
         /* --------------------------------------------------------
-         * Activate updated service worker immediately
-         * ------------------------------------------------------ */
+         * IMMEDIATE UPDATE
+         * --------------------------------------------------------
+         *
+         * New service worker takes control immediately.
+         */
 
         clientsClaim: true,
 
@@ -175,7 +201,7 @@ export default defineConfig({
        * DEVELOPMENT
        * ==========================================================
        *
-       * Keep PWA disabled during:
+       * PWA is disabled during:
        *
        * npm run dev
        *
@@ -191,7 +217,12 @@ export default defineConfig({
 
   /* ============================================================
    * PATH ALIAS
-   * ============================================================ */
+   * ============================================================
+   *
+   * Allows:
+   *
+   * import Something from "@/components/Something";
+   */
 
   resolve: {
     alias: {
