@@ -1,10 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import {
-  Menu,
-  X,
   Home,
   BarChart3,
   Info,
@@ -14,10 +10,48 @@ import {
   Sparkles,
   Ticket,
   ArrowLeft,
+  MoreHorizontal,
+  LogIn,
+  UserPlus,
 } from "lucide-react";
 
+import { useEffect, useRef, useState } from "react";
+
 /* ============================================================
-   NAV ITEM
+   PUBLIC PLAY NAVIGATION
+============================================================ */
+
+const playNavigation = [
+  {
+    name: "2D Play",
+    description: "Play 2D Lottery",
+    path: "/player/play-2d",
+    icon: Dice5,
+  },
+  {
+    name: "3D Play",
+    description: "Play 3D Lottery",
+    path: "/player/play-3d",
+    icon: Boxes,
+  },
+];
+
+/* ============================================================
+   PUBLIC ROUTE CHECK
+============================================================ */
+
+function isPublicPath(path: string) {
+  return (
+    path === "/" ||
+    path === "/results-history" ||
+    path === "/about" ||
+    path === "/login" ||
+    path === "/register"
+  );
+}
+
+/* ============================================================
+   NAV ITEM TYPES
 ============================================================ */
 
 type NavItemProps = {
@@ -28,6 +62,10 @@ type NavItemProps = {
   onClick?: () => void;
   mobile?: boolean;
 };
+
+/* ============================================================
+   NAV ITEM
+============================================================ */
 
 function NavItem({
   to,
@@ -51,8 +89,6 @@ function NavItem({
           : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
       }`}
     >
-      {/* ICON */}
-
       <span
         className={`shrink-0 transition-all duration-200 ${
           active
@@ -63,30 +99,12 @@ function NavItem({
         {icon}
       </span>
 
-      {/* LABEL */}
-
       <span>{label}</span>
-
-      {/* ACTIVE INDICATOR */}
 
       {active && !mobile && (
         <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
       )}
     </Link>
-  );
-}
-
-/* ============================================================
-   PUBLIC ROUTE CHECK
-============================================================ */
-
-function isPublicPath(path: string) {
-  return (
-    path === "/" ||
-    path === "/results-history" ||
-    path === "/about" ||
-    path === "/login" ||
-    path === "/register"
   );
 }
 
@@ -99,25 +117,20 @@ export default function PublicLayout() {
   const navigate = useNavigate();
 
   /* ============================================================
-     MOBILE MENU
+     MOBILE / POPUP STATE
   ============================================================ */
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobilePlayOpen, setMobilePlayOpen] = useState(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
   /* ============================================================
-     DESKTOP PLAY DROPDOWN
+     DESKTOP DROPDOWN STATE
   ============================================================ */
 
   const [desktopPlayOpen, setDesktopPlayOpen] = useState(false);
 
   /* ============================================================
-     MOBILE PLAY DROPDOWN
-  ============================================================ */
-
-  const [mobilePlayOpen, setMobilePlayOpen] = useState(false);
-
-  /* ============================================================
-     MOBILE BACK BUTTON / SCROLL
+     MOBILE BACK BUTTON
   ============================================================ */
 
   const [showBackButton, setShowBackButton] = useState(false);
@@ -147,22 +160,46 @@ export default function PublicLayout() {
     location.pathname === "/player/play-3d";
 
   /* ============================================================
-     CLOSE MOBILE MENU
+     IS MORE ACTIVE
   ============================================================ */
 
-  const closeMobileMenu = () => {
-    setMobileMenuOpen(false);
+  const isMoreActive =
+    location.pathname === "/login" || location.pathname === "/register";
+
+  /* ============================================================
+     CLOSE ALL MENUS
+  ============================================================ */
+
+  const closeAllMenus = () => {
     setMobilePlayOpen(false);
+    setMobileMoreOpen(false);
+    setDesktopPlayOpen(false);
   };
 
   /* ============================================================
-     CLOSE ALL MENUS WHEN ROUTE CHANGES
+     MOBILE NAVIGATION
+  ============================================================ */
+
+  const handleMobileNavigation = () => {
+    closeAllMenus();
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
+  /* ============================================================
+     ROUTE CHANGE
   ============================================================ */
 
   useEffect(() => {
-    setMobileMenuOpen(false);
-    setDesktopPlayOpen(false);
-    setMobilePlayOpen(false);
+    closeAllMenus();
+
+    window.scrollTo({
+      top: 0,
+      behavior: "instant",
+    });
   }, [location.pathname]);
 
   /* ============================================================
@@ -199,19 +236,11 @@ export default function PublicLayout() {
         }
       }
 
-      /*
-       * Do not add the same route twice consecutively.
-       */
-
       const lastRoute = history[history.length - 1];
 
       if (lastRoute !== location.pathname) {
         history.push(location.pathname);
       }
-
-      /*
-       * Keep only latest 20 public routes.
-       */
 
       if (history.length > 20) {
         history = history.slice(-20);
@@ -224,9 +253,7 @@ export default function PublicLayout() {
   }, [location.pathname]);
 
   /* ============================================================
-     SCROLL DETECTION
-
-     Back button appears after scrolling.
+     MOBILE BACK BUTTON VISIBILITY
   ============================================================ */
 
   useEffect(() => {
@@ -236,7 +263,9 @@ export default function PublicLayout() {
 
     handleScroll();
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
@@ -248,7 +277,7 @@ export default function PublicLayout() {
 
      NEVER USE navigate(-1).
 
-     This only uses our public navigation history.
+     ONLY USE OUR PUBLIC NAVIGATION HISTORY.
   ============================================================ */
 
   const handlePublicBack = () => {
@@ -272,9 +301,7 @@ export default function PublicLayout() {
         }
       }
 
-      /*
-       * Remove current page.
-       */
+      /* Remove current page */
 
       if (
         history.length > 0 &&
@@ -283,21 +310,15 @@ export default function PublicLayout() {
         history.pop();
       }
 
-      /*
-       * Find previous public page.
-       */
+      /* Previous public page */
 
       const previousPublicPage = history[history.length - 1];
 
-      /*
-       * Save updated history.
-       */
+      /* Save updated history */
 
       sessionStorage.setItem(PUBLIC_HISTORY_KEY, JSON.stringify(history));
 
-      /*
-       * Navigate to previous PUBLIC page.
-       */
+      /* Navigate */
 
       if (
         previousPublicPage &&
@@ -308,10 +329,6 @@ export default function PublicLayout() {
         return;
       }
 
-      /*
-       * Safe fallback.
-       */
-
       navigate("/");
     } catch {
       navigate("/");
@@ -319,39 +336,54 @@ export default function PublicLayout() {
   };
 
   /* ============================================================
-     TOGGLE MOBILE MENU
-  ============================================================ */
-
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen((current) => {
-      const next = !current;
-
-      if (!next) {
-        setMobilePlayOpen(false);
-      }
-
-      return next;
-    });
-  };
-
-  /* ============================================================
-     TOGGLE MOBILE PLAY
+     MOBILE PLAY
   ============================================================ */
 
   const toggleMobilePlay = () => {
     setMobilePlayOpen((current) => !current);
+
+    setMobileMoreOpen(false);
+    setDesktopPlayOpen(false);
   };
 
   /* ============================================================
-     TOGGLE DESKTOP PLAY
+     MOBILE MORE
+  ============================================================ */
+
+  const toggleMobileMore = () => {
+    setMobileMoreOpen((current) => !current);
+
+    setMobilePlayOpen(false);
+    setDesktopPlayOpen(false);
+  };
+
+  /* ============================================================
+     DESKTOP PLAY
   ============================================================ */
 
   const toggleDesktopPlay = () => {
     setDesktopPlayOpen((current) => !current);
+
+    setMobilePlayOpen(false);
+    setMobileMoreOpen(false);
   };
 
   /* ============================================================
-     CLOSE DESKTOP DROPDOWN OUTSIDE CLICK
+     PLAY LOGIN REDIRECT
+  ============================================================ */
+
+  const handlePlay = (destination: string) => {
+    closeAllMenus();
+
+    navigate("/login", {
+      state: {
+        from: destination,
+      },
+    });
+  };
+
+  /* ============================================================
+     DESKTOP OUTSIDE CLICK
   ============================================================ */
 
   useEffect(() => {
@@ -371,20 +403,30 @@ export default function PublicLayout() {
   }, []);
 
   /* ============================================================
-     PLAY LOGIN REDIRECT
+     DESKTOP NAV CLASS
   ============================================================ */
 
-  const handlePlay = (destination: string) => {
-    setDesktopPlayOpen(false);
-    setMobilePlayOpen(false);
-    setMobileMenuOpen(false);
+  const navClass = (active: boolean) =>
+    `group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
+      active
+        ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
+        : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
+    }`;
 
-    navigate("/login", {
-      state: {
-        from: destination,
-      },
-    });
-  };
+  /* ============================================================
+     PLAY ITEM CLASS
+  ============================================================ */
+
+  const playItemClass = (active: boolean, is2D: boolean) =>
+    `group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200 ${
+      active
+        ? is2D
+          ? "bg-indigo-500/20"
+          : "bg-violet-500/20"
+        : is2D
+          ? "hover:bg-indigo-500/15"
+          : "hover:bg-violet-500/15"
+    }`;
 
   /* ============================================================
      RENDER
@@ -397,388 +439,535 @@ export default function PublicLayout() {
       ======================================================= */}
 
       <header className="sticky top-0 z-50 border-b border-slate-700/80 bg-slate-900/95 backdrop-blur-xl">
-        <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
-          <div className="flex h-[64px] items-center justify-between sm:h-[72px]">
-            {/* ==================================================
-                LOGO
-            =================================================== */}
+        <div className="mx-auto flex h-[64px] items-center justify-between gap-3 px-3 sm:h-[72px] sm:px-6 lg:max-w-7xl lg:px-8">
+          {/* ==================================================
+              LOGO
+          =================================================== */}
+
+          <Link
+            to="/"
+            onClick={closeAllMenus}
+            className="group flex shrink-0 items-center gap-2.5"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30 transition-transform duration-200 group-hover:scale-105">
+              <Ticket className="h-5 w-5" />
+            </div>
+
+            <div className="flex items-center">
+              <span className="text-lg font-extrabold tracking-tight text-white">
+                AB
+              </span>
+
+              <span className="text-lg font-extrabold tracking-tight text-indigo-400">
+                CD
+              </span>
+            </div>
+          </Link>
+
+          {/* ==================================================
+              DESKTOP NAVIGATION
+          =================================================== */}
+
+          <nav className="hidden min-w-0 items-center justify-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 lg:flex">
+            {/* HOME */}
 
             <Link
               to="/"
-              onClick={closeMobileMenu}
-              className="group flex shrink-0 items-center gap-2"
+              onClick={closeAllMenus}
+              className={navClass(isActive("/"))}
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30 transition-transform duration-200 group-hover:scale-105 sm:h-9 sm:w-9 sm:rounded-xl">
-                <Ticket className="h-4 w-4 sm:h-5 sm:w-5" />
-              </div>
-
-              <div className="flex items-center">
-                <span className="text-base font-extrabold tracking-tight text-white sm:text-lg">
-                  {/* Lottery */}
-                  AB
-                </span>
-
-                <span className="text-base font-extrabold tracking-tight text-indigo-400 sm:text-lg">
-                  {/* Play */}
-                  CD
-                </span>
-              </div>
+              <Home size={17} />
+              Home
+              {isActive("/") && (
+                <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
+              )}
             </Link>
 
-            {/* ==================================================
-                DESKTOP NAVIGATION
-            =================================================== */}
+            {/* =================================================
+                PLAY
+            ================================================= */}
 
-            <nav className="hidden items-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 md:flex">
-              {/* HOME */}
-
-              <NavItem
-                to="/"
-                label="Home"
-                active={isActive("/")}
-                icon={<Home className="h-4 w-4" />}
-              />
-
-              {/* =================================================
-                  DESKTOP PLAY DROPDOWN
-              ================================================= */}
-
-              <div ref={playMenuRef} className="relative">
-                <button
-                  type="button"
-                  onClick={toggleDesktopPlay}
-                  aria-haspopup="menu"
-                  aria-expanded={desktopPlayOpen}
-                  className={`group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
-                    isPlayActive
-                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
-                      : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
+            <div ref={playMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={toggleDesktopPlay}
+                aria-haspopup="menu"
+                aria-expanded={desktopPlayOpen}
+                className={`group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                  isPlayActive
+                    ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
+                    : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
+                }`}
+              >
+                <Dice5
+                  size={17}
+                  className={`transition-all duration-200 ${
+                    desktopPlayOpen ? "rotate-6 text-indigo-300" : ""
                   }`}
+                />
+
+                <span>Play</span>
+
+                <ChevronDown
+                  size={15}
+                  strokeWidth={2.5}
+                  className={`transition-transform duration-200 ${
+                    desktopPlayOpen ? "rotate-180" : ""
+                  }`}
+                />
+
+                {isPlayActive && (
+                  <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
+                )}
+              </button>
+
+              {/* DESKTOP PLAY POPUP */}
+
+              {desktopPlayOpen && (
+                <div
+                  className="absolute left-0 top-full z-[100] mt-2 w-64 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-2 shadow-2xl shadow-slate-950/50"
+                  role="menu"
                 >
-                  <Dice5
-                    className={`h-4 w-4 shrink-0 transition-colors duration-200 ${
-                      isPlayActive
-                        ? "text-white"
-                        : "text-slate-400 group-hover:text-indigo-300"
+                  <div className="px-3 pb-2 pt-1">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                        Choose Game
+                      </p>
+                    </div>
+                  </div>
+
+                  {playNavigation.map((item, index) => {
+                    const Icon = item.icon;
+                    const is2D = index === 0;
+
+                    return (
+                      <button
+                        key={item.path}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => handlePlay(item.path)}
+                        className={playItemClass(
+                          location.pathname === item.path,
+                          is2D,
+                        )}
+                      >
+                        <div
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                            is2D
+                              ? "bg-indigo-500/15 text-indigo-400"
+                              : "bg-violet-500/15 text-violet-400"
+                          }`}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </div>
+
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-white">
+                            {item.name}
+                          </p>
+
+                          <p className="mt-0.5 text-xs text-slate-400">
+                            {item.description}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* RESULTS HISTORY */}
+
+            <Link
+              to="/results-history"
+              onClick={closeAllMenus}
+              className={navClass(isActive("/results-history"))}
+            >
+              <BarChart3 size={17} />
+              Results History
+              {isActive("/results-history") && (
+                <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
+              )}
+            </Link>
+
+            {/* ABOUT */}
+
+            <Link
+              to="/about"
+              onClick={closeAllMenus}
+              className={navClass(isActive("/about"))}
+            >
+              <Info size={17} />
+              About
+              {isActive("/about") && (
+                <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
+              )}
+            </Link>
+          </nav>
+
+          {/* ==================================================
+              DESKTOP AUTH
+          =================================================== */}
+
+          <div className="hidden shrink-0 items-center gap-2 lg:flex">
+            {/* LOGIN */}
+
+            <Link
+              to="/login"
+              onClick={closeAllMenus}
+              className={`rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                isActive("/login")
+                  ? "bg-indigo-500/20 text-indigo-300"
+                  : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
+              }`}
+            >
+              Login
+            </Link>
+
+            {/* REGISTER */}
+
+            <Link
+              to="/register"
+              onClick={closeAllMenus}
+              className={`flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-900/30 transition-all duration-200 hover:-translate-y-0.5 hover:from-indigo-500 hover:to-violet-500 hover:shadow-lg hover:shadow-indigo-900/40 ${
+                isActive("/register") ? "ring-2 ring-indigo-400/40" : ""
+              }`}
+            >
+              <Sparkles className="h-4 w-4" />
+              Register
+            </Link>
+          </div>
+
+          {/* ==================================================
+              MOBILE HEADER
+          =================================================== */}
+
+          <div className="flex items-center lg:hidden">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-300">
+              <Ticket className="h-[18px] w-[18px]" />
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ======================================================
+          MOBILE PLAY POPUP
+      ======================================================= */}
+
+      {mobilePlayOpen && (
+        <div className="fixed inset-x-3 bottom-[82px] z-[80] lg:hidden">
+          <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/98 p-2 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">
+            <div className="px-3 pb-2 pt-1">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Choose Game
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {playNavigation.map((item, index) => {
+                const Icon = item.icon;
+                const is2D = index === 0;
+
+                return (
+                  <button
+                    key={item.path}
+                    type="button"
+                    onClick={() => handlePlay(item.path)}
+                    className={`flex flex-col items-center justify-center rounded-xl border px-3 py-4 text-center transition-all ${
+                      location.pathname === item.path
+                        ? is2D
+                          ? "border-indigo-500/40 bg-indigo-500/20 text-indigo-300"
+                          : "border-violet-500/40 bg-violet-500/20 text-violet-300"
+                        : "border-slate-700 bg-slate-800/80 text-slate-300 hover:bg-slate-700"
                     }`}
-                  />
-
-                  <span>Play</span>
-
-                  <ChevronDown
-                    className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${
-                      desktopPlayOpen ? "rotate-180" : "rotate-0"
-                    }`}
-                  />
-
-                  {isPlayActive && (
-                    <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
-                  )}
-                </button>
-
-                {/* DESKTOP PLAY DROPDOWN */}
-
-                {desktopPlayOpen && (
-                  <div
-                    className="absolute left-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-2 shadow-xl shadow-slate-950/40"
-                    role="menu"
                   >
-                    <div className="px-3 pb-2 pt-1">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
-
-                        <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                          Choose Game
-                        </p>
-                      </div>
+                    <div
+                      className={`mb-2 flex h-11 w-11 items-center justify-center rounded-xl ${
+                        is2D
+                          ? "bg-indigo-500/15 text-indigo-400"
+                          : "bg-violet-500/15 text-violet-400"
+                      }`}
+                    >
+                      <Icon className="h-5 w-5" />
                     </div>
 
-                    {/* 2D */}
+                    <span className="text-xs font-bold">{item.name}</span>
 
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => handlePlay("/player/play-2d")}
-                      className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200 hover:bg-indigo-500/15"
-                    >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-400 transition-colors group-hover:bg-indigo-500/25">
-                        <Dice5 className="h-5 w-5" />
-                      </div>
+                    <span className="mt-0.5 text-[9px] text-slate-500">
+                      {item.description}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-white group-hover:text-indigo-300">
-                          2D Play
-                        </p>
+      {/* ======================================================
+          MOBILE MORE POPUP
+      ======================================================= */}
 
-                        <p className="mt-0.5 text-xs text-slate-400">
-                          Play 2D Lottery
-                        </p>
-                      </div>
-                    </button>
+      {mobileMoreOpen && (
+        <div className="fixed inset-x-3 bottom-[82px] z-[80] lg:hidden">
+          <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/98 p-2 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">
+            <div className="px-3 pb-2 pt-1">
+              <div className="flex items-center gap-2">
+                <MoreHorizontal className="h-3.5 w-3.5 text-indigo-400" />
 
-                    {/* 3D */}
-
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => handlePlay("/player/play-3d")}
-                      className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200 hover:bg-violet-500/15"
-                    >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 transition-colors group-hover:bg-violet-500/25">
-                        <Boxes className="h-5 w-5" />
-                      </div>
-
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-white group-hover:text-violet-300">
-                          3D Play
-                        </p>
-
-                        <p className="mt-0.5 text-xs text-slate-400">
-                          Play 3D Lottery
-                        </p>
-                      </div>
-                    </button>
-                  </div>
-                )}
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  More
+                </span>
               </div>
+            </div>
 
-              {/* RESULTS HISTORY */}
-
-              <NavItem
-                to="/results-history"
-                label="Results History"
-                active={isActive("/results-history")}
-                icon={<BarChart3 className="h-4 w-4" />}
-              />
-
-              {/* ABOUT */}
-
-              <NavItem
-                to="/about"
-                label="About"
-                active={isActive("/about")}
-                icon={<Info className="h-4 w-4" />}
-              />
-            </nav>
-
-            {/* ==================================================
-                DESKTOP AUTH
-            =================================================== */}
-
-            <div className="hidden items-center gap-2 md:flex">
+            <div className="space-y-1">
               {/* LOGIN */}
 
               <Link
                 to="/login"
-                className="rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-300 transition-all duration-200 hover:bg-indigo-500/15 hover:text-white"
+                onClick={handleMobileNavigation}
+                className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
+                  isActive("/login")
+                    ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                }`}
               >
-                Login
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                  <LogIn size={17} />
+                </span>
+
+                <span>Login</span>
               </Link>
 
               {/* REGISTER */}
 
               <Link
                 to="/register"
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-900/30 transition-all duration-200 hover:-translate-y-0.5 hover:from-indigo-500 hover:to-violet-500 hover:shadow-lg hover:shadow-indigo-900/40"
+                onClick={handleMobileNavigation}
+                className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
+                  isActive("/register")
+                    ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                }`}
               >
-                <Sparkles className="h-4 w-4" />
-                Register
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                  <UserPlus size={17} />
+                </span>
+
+                <span>Register</span>
               </Link>
-            </div>
-
-            {/* ==================================================
-                MOBILE MENU BUTTON
-            =================================================== */}
-
-            <button
-              type="button"
-              onClick={toggleMobileMenu}
-              className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-all duration-200 md:hidden ${
-                mobileMenuOpen
-                  ? "border-indigo-500 bg-indigo-500/20 text-indigo-300"
-                  : "border-slate-700 bg-slate-800 text-slate-300 hover:border-indigo-500 hover:bg-indigo-500/20 hover:text-white"
-              }`}
-              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-              aria-expanded={mobileMenuOpen}
-            >
-              {mobileMenuOpen ? (
-                <X className="h-[18px] w-[18px]" />
-              ) : (
-                <Menu className="h-[18px] w-[18px]" />
-              )}
-            </button>
-          </div>
-
-          {/* ====================================================
-              MOBILE NAVIGATION
-          ===================================================== */}
-
-          <div
-            className={`overflow-hidden transition-all duration-300 md:hidden ${
-              mobileMenuOpen
-                ? "max-h-[600px] pb-3 opacity-100"
-                : "max-h-0 opacity-0"
-            }`}
-          >
-            <div className="rounded-xl border border-slate-700 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20">
-              <nav className="space-y-0.5">
-                {/* HOME */}
-
-                <NavItem
-                  to="/"
-                  label="Home"
-                  active={isActive("/")}
-                  onClick={closeMobileMenu}
-                  mobile
-                  icon={<Home className="h-[17px] w-[17px]" />}
-                />
-
-                {/* MOBILE PLAY */}
-
-                <div className="rounded-lg bg-slate-900/80 p-1">
-                  <button
-                    type="button"
-                    onClick={toggleMobilePlay}
-                    aria-haspopup="menu"
-                    aria-expanded={mobilePlayOpen}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-all ${
-                      isPlayActive
-                        ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm"
-                        : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2.5">
-                      <Dice5 className="h-[17px] w-[17px]" />
-
-                      <span>Play</span>
-                    </span>
-
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform duration-200 ${
-                        mobilePlayOpen ? "rotate-180" : "rotate-0"
-                      }`}
-                    />
-                  </button>
-
-                  {/* MOBILE PLAY OPTIONS */}
-
-                  {mobilePlayOpen && (
-                    <div
-                      className="mt-1 space-y-0.5 border-t border-slate-700 pt-1"
-                      role="menu"
-                    >
-                      {/* 2D */}
-
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => handlePlay("/player/play-2d")}
-                        className="group flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all hover:bg-indigo-500/15"
-                      >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-400">
-                          <Dice5 className="h-4 w-4" />
-                        </div>
-
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-semibold text-slate-200 group-hover:text-indigo-300">
-                            2D Play
-                          </p>
-
-                          <p className="text-[10px] text-slate-500">
-                            Play 2D Lottery
-                          </p>
-                        </div>
-                      </button>
-
-                      {/* 3D */}
-
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => handlePlay("/player/play-3d")}
-                        className="group flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all hover:bg-violet-500/15"
-                      >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400">
-                          <Boxes className="h-4 w-4" />
-                        </div>
-
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-semibold text-slate-200 group-hover:text-violet-300">
-                            3D Play
-                          </p>
-
-                          <p className="text-[10px] text-slate-500">
-                            Play 3D Lottery
-                          </p>
-                        </div>
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* RESULTS HISTORY */}
-
-                <NavItem
-                  to="/results-history"
-                  label="Results History"
-                  active={isActive("/results-history")}
-                  onClick={closeMobileMenu}
-                  mobile
-                  icon={<BarChart3 className="h-[17px] w-[17px]" />}
-                />
-
-                {/* ABOUT */}
-
-                <NavItem
-                  to="/about"
-                  label="About"
-                  active={isActive("/about")}
-                  onClick={closeMobileMenu}
-                  mobile
-                  icon={<Info className="h-[17px] w-[17px]" />}
-                />
-              </nav>
-
-              {/* MOBILE AUTH */}
-
-              <div className="mt-1.5 grid grid-cols-2 gap-1.5 border-t border-slate-700 pt-2">
-                {/* LOGIN */}
-
-                <Link
-                  to="/login"
-                  onClick={closeMobileMenu}
-                  className="flex items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3 py-2.5 text-[13px] font-semibold text-slate-300 transition-all hover:border-indigo-500 hover:bg-indigo-500/15 hover:text-indigo-300"
-                >
-                  Login
-                </Link>
-
-                {/* REGISTER */}
-
-                <Link
-                  to="/register"
-                  onClick={closeMobileMenu}
-                  className="flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-2.5 text-[13px] font-semibold text-white shadow-sm shadow-indigo-900/30 transition-all hover:from-indigo-500 hover:to-violet-500"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Register
-                </Link>
-              </div>
             </div>
           </div>
         </div>
-      </header>
+      )}
 
-      {/* ========================================================
-          PAGE CONTENT
-      ========================================================= */}
+      {/* ======================================================
+          MOBILE FLOATING BACK BUTTON
+      ======================================================= */}
 
-      <main className="min-h-[calc(100vh-4rem)]">
+      <div
+        className={`fixed bottom-[82px] right-4 z-[70] lg:hidden ${
+          showBackButton
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-6 opacity-0"
+        } transition-all duration-300 ease-out`}
+      >
+        <button
+          type="button"
+          onClick={handlePublicBack}
+          aria-label="Go back"
+          className="group flex items-center gap-2 rounded-full border border-indigo-400/40 bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-900/40 ring-1 ring-white/10 backdrop-blur-md transition-all duration-200 hover:-translate-y-1 hover:border-indigo-300/60 hover:from-indigo-500 hover:to-violet-500 hover:shadow-xl hover:shadow-indigo-900/50 active:translate-y-0 active:scale-95 focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:ring-offset-2 focus:ring-offset-slate-50"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-white shadow-inner shadow-white/10 ring-1 ring-white/20 transition-all duration-200 group-hover:-translate-x-0.5 group-hover:bg-white/20">
+            <ArrowLeft className="h-4 w-4" strokeWidth={2.75} />
+          </span>
+
+          <span className="pr-1 tracking-wide">Back</span>
+        </button>
+      </div>
+
+      {/* ======================================================
+          MOBILE / PWA BOTTOM NAVIGATION
+      ======================================================= */}
+
+      <nav className="fixed inset-x-0 bottom-0 z-[75] border-t border-slate-700/80 bg-slate-900/97 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgba(15,23,42,0.25)] backdrop-blur-xl lg:hidden">
+        <div className="mx-auto grid h-[68px] max-w-md grid-cols-5 px-1">
+          {/* HOME */}
+
+          <Link
+            to="/"
+            onClick={handleMobileNavigation}
+            className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
+              isActive("/")
+                ? "text-indigo-300"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <div
+              className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+                isActive("/") ? "bg-indigo-500/15" : "bg-transparent"
+              }`}
+            >
+              <Home
+                className="h-[19px] w-[19px]"
+                strokeWidth={isActive("/") ? 2.5 : 2}
+              />
+            </div>
+
+            <span className="text-[10px] font-semibold">Home</span>
+
+            {isActive("/") && (
+              <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
+            )}
+          </Link>
+
+          {/* PLAY */}
+
+          <button
+            type="button"
+            onClick={toggleMobilePlay}
+            aria-label="Open Play menu"
+            aria-expanded={mobilePlayOpen}
+            className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
+              isPlayActive || mobilePlayOpen
+                ? "text-indigo-300"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <div
+              className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+                isPlayActive || mobilePlayOpen
+                  ? "bg-indigo-500/15"
+                  : "bg-transparent"
+              }`}
+            >
+              <Dice5
+                className="h-[20px] w-[20px]"
+                strokeWidth={isPlayActive || mobilePlayOpen ? 2.5 : 2}
+              />
+            </div>
+
+            <span className="text-[10px] font-semibold">Play</span>
+
+            {(isPlayActive || mobilePlayOpen) && (
+              <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
+            )}
+          </button>
+
+          {/* RESULTS */}
+
+          <Link
+            to="/results-history"
+            onClick={handleMobileNavigation}
+            className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
+              isActive("/results-history")
+                ? "text-indigo-300"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <div
+              className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+                isActive("/results-history")
+                  ? "bg-indigo-500/15"
+                  : "bg-transparent"
+              }`}
+            >
+              <BarChart3
+                className="h-[19px] w-[19px]"
+                strokeWidth={isActive("/results-history") ? 2.5 : 2}
+              />
+            </div>
+
+            <span className="text-[10px] font-semibold">Results</span>
+
+            {isActive("/results-history") && (
+              <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
+            )}
+          </Link>
+
+          {/* ABOUT */}
+
+          <Link
+            to="/about"
+            onClick={handleMobileNavigation}
+            className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
+              isActive("/about")
+                ? "text-indigo-300"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <div
+              className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+                isActive("/about") ? "bg-indigo-500/15" : "bg-transparent"
+              }`}
+            >
+              <Info
+                className="h-[19px] w-[19px]"
+                strokeWidth={isActive("/about") ? 2.5 : 2}
+              />
+            </div>
+
+            <span className="text-[10px] font-semibold">About</span>
+
+            {isActive("/about") && (
+              <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
+            )}
+          </Link>
+
+          {/* MORE */}
+
+          <button
+            type="button"
+            onClick={toggleMobileMore}
+            aria-label="Open more menu"
+            aria-expanded={mobileMoreOpen}
+            className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
+              isMoreActive || mobileMoreOpen
+                ? "text-indigo-300"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <div
+              className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+                isMoreActive || mobileMoreOpen
+                  ? "bg-indigo-500/15"
+                  : "bg-transparent"
+              }`}
+            >
+              <MoreHorizontal
+                className="h-[21px] w-[21px]"
+                strokeWidth={isMoreActive || mobileMoreOpen ? 2.5 : 2}
+              />
+            </div>
+
+            <span className="text-[10px] font-semibold">More</span>
+
+            {(isMoreActive || mobileMoreOpen) && (
+              <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
+            )}
+          </button>
+        </div>
+      </nav>
+
+      {/* ======================================================
+          MAIN CONTENT
+      ======================================================= */}
+
+      <main className="mx-auto min-h-[calc(100vh-4rem)] max-w-7xl px-4 py-6 pb-28 sm:px-6 lg:min-h-[calc(100vh-4.5rem)] lg:px-8 lg:py-8 lg:pb-8">
         <Outlet />
       </main>
 
-      {/* ========================================================
+      {/* ======================================================
           FOOTER
-      ======================================================== */}
+      ======================================================= */}
 
       <footer className="bg-slate-950 text-slate-400 sm:mt-16">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
@@ -786,15 +975,19 @@ export default function PublicLayout() {
             {/* ABOUT */}
 
             <div>
-              <Link to="/" className="mb-4 inline-flex items-center gap-2">
+              <Link
+                to="/"
+                onClick={closeAllMenus}
+                className="mb-4 inline-flex items-center gap-2"
+              >
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-white">
                   <Ticket className="h-4 w-4" />
                 </div>
 
                 <div>
-                  <span className="font-extrabold text-white">Lottery</span>
+                  <span className="font-extrabold text-white">AB</span>
 
-                  <span className="font-extrabold text-indigo-400">Play</span>
+                  <span className="font-extrabold text-indigo-400">CD</span>
                 </div>
               </Link>
 
@@ -813,6 +1006,7 @@ export default function PublicLayout() {
               <div className="space-y-3 text-sm">
                 <Link
                   to="/"
+                  onClick={handleMobileNavigation}
                   className="block transition-colors hover:text-indigo-400"
                 >
                   Home
@@ -820,6 +1014,7 @@ export default function PublicLayout() {
 
                 <Link
                   to="/results-history"
+                  onClick={handleMobileNavigation}
                   className="block transition-colors hover:text-indigo-400"
                 >
                   Results History
@@ -827,6 +1022,7 @@ export default function PublicLayout() {
 
                 <Link
                   to="/about"
+                  onClick={handleMobileNavigation}
                   className="block transition-colors hover:text-indigo-400"
                 >
                   About
@@ -834,9 +1030,18 @@ export default function PublicLayout() {
 
                 <Link
                   to="/login"
+                  onClick={handleMobileNavigation}
                   className="block transition-colors hover:text-indigo-400"
                 >
                   Login
+                </Link>
+
+                <Link
+                  to="/register"
+                  onClick={handleMobileNavigation}
+                  className="block transition-colors hover:text-indigo-400"
+                >
+                  Register
                 </Link>
               </div>
             </div>
@@ -879,106 +1084,6 @@ export default function PublicLayout() {
           </div>
         </div>
       </footer>
-
-      {/* ========================================================
-          MOBILE FLOATING BACK BUTTON
-          
-          NEW DESIGN
-          
-          - Indigo / Violet brand gradient
-          - Matches Register / Active navigation
-          - Soft colored glow
-          - White arrow
-          - No dark gray button
-          - Mobile only
-          - Appears after scrolling
-          - Never enters /player/*
-      ========================================================= */}
-
-      <div
-        className={`fixed bottom-5 right-4 z-[60] md:hidden ${
-          showBackButton
-            ? "translate-y-0 opacity-100"
-            : "pointer-events-none translate-y-5 opacity-0"
-        } transition-all duration-300`}
-      >
-        <button
-          type="button"
-          onClick={handlePublicBack}
-          aria-label="Go back"
-          className="
-            group
-            flex
-            items-center
-            gap-2
-            rounded-full
-            border
-            border-indigo-400/40
-            bg-gradient-to-r
-            from-indigo-600
-            to-violet-600
-            px-3
-            py-2.5
-            text-sm
-            font-bold
-            text-white
-            shadow-lg
-            shadow-indigo-900/40
-            ring-1
-            ring-white/10
-            backdrop-blur-md
-            transition-all
-            duration-200
-            hover:-translate-y-1
-            hover:from-indigo-500
-            hover:to-violet-500
-            hover:border-indigo-300/60
-            hover:shadow-xl
-            hover:shadow-indigo-900/50
-            active:translate-y-0
-            active:scale-95
-            focus:outline-none
-            focus:ring-2
-            focus:ring-indigo-400/60
-            focus:ring-offset-2
-            focus:ring-offset-slate-50
-          "
-        >
-          {/* ==================================================
-              ARROW ICON
-          =================================================== */}
-
-          <span
-            className="
-              flex
-              h-8
-              w-8
-              shrink-0
-              items-center
-              justify-center
-              rounded-full
-              bg-white/15
-              text-white
-              shadow-inner
-              shadow-white/10
-              ring-1
-              ring-white/20
-              transition-all
-              duration-200
-              group-hover:-translate-x-0.5
-              group-hover:bg-white/20
-            "
-          >
-            <ArrowLeft className="h-4 w-4" strokeWidth={2.75} />
-          </span>
-
-          {/* ==================================================
-              TEXT
-          =================================================== */}
-
-          <span className="pr-1 tracking-wide">Back</span>
-        </button>
-      </div>
     </div>
   );
 }
