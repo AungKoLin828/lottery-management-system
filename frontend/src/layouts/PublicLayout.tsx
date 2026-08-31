@@ -9,7 +9,6 @@ import {
   ChevronDown,
   Sparkles,
   Ticket,
-  ArrowLeft,
   MoreHorizontal,
   LogIn,
   UserPlus,
@@ -38,20 +37,6 @@ const playNavigation = [
 ];
 
 /* ============================================================
-   PUBLIC ROUTE CHECK
-============================================================ */
-
-function isPublicPath(path: string) {
-  return (
-    path === "/" ||
-    path === "/results-history" ||
-    path === "/about" ||
-    path === "/login" ||
-    path === "/register"
-  );
-}
-
-/* ============================================================
    COMPONENT
 ============================================================ */
 
@@ -60,9 +45,10 @@ export default function PublicLayout() {
   const navigate = useNavigate();
 
   /* ============================================================
-     MOBILE / POPUP STATE
+     PWA / MOBILE MENU STATE
   ============================================================ */
 
+  const [isInstalledPWA, setIsInstalledPWA] = useState(false);
   const [mobilePlayOpen, setMobilePlayOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
@@ -73,22 +59,76 @@ export default function PublicLayout() {
   const [desktopPlayOpen, setDesktopPlayOpen] = useState(false);
 
   /* ============================================================
-     MOBILE BACK BUTTON
-  ============================================================ */
-
-  const [showBackButton, setShowBackButton] = useState(false);
-
-  /* ============================================================
      REFS
   ============================================================ */
 
   const playMenuRef = useRef<HTMLDivElement>(null);
 
   /* ============================================================
-     PUBLIC HISTORY STORAGE KEY
+     DETECT INSTALLED PWA
+     
+     Supported modes:
+     
+     1. Android / Chrome / Edge
+        display-mode: standalone
+
+     2. iOS / Safari
+        navigator.standalone
+
+     3. Fullscreen PWA
+        display-mode: fullscreen
+
+     4. Minimal UI PWA
+        display-mode: minimal-ui
   ============================================================ */
 
-  const PUBLIC_HISTORY_KEY = "lottery_public_navigation_history";
+  useEffect(() => {
+    const checkPWAInstalled = () => {
+      const standaloneMedia = window.matchMedia(
+        "(display-mode: standalone)",
+      ).matches;
+
+      const fullscreenMedia = window.matchMedia(
+        "(display-mode: fullscreen)",
+      ).matches;
+
+      const minimalUiMedia = window.matchMedia(
+        "(display-mode: minimal-ui)",
+      ).matches;
+
+      const iosStandalone =
+        "standalone" in window.navigator &&
+        Boolean(
+          (
+            window.navigator as Navigator & {
+              standalone?: boolean;
+            }
+          ).standalone,
+        );
+
+      setIsInstalledPWA(
+        standaloneMedia || fullscreenMedia || minimalUiMedia || iosStandalone,
+      );
+    };
+
+    checkPWAInstalled();
+
+    const standaloneMedia = window.matchMedia("(display-mode: standalone)");
+
+    const fullscreenMedia = window.matchMedia("(display-mode: fullscreen)");
+
+    const minimalUiMedia = window.matchMedia("(display-mode: minimal-ui)");
+
+    standaloneMedia.addEventListener("change", checkPWAInstalled);
+    fullscreenMedia.addEventListener("change", checkPWAInstalled);
+    minimalUiMedia.addEventListener("change", checkPWAInstalled);
+
+    return () => {
+      standaloneMedia.removeEventListener("change", checkPWAInstalled);
+      fullscreenMedia.removeEventListener("change", checkPWAInstalled);
+      minimalUiMedia.removeEventListener("change", checkPWAInstalled);
+    };
+  }, []);
 
   /* ============================================================
      ACTIVE ROUTES
@@ -146,143 +186,16 @@ export default function PublicLayout() {
   }, [location.pathname]);
 
   /* ============================================================
-     TRACK PUBLIC ROUTES
-
-     ONLY PUBLIC ROUTES ARE STORED.
-
-     /player/*
-     IS NEVER STORED.
-  ============================================================ */
-
-  useEffect(() => {
-    if (!isPublicPath(location.pathname)) {
-      return;
-    }
-
-    try {
-      const stored = sessionStorage.getItem(PUBLIC_HISTORY_KEY);
-
-      let history: string[] = [];
-
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-
-          if (Array.isArray(parsed)) {
-            history = parsed.filter(
-              (item): item is string =>
-                typeof item === "string" && isPublicPath(item),
-            );
-          }
-        } catch {
-          history = [];
-        }
-      }
-
-      const lastRoute = history[history.length - 1];
-
-      if (lastRoute !== location.pathname) {
-        history.push(location.pathname);
-      }
-
-      if (history.length > 20) {
-        history = history.slice(-20);
-      }
-
-      sessionStorage.setItem(PUBLIC_HISTORY_KEY, JSON.stringify(history));
-    } catch {
-      // Ignore sessionStorage errors.
-    }
-  }, [location.pathname]);
-
-  /* ============================================================
-     MOBILE BACK BUTTON VISIBILITY
-  ============================================================ */
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setShowBackButton(window.scrollY > 120);
-    };
-
-    handleScroll();
-
-    window.addEventListener("scroll", handleScroll, {
-      passive: true,
-    });
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
-  }, []);
-
-  /* ============================================================
-     SAFE PUBLIC BACK
-
-     NEVER USE navigate(-1).
-
-     ONLY USE OUR PUBLIC NAVIGATION HISTORY.
-  ============================================================ */
-
-  const handlePublicBack = () => {
-    try {
-      const stored = sessionStorage.getItem(PUBLIC_HISTORY_KEY);
-
-      let history: string[] = [];
-
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-
-          if (Array.isArray(parsed)) {
-            history = parsed.filter(
-              (item): item is string =>
-                typeof item === "string" && isPublicPath(item),
-            );
-          }
-        } catch {
-          history = [];
-        }
-      }
-
-      /* Remove current page */
-
-      if (
-        history.length > 0 &&
-        history[history.length - 1] === location.pathname
-      ) {
-        history.pop();
-      }
-
-      /* Previous public page */
-
-      const previousPublicPage = history[history.length - 1];
-
-      /* Save updated history */
-
-      sessionStorage.setItem(PUBLIC_HISTORY_KEY, JSON.stringify(history));
-
-      /* Navigate */
-
-      if (
-        previousPublicPage &&
-        isPublicPath(previousPublicPage) &&
-        !previousPublicPage.startsWith("/player")
-      ) {
-        navigate(previousPublicPage);
-        return;
-      }
-
-      navigate("/");
-    } catch {
-      navigate("/");
-    }
-  };
-
-  /* ============================================================
      MOBILE PLAY
+     
+     Only available when running as installed PWA.
   ============================================================ */
 
   const toggleMobilePlay = () => {
+    if (!isInstalledPWA) {
+      return;
+    }
+
     setMobilePlayOpen((current) => !current);
 
     setMobileMoreOpen(false);
@@ -291,9 +204,15 @@ export default function PublicLayout() {
 
   /* ============================================================
      MOBILE MORE
+     
+     Only available when running as installed PWA.
   ============================================================ */
 
   const toggleMobileMore = () => {
+    if (!isInstalledPWA) {
+      return;
+    }
+
     setMobileMoreOpen((current) => !current);
 
     setMobilePlayOpen(false);
@@ -586,6 +505,10 @@ export default function PublicLayout() {
 
           {/* ==================================================
               MOBILE HEADER
+              
+              IMPORTANT:
+              This header is still shown in normal mobile
+              browser. Only the bottom PWA navigation is hidden.
           =================================================== */}
 
           <div className="flex items-center lg:hidden">
@@ -598,9 +521,11 @@ export default function PublicLayout() {
 
       {/* ======================================================
           MOBILE PLAY POPUP
+
+          ONLY DISPLAY INSIDE INSTALLED PWA
       ======================================================= */}
 
-      {mobilePlayOpen && (
+      {isInstalledPWA && mobilePlayOpen && (
         <div className="fixed inset-x-3 bottom-[82px] z-[80] lg:hidden">
           <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/98 p-2 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">
             <div className="px-3 pb-2 pt-1">
@@ -656,9 +581,11 @@ export default function PublicLayout() {
 
       {/* ======================================================
           MOBILE MORE POPUP
+
+          ONLY DISPLAY INSIDE INSTALLED PWA
       ======================================================= */}
 
-      {mobileMoreOpen && (
+      {isInstalledPWA && mobileMoreOpen && (
         <div className="fixed inset-x-3 bottom-[82px] z-[80] lg:hidden">
           <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/98 p-2 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">
             <div className="px-3 pb-2 pt-1">
@@ -713,198 +640,197 @@ export default function PublicLayout() {
       )}
 
       {/* ======================================================
-          MOBILE FLOATING BACK BUTTON
-      ======================================================= */}
-
-      <div
-        className={`fixed bottom-[82px] right-4 z-[70] lg:hidden ${
-          showBackButton
-            ? "translate-y-0 opacity-100"
-            : "pointer-events-none translate-y-6 opacity-0"
-        } transition-all duration-300 ease-out`}
-      >
-        <button
-          type="button"
-          onClick={handlePublicBack}
-          aria-label="Go back"
-          className="group flex items-center gap-2 rounded-full border border-indigo-400/40 bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-900/40 ring-1 ring-white/10 backdrop-blur-md transition-all duration-200 hover:-translate-y-1 hover:border-indigo-300/60 hover:from-indigo-500 hover:to-violet-500 hover:shadow-xl hover:shadow-indigo-900/50 active:translate-y-0 active:scale-95 focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:ring-offset-2 focus:ring-offset-slate-50"
-        >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-white shadow-inner shadow-white/10 ring-1 ring-white/20 transition-all duration-200 group-hover:-translate-x-0.5 group-hover:bg-white/20">
-            <ArrowLeft className="h-4 w-4" strokeWidth={2.75} />
-          </span>
-
-          <span className="pr-1 tracking-wide">Back</span>
-        </button>
-      </div>
-
-      {/* ======================================================
           MOBILE / PWA BOTTOM NAVIGATION
+
+          IMPORTANT:
+          This entire navigation is rendered ONLY when
+          the application is installed as a PWA.
+
+          Browser:
+             isInstalledPWA = false
+             => NOT rendered
+
+          Installed PWA:
+             isInstalledPWA = true
+             => rendered
       ======================================================= */}
 
-      <nav className="fixed inset-x-0 bottom-0 z-[75] border-t border-slate-700/80 bg-slate-900/97 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgba(15,23,42,0.25)] backdrop-blur-xl lg:hidden">
-        <div className="mx-auto grid h-[68px] max-w-md grid-cols-5 px-1">
-          {/* HOME */}
+      {isInstalledPWA && (
+        <nav className="fixed inset-x-0 bottom-0 z-[75] border-t border-slate-700/80 bg-slate-900/97 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgba(15,23,42,0.25)] backdrop-blur-xl lg:hidden">
+          <div className="mx-auto grid h-[68px] max-w-md grid-cols-5 px-1">
+            {/* HOME */}
 
-          <Link
-            to="/"
-            onClick={handleMobileNavigation}
-            className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
-              isActive("/")
-                ? "text-indigo-300"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <div
-              className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
-                isActive("/") ? "bg-indigo-500/15" : "bg-transparent"
+            <Link
+              to="/"
+              onClick={handleMobileNavigation}
+              className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
+                isActive("/")
+                  ? "text-indigo-300"
+                  : "text-slate-400 hover:text-white"
               }`}
             >
-              <Home
-                className="h-[19px] w-[19px]"
-                strokeWidth={isActive("/") ? 2.5 : 2}
-              />
-            </div>
+              <div
+                className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+                  isActive("/") ? "bg-indigo-500/15" : "bg-transparent"
+                }`}
+              >
+                <Home
+                  className="h-[19px] w-[19px]"
+                  strokeWidth={isActive("/") ? 2.5 : 2}
+                />
+              </div>
 
-            <span className="text-[10px] font-semibold">Home</span>
+              <span className="text-[10px] font-semibold">Home</span>
 
-            {isActive("/") && (
-              <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
-            )}
-          </Link>
+              {isActive("/") && (
+                <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
+              )}
+            </Link>
 
-          {/* PLAY */}
+            {/* PLAY */}
 
-          <button
-            type="button"
-            onClick={toggleMobilePlay}
-            aria-label="Open Play menu"
-            aria-expanded={mobilePlayOpen}
-            className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
-              isPlayActive || mobilePlayOpen
-                ? "text-indigo-300"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <div
-              className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+            <button
+              type="button"
+              onClick={toggleMobilePlay}
+              aria-label="Open Play menu"
+              aria-expanded={mobilePlayOpen}
+              className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
                 isPlayActive || mobilePlayOpen
-                  ? "bg-indigo-500/15"
-                  : "bg-transparent"
+                  ? "text-indigo-300"
+                  : "text-slate-400 hover:text-white"
               }`}
             >
-              <Dice5
-                className="h-[20px] w-[20px]"
-                strokeWidth={isPlayActive || mobilePlayOpen ? 2.5 : 2}
-              />
-            </div>
+              <div
+                className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+                  isPlayActive || mobilePlayOpen
+                    ? "bg-indigo-500/15"
+                    : "bg-transparent"
+                }`}
+              >
+                <Dice5
+                  className="h-[20px] w-[20px]"
+                  strokeWidth={isPlayActive || mobilePlayOpen ? 2.5 : 2}
+                />
+              </div>
 
-            <span className="text-[10px] font-semibold">Play</span>
+              <span className="text-[10px] font-semibold">Play</span>
 
-            {(isPlayActive || mobilePlayOpen) && (
-              <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
-            )}
-          </button>
+              {(isPlayActive || mobilePlayOpen) && (
+                <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
+              )}
+            </button>
 
-          {/* RESULTS */}
+            {/* RESULTS */}
 
-          <Link
-            to="/results-history"
-            onClick={handleMobileNavigation}
-            className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
-              isActive("/results-history")
-                ? "text-indigo-300"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <div
-              className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+            <Link
+              to="/results-history"
+              onClick={handleMobileNavigation}
+              className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
                 isActive("/results-history")
-                  ? "bg-indigo-500/15"
-                  : "bg-transparent"
+                  ? "text-indigo-300"
+                  : "text-slate-400 hover:text-white"
               }`}
             >
-              <BarChart3
-                className="h-[19px] w-[19px]"
-                strokeWidth={isActive("/results-history") ? 2.5 : 2}
-              />
-            </div>
+              <div
+                className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+                  isActive("/results-history")
+                    ? "bg-indigo-500/15"
+                    : "bg-transparent"
+                }`}
+              >
+                <BarChart3
+                  className="h-[19px] w-[19px]"
+                  strokeWidth={isActive("/results-history") ? 2.5 : 2}
+                />
+              </div>
 
-            <span className="text-[10px] font-semibold">Results</span>
+              <span className="text-[10px] font-semibold">Results</span>
 
-            {isActive("/results-history") && (
-              <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
-            )}
-          </Link>
+              {isActive("/results-history") && (
+                <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
+              )}
+            </Link>
 
-          {/* ABOUT */}
+            {/* ABOUT */}
 
-          <Link
-            to="/about"
-            onClick={handleMobileNavigation}
-            className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
-              isActive("/about")
-                ? "text-indigo-300"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <div
-              className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
-                isActive("/about") ? "bg-indigo-500/15" : "bg-transparent"
+            <Link
+              to="/about"
+              onClick={handleMobileNavigation}
+              className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
+                isActive("/about")
+                  ? "text-indigo-300"
+                  : "text-slate-400 hover:text-white"
               }`}
             >
-              <Info
-                className="h-[19px] w-[19px]"
-                strokeWidth={isActive("/about") ? 2.5 : 2}
-              />
-            </div>
+              <div
+                className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+                  isActive("/about") ? "bg-indigo-500/15" : "bg-transparent"
+                }`}
+              >
+                <Info
+                  className="h-[19px] w-[19px]"
+                  strokeWidth={isActive("/about") ? 2.5 : 2}
+                />
+              </div>
 
-            <span className="text-[10px] font-semibold">About</span>
+              <span className="text-[10px] font-semibold">About</span>
 
-            {isActive("/about") && (
-              <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
-            )}
-          </Link>
+              {isActive("/about") && (
+                <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
+              )}
+            </Link>
 
-          {/* MORE */}
+            {/* MORE */}
 
-          <button
-            type="button"
-            onClick={toggleMobileMore}
-            aria-label="Open more menu"
-            aria-expanded={mobileMoreOpen}
-            className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
-              isMoreActive || mobileMoreOpen
-                ? "text-indigo-300"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <div
-              className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+            <button
+              type="button"
+              onClick={toggleMobileMore}
+              aria-label="Open more menu"
+              aria-expanded={mobileMoreOpen}
+              className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
                 isMoreActive || mobileMoreOpen
-                  ? "bg-indigo-500/15"
-                  : "bg-transparent"
+                  ? "text-indigo-300"
+                  : "text-slate-400 hover:text-white"
               }`}
             >
-              <MoreHorizontal
-                className="h-[21px] w-[21px]"
-                strokeWidth={isMoreActive || mobileMoreOpen ? 2.5 : 2}
-              />
-            </div>
+              <div
+                className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+                  isMoreActive || mobileMoreOpen
+                    ? "bg-indigo-500/15"
+                    : "bg-transparent"
+                }`}
+              >
+                <MoreHorizontal
+                  className="h-[21px] w-[21px]"
+                  strokeWidth={isMoreActive || mobileMoreOpen ? 2.5 : 2}
+                />
+              </div>
 
-            <span className="text-[10px] font-semibold">More</span>
+              <span className="text-[10px] font-semibold">More</span>
 
-            {(isMoreActive || mobileMoreOpen) && (
-              <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
-            )}
-          </button>
-        </div>
-      </nav>
+              {(isMoreActive || mobileMoreOpen) && (
+                <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
+              )}
+            </button>
+          </div>
+        </nav>
+      )}
 
       {/* ======================================================
           MAIN CONTENT
+
+          Browser:
+             Normal bottom padding
+
+          Installed PWA:
+             Extra bottom padding for bottom navigation
       ======================================================= */}
 
-      <main className="mx-auto min-h-[calc(100vh-4rem)] max-w-7xl px-4 py-6 pb-28 sm:px-6 lg:min-h-[calc(100vh-4.5rem)] lg:px-8 lg:py-8 lg:pb-8">
+      <main
+        className={`mx-auto min-h-[calc(100vh-4rem)] max-w-7xl px-4 py-6 sm:px-6 lg:min-h-[calc(100vh-4.5rem)] lg:px-8 lg:py-8 ${
+          isInstalledPWA ? "pb-28 lg:pb-8" : "pb-8"
+        }`}
+      >
         <Outlet />
       </main>
 
@@ -1027,6 +953,17 @@ export default function PublicLayout() {
           </div>
         </div>
       </footer>
+
+      {/* ======================================================
+          PWA INSTALL BUTTON
+
+          This remains available in browser mode so the user
+          can install the PWA.
+
+          Once installed, the bottom navigation becomes
+          available automatically.
+      ======================================================= */}
+
       <PWAInstallButton />
     </div>
   );

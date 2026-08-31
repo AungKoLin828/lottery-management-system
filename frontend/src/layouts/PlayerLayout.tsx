@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import {
   LayoutDashboard,
@@ -12,12 +12,11 @@ import {
   BarChart3,
   ChevronDown,
   Sparkles,
-  ArrowLeft,
   Bell,
   MoreHorizontal,
 } from "lucide-react";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import NotificationBell from "@/components/common/notification/NotificationBell";
 
@@ -99,14 +98,6 @@ const moreNavigation = [
 ];
 
 /* ============================================================
-   PLAYER ROUTE CHECK
-============================================================ */
-
-function isPlayerPath(path: string) {
-  return path === "/player" || path.startsWith("/player/");
-}
-
-/* ============================================================
    FORMAT WALLET BALANCE
 ============================================================ */
 
@@ -123,12 +114,57 @@ function formatWalletBalance(
 }
 
 /* ============================================================
+   PWA DETECTION
+============================================================ */
+
+function isRunningAsPWA(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  /* ==========================================================
+     STANDARD PWA STANDALONE MODE
+  ========================================================== */
+
+  const standalone = window.matchMedia("(display-mode: standalone)").matches;
+
+  /* ==========================================================
+     IOS SAFARI HOME SCREEN MODE
+  ========================================================== */
+
+  const iosStandalone =
+    "standalone" in window.navigator &&
+    Boolean(
+      (
+        window.navigator as Navigator & {
+          standalone?: boolean;
+        }
+      ).standalone,
+    );
+
+  /* ==========================================================
+     FULLSCREEN / MINIMAL UI PWA MODES
+  ========================================================== */
+
+  const fullscreen = window.matchMedia("(display-mode: fullscreen)").matches;
+
+  const minimalUi = window.matchMedia("(display-mode: minimal-ui)").matches;
+
+  return standalone || iosStandalone || fullscreen || minimalUi;
+}
+
+/* ============================================================
    COMPONENT
 ============================================================ */
 
 export default function PlayerLayout() {
   const location = useLocation();
-  const navigate = useNavigate();
+
+  /* ============================================================
+     PWA STATE
+  ============================================================ */
+
+  const [isPWA, setIsPWA] = useState(false);
 
   /* ============================================================
      WALLET BALANCE
@@ -152,24 +188,8 @@ export default function PlayerLayout() {
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
   /* ============================================================
-     MOBILE BACK BUTTON
-  ============================================================ */
-
-  const [showBackButton, setShowBackButton] = useState(false);
-
-  /* ============================================================
      REFS
   ============================================================ */
-
-  const profileMenuRef = useRef<HTMLDivElement>(null);
-  const playMenuRef = useRef<HTMLDivElement>(null);
-  const moreMenuRef = useRef<HTMLDivElement>(null);
-
-  /* ============================================================
-     PLAYER HISTORY STORAGE KEY
-  ============================================================ */
-
-  const PLAYER_HISTORY_KEY = "lottery_player_navigation_history";
 
   /* ============================================================
      ACTIVE ROUTES
@@ -183,6 +203,42 @@ export default function PlayerLayout() {
     location.pathname.startsWith("/player/results-history") ||
     location.pathname.startsWith("/player/contact") ||
     location.pathname.startsWith("/player/profile");
+
+  /* ============================================================
+     DETECT PWA
+  ============================================================ */
+
+  useEffect(() => {
+    const updatePWAMode = () => {
+      setIsPWA(isRunningAsPWA());
+    };
+
+    updatePWAMode();
+
+    const standaloneMedia = window.matchMedia("(display-mode: standalone)");
+
+    const fullscreenMedia = window.matchMedia("(display-mode: fullscreen)");
+
+    const minimalUiMedia = window.matchMedia("(display-mode: minimal-ui)");
+
+    const handleDisplayModeChange = () => {
+      updatePWAMode();
+    };
+
+    standaloneMedia.addEventListener("change", handleDisplayModeChange);
+
+    fullscreenMedia.addEventListener("change", handleDisplayModeChange);
+
+    minimalUiMedia.addEventListener("change", handleDisplayModeChange);
+
+    return () => {
+      standaloneMedia.removeEventListener("change", handleDisplayModeChange);
+
+      fullscreenMedia.removeEventListener("change", handleDisplayModeChange);
+
+      minimalUiMedia.removeEventListener("change", handleDisplayModeChange);
+    };
+  }, []);
 
   /* ============================================================
      LOAD WALLET BALANCE
@@ -235,10 +291,6 @@ export default function PlayerLayout() {
 
         return;
       }
-
-      /* ========================================================
-         GET BALANCE
-      ======================================================== */
 
       const balance =
         result.data?.stats?.walletBalance ??
@@ -371,6 +423,10 @@ export default function PlayerLayout() {
   ============================================================ */
 
   const toggleMobilePlay = () => {
+    if (!isPWA) {
+      return;
+    }
+
     setMobilePlayOpen((current) => !current);
     setMobileMoreOpen(false);
 
@@ -384,6 +440,10 @@ export default function PlayerLayout() {
   ============================================================ */
 
   const toggleMobileMore = () => {
+    if (!isPWA) {
+      return;
+    }
+
     setMobileMoreOpen((current) => !current);
     setMobilePlayOpen(false);
 
@@ -426,118 +486,6 @@ export default function PlayerLayout() {
   };
 
   /* ============================================================
-     TRACK PLAYER ROUTES
-  ============================================================ */
-
-  useEffect(() => {
-    if (!isPlayerPath(location.pathname)) {
-      return;
-    }
-
-    try {
-      const stored = sessionStorage.getItem(PLAYER_HISTORY_KEY);
-
-      let history: string[] = [];
-
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-
-          if (Array.isArray(parsed)) {
-            history = parsed.filter(
-              (item): item is string =>
-                typeof item === "string" && isPlayerPath(item),
-            );
-          }
-        } catch {
-          history = [];
-        }
-      }
-
-      const lastRoute = history[history.length - 1];
-
-      if (lastRoute !== location.pathname) {
-        history.push(location.pathname);
-      }
-
-      if (history.length > 30) {
-        history = history.slice(-30);
-      }
-
-      sessionStorage.setItem(PLAYER_HISTORY_KEY, JSON.stringify(history));
-    } catch {
-      // Ignore sessionStorage errors.
-    }
-  }, [location.pathname]);
-
-  /* ============================================================
-     MOBILE BACK BUTTON VISIBILITY
-  ============================================================ */
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setShowBackButton(window.scrollY > 120);
-    };
-
-    handleScroll();
-
-    window.addEventListener("scroll", handleScroll, {
-      passive: true,
-    });
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
-  }, []);
-
-  /* ============================================================
-     SAFE PLAYER BACK
-  ============================================================ */
-
-  const handlePlayerBack = () => {
-    try {
-      const stored = sessionStorage.getItem(PLAYER_HISTORY_KEY);
-
-      let history: string[] = [];
-
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-
-          if (Array.isArray(parsed)) {
-            history = parsed.filter(
-              (item): item is string =>
-                typeof item === "string" && isPlayerPath(item),
-            );
-          }
-        } catch {
-          history = [];
-        }
-      }
-
-      if (
-        history.length > 0 &&
-        history[history.length - 1] === location.pathname
-      ) {
-        history.pop();
-      }
-
-      const previousPlayerPage = history[history.length - 1];
-
-      sessionStorage.setItem(PLAYER_HISTORY_KEY, JSON.stringify(history));
-
-      if (previousPlayerPage && isPlayerPath(previousPlayerPage)) {
-        navigate(previousPlayerPage);
-        return;
-      }
-
-      navigate("/player");
-    } catch {
-      navigate("/player");
-    }
-  };
-
-  /* ============================================================
      ROUTE CHANGE
   ============================================================ */
 
@@ -558,15 +506,19 @@ export default function PlayerLayout() {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
 
-      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
+      const menus = document.querySelectorAll("[data-player-menu]");
+
+      let clickedInsideMenu = false;
+
+      menus.forEach((menu) => {
+        if (menu.contains(target)) {
+          clickedInsideMenu = true;
+        }
+      });
+
+      if (!clickedInsideMenu) {
         setProfileMenuOpen(false);
-      }
-
-      if (playMenuRef.current && !playMenuRef.current.contains(target)) {
         setPlayMenuOpen(false);
-      }
-
-      if (moreMenuRef.current && !moreMenuRef.current.contains(target)) {
         setMoreMenuOpen(false);
       }
     };
@@ -630,6 +582,12 @@ export default function PlayerLayout() {
   const formattedWalletBalance = formatWalletBalance(walletBalance);
 
   /* ============================================================
+     PWA BOTTOM SPACING
+  ============================================================ */
+
+  const mainPaddingBottom = isPWA ? "pb-28" : "pb-6";
+
+  /* ============================================================
      RENDER
   ============================================================ */
 
@@ -641,9 +599,7 @@ export default function PlayerLayout() {
 
       <header className="sticky top-0 z-50 border-b border-slate-700/80 bg-slate-900/95 backdrop-blur-xl">
         <div className="mx-auto flex h-[64px] items-center justify-between gap-3 px-3 sm:h-[72px] sm:px-6 lg:max-w-7xl lg:px-8">
-          {/* ==================================================
-              LOGO
-          ================================================== */}
+          {/* LOGO */}
 
           <NavLink
             to="/player"
@@ -670,16 +626,12 @@ export default function PlayerLayout() {
           ================================================== */}
 
           <nav className="hidden min-w-0 items-center justify-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 lg:flex">
-            {/* DASHBOARD */}
-
             <NavLink to="/player" end className={navClass}>
               <LayoutDashboard size={17} />
               Dashboard
             </NavLink>
 
-            {/* PLAY */}
-
-            <div ref={playMenuRef} className="relative">
+            <div data-player-menu className="relative">
               <button
                 type="button"
                 onClick={togglePlayMenu}
@@ -768,23 +720,17 @@ export default function PlayerLayout() {
               )}
             </div>
 
-            {/* MY TICKETS */}
-
             <NavLink to="/player/tickets" className={navClass}>
               <Ticket size={17} />
               My Tickets
             </NavLink>
-
-            {/* WALLET */}
 
             <NavLink to="/player/wallet" className={navClass}>
               <WalletCards size={17} />
               Wallet
             </NavLink>
 
-            {/* MORE */}
-
-            <div ref={moreMenuRef} className="relative">
+            <div data-player-menu className="relative">
               <button
                 type="button"
                 onClick={toggleMoreMenu}
@@ -885,13 +831,11 @@ export default function PlayerLayout() {
               </span>
             </NavLink>
 
-            {/* DESKTOP NOTIFICATIONS */}
+            {/* NOTIFICATIONS */}
 
             <div className="hidden shrink-0 rounded-xl lg:block">
               <NotificationBell role="PLAYER" />
             </div>
-
-            {/* MOBILE NOTIFICATION */}
 
             <div className="flex shrink-0 rounded-xl lg:hidden">
               <NotificationBell role="PLAYER" />
@@ -899,10 +843,7 @@ export default function PlayerLayout() {
 
             {/* DESKTOP PROFILE */}
 
-            <div
-              ref={profileMenuRef}
-              className="relative hidden shrink-0 lg:block"
-            >
+            <div data-player-menu className="relative hidden shrink-0 lg:block">
               <button
                 type="button"
                 onClick={toggleProfileMenu}
@@ -986,10 +927,11 @@ export default function PlayerLayout() {
       </header>
 
       {/* ======================================================
-          MOBILE PLAY POPUP
+          PWA MOBILE PLAY POPUP
+          ONLY VISIBLE WHEN INSTALLED / HOME SCREEN
       ======================================================= */}
 
-      {mobilePlayOpen && (
+      {isPWA && mobilePlayOpen && (
         <div className="fixed inset-x-3 bottom-[82px] z-[80] lg:hidden">
           <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/98 p-2 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">
             <div className="px-3 pb-2 pt-1">
@@ -1046,10 +988,11 @@ export default function PlayerLayout() {
       )}
 
       {/* ======================================================
-          MOBILE MORE POPUP
+          PWA MOBILE MORE POPUP
+          ONLY VISIBLE WHEN INSTALLED / HOME SCREEN
       ======================================================= */}
 
-      {mobileMoreOpen && (
+      {isPWA && mobileMoreOpen && (
         <div className="fixed inset-x-3 bottom-[82px] z-[80] lg:hidden">
           <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/98 p-2 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">
             <div className="px-3 pb-2 pt-1">
@@ -1088,8 +1031,6 @@ export default function PlayerLayout() {
                 );
               })}
 
-              {/* NOTIFICATIONS */}
-
               <div className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold text-slate-300">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
                   <Bell size={17} />
@@ -1101,8 +1042,6 @@ export default function PlayerLayout() {
                   <NotificationBell role="PLAYER" />
                 </div>
               </div>
-
-              {/* PROFILE */}
 
               <NavLink
                 to="/player/profile"
@@ -1122,8 +1061,6 @@ export default function PlayerLayout() {
                 <span>Profile</span>
               </NavLink>
 
-              {/* LOGOUT */}
-
               <button
                 type="button"
                 onClick={handleLogout}
@@ -1141,211 +1078,195 @@ export default function PlayerLayout() {
       )}
 
       {/* ======================================================
-          MOBILE FLOATING BACK BUTTON
+          PWA MOBILE BOTTOM NAVIGATION
+          NOT DISPLAYED IN NORMAL BROWSER
       ======================================================= */}
 
-      <div
-        className={`fixed bottom-[82px] right-4 z-[70] lg:hidden ${
-          showBackButton
-            ? "translate-y-0 opacity-100"
-            : "pointer-events-none translate-y-6 opacity-0"
-        } transition-all duration-300 ease-out`}
-      >
-        <button
-          type="button"
-          onClick={handlePlayerBack}
-          aria-label="Go back"
-          className="group flex items-center gap-2 rounded-full border border-indigo-400/40 bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-900/40 ring-1 ring-white/10 backdrop-blur-md transition-all duration-200 hover:-translate-y-1 hover:from-indigo-500 hover:to-violet-500 hover:border-indigo-300/60 hover:shadow-xl hover:shadow-indigo-900/50 active:translate-y-0 active:scale-95 focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:ring-offset-2 focus:ring-offset-slate-50"
-        >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-white shadow-inner shadow-white/10 ring-1 ring-white/20 transition-all duration-200 group-hover:-translate-x-0.5 group-hover:bg-white/20">
-            <ArrowLeft className="h-4 w-4" strokeWidth={2.75} />
-          </span>
+      {isPWA && (
+        <nav className="fixed inset-x-0 bottom-0 z-[75] border-t border-slate-700/80 bg-slate-900/97 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgba(15,23,42,0.25)] backdrop-blur-xl lg:hidden">
+          <div className="mx-auto grid h-[68px] max-w-md grid-cols-5 px-1">
+            {/* HOME */}
 
-          <span className="pr-1 tracking-wide">Back</span>
-        </button>
-      </div>
+            <NavLink
+              to="/player"
+              end
+              onClick={handleMobileNavigation}
+              className={({ isActive }) =>
+                `relative flex flex-col items-center justify-center gap-1 transition-all ${
+                  isActive
+                    ? "text-indigo-300"
+                    : "text-slate-400 hover:text-white"
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <div
+                    className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+                      isActive ? "bg-indigo-500/15" : "bg-transparent"
+                    }`}
+                  >
+                    <LayoutDashboard
+                      className="h-[19px] w-[19px]"
+                      strokeWidth={isActive ? 2.5 : 2}
+                    />
+                  </div>
 
-      {/* ======================================================
-          MOBILE/PWA BOTTOM NAVIGATION
-      ======================================================= */}
+                  <span className="text-[10px] font-semibold">Home</span>
 
-      <nav className="fixed inset-x-0 bottom-0 z-[75] border-t border-slate-700/80 bg-slate-900/97 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgba(15,23,42,0.25)] backdrop-blur-xl lg:hidden">
-        <div className="mx-auto grid h-[68px] max-w-md grid-cols-5 px-1">
-          {/* HOME */}
+                  {isActive && (
+                    <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
+                  )}
+                </>
+              )}
+            </NavLink>
 
-          <NavLink
-            to="/player"
-            end
-            onClick={handleMobileNavigation}
-            className={({ isActive }) =>
-              `relative flex flex-col items-center justify-center gap-1 transition-all ${
-                isActive ? "text-indigo-300" : "text-slate-400 hover:text-white"
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <div
-                  className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
-                    isActive ? "bg-indigo-500/15" : "bg-transparent"
-                  }`}
-                >
-                  <LayoutDashboard
-                    className="h-[19px] w-[19px]"
-                    strokeWidth={isActive ? 2.5 : 2}
-                  />
-                </div>
+            {/* PLAY */}
 
-                <span className="text-[10px] font-semibold">Home</span>
-
-                {isActive && (
-                  <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
-                )}
-              </>
-            )}
-          </NavLink>
-
-          {/* PLAY */}
-
-          <button
-            type="button"
-            onClick={toggleMobilePlay}
-            aria-label="Open Play menu"
-            aria-expanded={mobilePlayOpen}
-            className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
-              isPlayActive || mobilePlayOpen
-                ? "text-indigo-300"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <div
-              className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+            <button
+              type="button"
+              onClick={toggleMobilePlay}
+              aria-label="Open Play menu"
+              aria-expanded={mobilePlayOpen}
+              className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
                 isPlayActive || mobilePlayOpen
-                  ? "bg-indigo-500/15"
-                  : "bg-transparent"
-              }`}
-            >
-              <Dice5
-                className="h-[20px] w-[20px]"
-                strokeWidth={isPlayActive || mobilePlayOpen ? 2.5 : 2}
-              />
-            </div>
-
-            <span className="text-[10px] font-semibold">Play</span>
-
-            {(isPlayActive || mobilePlayOpen) && (
-              <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
-            )}
-          </button>
-
-          {/* TICKETS */}
-
-          <NavLink
-            to="/player/tickets"
-            onClick={handleMobileNavigation}
-            className={({ isActive }) =>
-              `relative flex flex-col items-center justify-center gap-1 transition-all ${
-                isActive ? "text-indigo-300" : "text-slate-400 hover:text-white"
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <div
-                  className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
-                    isActive ? "bg-indigo-500/15" : "bg-transparent"
-                  }`}
-                >
-                  <Ticket
-                    className="h-[19px] w-[19px]"
-                    strokeWidth={isActive ? 2.5 : 2}
-                  />
-                </div>
-
-                <span className="text-[10px] font-semibold">Tickets</span>
-
-                {isActive && (
-                  <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
-                )}
-              </>
-            )}
-          </NavLink>
-
-          {/* WALLET */}
-
-          <NavLink
-            to="/player/wallet"
-            onClick={handleMobileNavigation}
-            className={({ isActive }) =>
-              `relative flex flex-col items-center justify-center gap-1 transition-all ${
-                isActive
-                  ? "text-emerald-300"
+                  ? "text-indigo-300"
                   : "text-slate-400 hover:text-white"
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <div
-                  className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
-                    isActive ? "bg-emerald-500/15" : "bg-transparent"
-                  }`}
-                >
-                  <WalletCards
-                    className="h-[19px] w-[19px]"
-                    strokeWidth={isActive ? 2.5 : 2}
-                  />
-                </div>
-
-                <span className="text-[10px] font-semibold">Wallet</span>
-
-                {isActive && (
-                  <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-emerald-400" />
-                )}
-              </>
-            )}
-          </NavLink>
-
-          {/* MORE */}
-
-          <button
-            type="button"
-            onClick={toggleMobileMore}
-            aria-label="Open more menu"
-            aria-expanded={mobileMoreOpen}
-            className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
-              isMoreActive || mobileMoreOpen
-                ? "text-indigo-300"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <div
-              className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
-                isMoreActive || mobileMoreOpen
-                  ? "bg-indigo-500/15"
-                  : "bg-transparent"
               }`}
             >
-              <MoreHorizontal
-                className="h-[21px] w-[21px]"
-                strokeWidth={isMoreActive || mobileMoreOpen ? 2.5 : 2}
-              />
-            </div>
+              <div
+                className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+                  isPlayActive || mobilePlayOpen
+                    ? "bg-indigo-500/15"
+                    : "bg-transparent"
+                }`}
+              >
+                <Dice5
+                  className="h-[20px] w-[20px]"
+                  strokeWidth={isPlayActive || mobilePlayOpen ? 2.5 : 2}
+                />
+              </div>
 
-            <span className="text-[10px] font-semibold">More</span>
+              <span className="text-[10px] font-semibold">Play</span>
 
-            {(isMoreActive || mobileMoreOpen) && (
-              <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
-            )}
-          </button>
-        </div>
-      </nav>
+              {(isPlayActive || mobilePlayOpen) && (
+                <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
+              )}
+            </button>
+
+            {/* TICKETS */}
+
+            <NavLink
+              to="/player/tickets"
+              onClick={handleMobileNavigation}
+              className={({ isActive }) =>
+                `relative flex flex-col items-center justify-center gap-1 transition-all ${
+                  isActive
+                    ? "text-indigo-300"
+                    : "text-slate-400 hover:text-white"
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <div
+                    className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+                      isActive ? "bg-indigo-500/15" : "bg-transparent"
+                    }`}
+                  >
+                    <Ticket
+                      className="h-[19px] w-[19px]"
+                      strokeWidth={isActive ? 2.5 : 2}
+                    />
+                  </div>
+
+                  <span className="text-[10px] font-semibold">Tickets</span>
+
+                  {isActive && (
+                    <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
+                  )}
+                </>
+              )}
+            </NavLink>
+
+            {/* WALLET */}
+
+            <NavLink
+              to="/player/wallet"
+              onClick={handleMobileNavigation}
+              className={({ isActive }) =>
+                `relative flex flex-col items-center justify-center gap-1 transition-all ${
+                  isActive
+                    ? "text-emerald-300"
+                    : "text-slate-400 hover:text-white"
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <div
+                    className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+                      isActive ? "bg-emerald-500/15" : "bg-transparent"
+                    }`}
+                  >
+                    <WalletCards
+                      className="h-[19px] w-[19px]"
+                      strokeWidth={isActive ? 2.5 : 2}
+                    />
+                  </div>
+
+                  <span className="text-[10px] font-semibold">Wallet</span>
+
+                  {isActive && (
+                    <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-emerald-400" />
+                  )}
+                </>
+              )}
+            </NavLink>
+
+            {/* MORE */}
+
+            <button
+              type="button"
+              onClick={toggleMobileMore}
+              aria-label="Open more menu"
+              aria-expanded={mobileMoreOpen}
+              className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
+                isMoreActive || mobileMoreOpen
+                  ? "text-indigo-300"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <div
+                className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
+                  isMoreActive || mobileMoreOpen
+                    ? "bg-indigo-500/15"
+                    : "bg-transparent"
+                }`}
+              >
+                <MoreHorizontal
+                  className="h-[21px] w-[21px]"
+                  strokeWidth={isMoreActive || mobileMoreOpen ? 2.5 : 2}
+                />
+              </div>
+
+              <span className="text-[10px] font-semibold">More</span>
+
+              {(isMoreActive || mobileMoreOpen) && (
+                <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
+              )}
+            </button>
+          </div>
+        </nav>
+      )}
 
       {/* ======================================================
           MAIN CONTENT
       ======================================================= */}
 
-      <main className="mx-auto min-h-[calc(100vh-4rem)] max-w-7xl px-4 py-6 pb-28 sm:px-6 lg:min-h-[calc(100vh-4.5rem)] lg:px-8 lg:py-8 lg:pb-8">
+      <main
+        className={`mx-auto min-h-[calc(100vh-4rem)] max-w-7xl px-4 py-6 sm:px-6 lg:min-h-[calc(100vh-4.5rem)] lg:px-8 lg:py-8 ${mainPaddingBottom}`}
+      >
         <Outlet />
       </main>
     </div>

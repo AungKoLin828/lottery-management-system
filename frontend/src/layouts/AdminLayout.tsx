@@ -1,14 +1,7 @@
 import { useEffect, useState } from "react";
-import {
-  Link,
-  NavLink,
-  Outlet,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
 import {
-  ArrowLeft,
   BarChart3,
   FileText,
   LayoutDashboard,
@@ -106,11 +99,51 @@ const moreNavigation = [
 ];
 
 /* ============================================================
-   PLAYER / ADMIN ROUTE CHECK
+   ADMIN ROUTE CHECK
 ============================================================ */
 
 function isAdminPath(path: string) {
   return path === "/admin" || path.startsWith("/admin/");
+}
+
+/* ============================================================
+   PWA / STANDALONE DETECTION
+============================================================ */
+
+/**
+ * Returns true only when the website is running as an
+ * installed PWA / Add to Home Screen application.
+ *
+ * Browser:
+ *   false
+ *
+ * Installed PWA:
+ *   true
+ *
+ * iOS Add to Home Screen:
+ *   true
+ *
+ * Android/Chrome installed PWA:
+ *   true
+ */
+function isPWAStandalone() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  /* Android / Chrome / Edge / modern browsers */
+  const standaloneMediaQuery = window.matchMedia(
+    "(display-mode: standalone)",
+  ).matches;
+
+  /* iOS Safari Add to Home Screen */
+  const iosStandalone =
+    "standalone" in window.navigator &&
+    Boolean(
+      (window.navigator as Navigator & { standalone?: boolean }).standalone,
+    );
+
+  return standaloneMediaQuery || iosStandalone;
 }
 
 /* ============================================================
@@ -119,13 +152,18 @@ function isAdminPath(path: string) {
 
 export default function AdminLayout() {
   const location = useLocation();
-  const navigate = useNavigate();
 
   /* ==========================================================
-     DESKTOP SIDEBAR
+     DESKTOP / MOBILE SIDEBAR
   ========================================================== */
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  /* ==========================================================
+     PWA DETECTION
+  ========================================================== */
+
+  const [isInstalledPWA, setIsInstalledPWA] = useState(false);
 
   /* ==========================================================
      MOBILE MORE
@@ -146,10 +184,56 @@ export default function AdminLayout() {
   const [showBackButton, setShowBackButton] = useState(false);
 
   /* ==========================================================
-     PLAYER / ADMIN HISTORY STORAGE
+     ADMIN HISTORY STORAGE
   ========================================================== */
 
   const ADMIN_HISTORY_KEY = "lottery_admin_navigation_history";
+
+  /* ==========================================================
+     DETECT PWA INSTALL / STANDALONE MODE
+  ========================================================== */
+
+  useEffect(() => {
+    const updatePWAState = () => {
+      setIsInstalledPWA(isPWAStandalone());
+    };
+
+    updatePWAState();
+
+    const mediaQuery = window.matchMedia("(display-mode: standalone)");
+
+    const handleMediaChange = () => {
+      updatePWAState();
+    };
+
+    /*
+     * Modern browsers
+     */
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleMediaChange);
+    } else {
+      /*
+       * Older Safari/browser fallback
+       */
+      mediaQuery.addListener(handleMediaChange);
+    }
+
+    /*
+     * pageshow helps when the browser moves between
+     * normal browser mode and installed PWA mode.
+     */
+    window.addEventListener("pageshow", updatePWAState);
+
+    return () => {
+      if (typeof mediaQuery.removeEventListener === "function") {
+        mediaQuery.removeEventListener("change", handleMediaChange);
+      } else {
+        mediaQuery.removeListener(handleMediaChange);
+      }
+
+      window.removeEventListener("pageshow", updatePWAState);
+    };
+  }, []);
 
   /* ==========================================================
      ACTIVE NAVIGATION
@@ -214,7 +298,6 @@ export default function AdminLayout() {
 
   const toggleMobileTransaction = () => {
     setMobileTransactionOpen((current) => !current);
-
     setMobileMoreOpen(false);
   };
 
@@ -224,7 +307,6 @@ export default function AdminLayout() {
 
   const toggleMobileMore = () => {
     setMobileMoreOpen((current) => !current);
-
     setMobileTransactionOpen(false);
   };
 
@@ -348,10 +430,23 @@ export default function AdminLayout() {
   }, [location.pathname]);
 
   /* ==========================================================
-     MOBILE BACK BUTTON VISIBILITY
+     PWA BACK BUTTON VISIBILITY
   ========================================================== */
 
   useEffect(() => {
+    /*
+     * Normal browser:
+     * Back button is completely disabled.
+     */
+    if (!isInstalledPWA) {
+      setShowBackButton(false);
+      return;
+    }
+
+    /*
+     * Installed PWA:
+     * Show back button after scrolling.
+     */
     const handleScroll = () => {
       setShowBackButton(window.scrollY > 120);
     };
@@ -365,13 +460,21 @@ export default function AdminLayout() {
     return () => {
       window.removeEventListener("scroll", handleScroll);
     };
-  }, []);
+  }, [isInstalledPWA]);
 
   /* ==========================================================
      SAFE ADMIN BACK
   ========================================================== */
 
   const handleAdminBack = () => {
+    /*
+     * Extra safety:
+     * Never execute the PWA back action in normal browser mode.
+     */
+    if (!isInstalledPWA) {
+      return;
+    }
+
     try {
       const stored = sessionStorage.getItem(ADMIN_HISTORY_KEY);
 
@@ -404,13 +507,15 @@ export default function AdminLayout() {
       sessionStorage.setItem(ADMIN_HISTORY_KEY, JSON.stringify(history));
 
       if (previousAdminPage && isAdminPath(previousAdminPage)) {
-        navigate(previousAdminPage);
+        window.history.pushState(null, "", previousAdminPage);
+        window.dispatchEvent(new PopStateEvent("popstate"));
         return;
       }
 
-      navigate("/admin");
+      window.history.pushState(null, "", "/admin");
+      window.dispatchEvent(new PopStateEvent("popstate"));
     } catch {
-      navigate("/admin");
+      window.location.href = "/admin";
     }
   };
 
@@ -540,7 +645,6 @@ export default function AdminLayout() {
         <nav className="flex-1 space-y-1 overflow-y-auto p-3 sm:p-4">
           {navigation.map((item) => {
             const Icon = item.icon;
-
             const active = isActive(item.path);
 
             return (
@@ -714,19 +818,21 @@ export default function AdminLayout() {
         ================================================== */}
 
         <section
-          className="
+          className={`
             min-w-0
             flex-1
             px-3
             py-4
-            pb-28
             sm:px-4
             sm:py-5
-            sm:pb-28
             md:px-6
             md:py-6
-            lg:pb-6
-          "
+            ${
+              isInstalledPWA
+                ? "pb-28 sm:pb-28 lg:pb-28"
+                : "pb-4 sm:pb-5 md:pb-6"
+            }
+          `}
         >
           <Outlet />
         </section>
@@ -757,10 +863,14 @@ export default function AdminLayout() {
       </main>
 
       {/* ======================================================
-          MOBILE / PWA MORE PANEL
+          PWA MOBILE / MORE PANEL
+
+          IMPORTANT:
+          This entire section only exists when the application
+          is running as an installed PWA.
       ======================================================= */}
 
-      {mobileMoreOpen && (
+      {isInstalledPWA && mobileMoreOpen && (
         <>
           {/* BACKDROP */}
 
@@ -873,10 +983,10 @@ export default function AdminLayout() {
       )}
 
       {/* ======================================================
-          MOBILE TRANSACTION SUBMENU
+          PWA TRANSACTION SUBMENU
       ======================================================= */}
 
-      {mobileTransactionOpen && (
+      {isInstalledPWA && mobileTransactionOpen && (
         <>
           {/* BACKDROP */}
 
@@ -981,196 +1091,219 @@ export default function AdminLayout() {
       )}
 
       {/* ======================================================
-          MOBILE / PWA BOTTOM NAVIGATION
+          PWA MOBILE BOTTOM NAVIGATION
+
+          IMPORTANT:
+          NOT rendered in normal browser.
+          Only rendered after PWA installation / Add to Home
+          Screen and launch in standalone mode.
       ======================================================= */}
 
-      <nav
-        className="
-          fixed
-          bottom-0
-          left-0
-          right-0
-          z-[60]
-          border-t
-          border-slate-700
-          bg-slate-900/95
-          px-2
-          pb-[calc(0.5rem+env(safe-area-inset-bottom))]
-          pt-2
-          shadow-[0_-8px_30px_rgba(15,23,42,0.25)]
-          backdrop-blur-xl
-          lg:hidden
-        "
-      >
-        <div className="mx-auto flex max-w-xl items-center gap-1">
-          {/* HOME */}
-
-          <NavLink
-            to="/admin"
-            end
-            onClick={handleMobileNavigation}
-            className={({ isActive: linkActive }) =>
-              mobileBottomNavClass(linkActive)
-            }
-          >
-            <LayoutDashboard className="h-5 w-5" />
-
-            <span>Home</span>
-          </NavLink>
-
-          {/* RESULTS */}
-
-          <NavLink
-            to="/admin/results"
-            onClick={handleMobileNavigation}
-            className={({ isActive: linkActive }) =>
-              mobileBottomNavClass(linkActive)
-            }
-          >
-            <Trophy className="h-5 w-5" />
-
-            <span>Results</span>
-          </NavLink>
-
-          {/* USERS */}
-
-          <NavLink
-            to="/admin/users"
-            onClick={handleMobileNavigation}
-            className={({ isActive: linkActive }) =>
-              mobileBottomNavClass(linkActive)
-            }
-          >
-            <Users className="h-5 w-5" />
-
-            <span>Users</span>
-          </NavLink>
-
-          {/* TRANSACTIONS */}
-
-          <button
-            type="button"
-            onClick={toggleMobileTransaction}
-            aria-label="Open transaction management"
-            aria-expanded={mobileTransactionOpen}
-            className={mobileBottomNavClass(
-              isTransactionActive || mobileTransactionOpen,
-            )}
-          >
-            <Wallet className="h-5 w-5" />
-
-            <span>Transactions</span>
-
-            {isTransactionActive && (
-              <span className="absolute right-1/2 top-1 h-1 w-1 translate-x-1/2 rounded-full bg-white" />
-            )}
-          </button>
-
-          {/* MORE */}
-
-          <button
-            type="button"
-            onClick={toggleMobileMore}
-            aria-label="Open more menu"
-            aria-expanded={mobileMoreOpen}
-            className={mobileBottomNavClass(isMoreActive || mobileMoreOpen)}
-          >
-            <MoreHorizontal className="h-5 w-5" />
-
-            <span>More</span>
-          </button>
-        </div>
-      </nav>
-
-      {/* ======================================================
-          MOBILE FLOATING BACK BUTTON
-      ======================================================= */}
-
-      <div
-        className={`
-          fixed
-          bottom-[92px]
-          right-4
-          z-[75]
-          lg:hidden
-          ${
-            showBackButton
-              ? "translate-y-0 opacity-100"
-              : "pointer-events-none translate-y-6 opacity-0"
-          }
-          transition-all
-          duration-300
-          ease-out
-        `}
-      >
-        <button
-          type="button"
-          onClick={handleAdminBack}
-          aria-label="Go back"
+      {isInstalledPWA && (
+        <nav
           className="
-            group
-            flex
-            items-center
-            gap-2
-            rounded-full
-            border
-            border-indigo-400/40
-            bg-gradient-to-r
-            from-indigo-600
-            to-violet-600
-            px-3
-            py-2.5
-            text-sm
-            font-bold
-            text-white
-            shadow-lg
-            shadow-indigo-900/40
-            ring-1
-            ring-white/10
-            backdrop-blur-md
-            transition-all
-            duration-200
-            hover:-translate-y-1
-            hover:border-indigo-300/60
-            hover:from-indigo-500
-            hover:to-violet-500
-            hover:shadow-xl
-            active:translate-y-0
-            active:scale-95
-            focus:outline-none
-            focus:ring-2
-            focus:ring-indigo-400/60
-            focus:ring-offset-2
-            focus:ring-offset-slate-50
+            fixed
+            bottom-0
+            left-0
+            right-0
+            z-[60]
+            border-t
+            border-slate-700
+            bg-slate-900/95
+            px-2
+            pb-[calc(0.5rem+env(safe-area-inset-bottom))]
+            pt-2
+            shadow-[0_-8px_30px_rgba(15,23,42,0.25)]
+            backdrop-blur-xl
+            lg:hidden
           "
         >
-          <span
+          <div className="mx-auto flex max-w-xl items-center gap-1">
+            {/* HOME */}
+
+            <NavLink
+              to="/admin"
+              end
+              onClick={handleMobileNavigation}
+              className={({ isActive: linkActive }) =>
+                mobileBottomNavClass(linkActive)
+              }
+            >
+              <LayoutDashboard className="h-5 w-5" />
+
+              <span>Home</span>
+            </NavLink>
+
+            {/* RESULTS */}
+
+            <NavLink
+              to="/admin/results"
+              onClick={handleMobileNavigation}
+              className={({ isActive: linkActive }) =>
+                mobileBottomNavClass(linkActive)
+              }
+            >
+              <Trophy className="h-5 w-5" />
+
+              <span>Results</span>
+            </NavLink>
+
+            {/* USERS */}
+
+            <NavLink
+              to="/admin/users"
+              onClick={handleMobileNavigation}
+              className={({ isActive: linkActive }) =>
+                mobileBottomNavClass(linkActive)
+              }
+            >
+              <Users className="h-5 w-5" />
+
+              <span>Users</span>
+            </NavLink>
+
+            {/* TRANSACTIONS */}
+
+            <button
+              type="button"
+              onClick={toggleMobileTransaction}
+              aria-label="Open transaction management"
+              aria-expanded={mobileTransactionOpen}
+              className={mobileBottomNavClass(
+                isTransactionActive || mobileTransactionOpen,
+              )}
+            >
+              <Wallet className="h-5 w-5" />
+
+              <span>Transactions</span>
+
+              {isTransactionActive && (
+                <span className="absolute right-1/2 top-1 h-1 w-1 translate-x-1/2 rounded-full bg-white" />
+              )}
+            </button>
+
+            {/* MORE */}
+
+            <button
+              type="button"
+              onClick={toggleMobileMore}
+              aria-label="Open more menu"
+              aria-expanded={mobileMoreOpen}
+              className={mobileBottomNavClass(isMoreActive || mobileMoreOpen)}
+            >
+              <MoreHorizontal className="h-5 w-5" />
+
+              <span>More</span>
+            </button>
+          </div>
+        </nav>
+      )}
+
+      {/* ======================================================
+          PWA MOBILE FLOATING BACK BUTTON
+
+          Hidden completely in normal browser.
+      ======================================================= */}
+
+      {isInstalledPWA && (
+        <div
+          className={`
+            fixed
+            bottom-[92px]
+            right-4
+            z-[75]
+            lg:hidden
+            ${
+              showBackButton
+                ? "translate-y-0 opacity-100"
+                : "pointer-events-none translate-y-6 opacity-0"
+            }
+            transition-all
+            duration-300
+            ease-out
+          `}
+        >
+          <button
+            type="button"
+            onClick={handleAdminBack}
+            aria-label="Go back"
             className="
+              group
               flex
-              h-8
-              w-8
-              shrink-0
               items-center
-              justify-center
+              gap-2
               rounded-full
-              bg-white/15
+              border
+              border-indigo-400/40
+              bg-gradient-to-r
+              from-indigo-600
+              to-violet-600
+              px-3
+              py-2.5
+              text-sm
+              font-bold
               text-white
-              shadow-inner
-              shadow-white/10
+              shadow-lg
+              shadow-indigo-900/40
               ring-1
-              ring-white/20
+              ring-white/10
+              backdrop-blur-md
               transition-all
               duration-200
-              group-hover:-translate-x-0.5
-              group-hover:bg-white/20
+              hover:-translate-y-1
+              hover:border-indigo-300/60
+              hover:from-indigo-500
+              hover:to-violet-500
+              hover:shadow-xl
+              active:translate-y-0
+              active:scale-95
+              focus:outline-none
+              focus:ring-2
+              focus:ring-indigo-400/60
+              focus:ring-offset-2
+              focus:ring-offset-slate-50
             "
           >
-            <ArrowLeft className="h-4 w-4" strokeWidth={2.75} />
-          </span>
+            <span
+              className="
+                flex
+                h-8
+                w-8
+                shrink-0
+                items-center
+                justify-center
+                rounded-full
+                bg-white/15
+                text-white
+                shadow-inner
+                shadow-white/10
+                ring-1
+                ring-white/20
+                transition-all
+                duration-200
+                group-hover:-translate-x-0.5
+                group-hover:bg-white/20
+              "
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+                aria-hidden="true"
+              >
+                <path d="M19 12H5" />
+                <path d="M12 19l-7-7 7-7" />
+              </svg>
+            </span>
 
-          <span className="pr-1 tracking-wide">Back</span>
-        </button>
-      </div>
+            <span className="pr-1 tracking-wide">Back</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
