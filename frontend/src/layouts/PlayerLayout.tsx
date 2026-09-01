@@ -117,6 +117,28 @@ function formatWalletBalance(
    PWA DETECTION
 ============================================================ */
 
+/**
+ * Returns true ONLY when the application is running in a
+ * PWA / Home Screen standalone environment.
+ *
+ * Browser:
+ *   false
+ *
+ * Installed PWA:
+ *   true
+ *
+ * iOS Safari Home Screen:
+ *   true
+ *
+ * Android / Chrome standalone:
+ *   true
+ *
+ * Fullscreen:
+ *   true
+ *
+ * Minimal UI:
+ *   true
+ */
 function isRunningAsPWA(): boolean {
   if (typeof window === "undefined") {
     return false;
@@ -143,10 +165,14 @@ function isRunningAsPWA(): boolean {
     );
 
   /* ==========================================================
-     FULLSCREEN / MINIMAL UI PWA MODES
+     FULLSCREEN PWA MODE
   ========================================================== */
 
   const fullscreen = window.matchMedia("(display-mode: fullscreen)").matches;
+
+  /* ==========================================================
+     MINIMAL UI PWA MODE
+  ========================================================== */
 
   const minimalUi = window.matchMedia("(display-mode: minimal-ui)").matches;
 
@@ -162,38 +188,43 @@ export default function PlayerLayout() {
 
   /* ============================================================
      PWA STATE
+
+     IMPORTANT:
+     This state controls ONLY the PWA-specific bottom
+     navigation and PWA mobile popup menus.
+
+     It does NOT change the normal browser navigation.
   ============================================================ */
 
   const [isPWA, setIsPWA] = useState(false);
 
   /* ============================================================
      WALLET BALANCE
-  ============================================================ */
+============================================================ */
 
   const [walletBalance, setWalletBalance] = useState<number>(0);
 
   /* ============================================================
      DESKTOP DROPDOWN STATE
-  ============================================================ */
+============================================================ */
 
   const [playMenuOpen, setPlayMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   /* ============================================================
-     MOBILE/PWA STATE
-  ============================================================ */
+     MOBILE / PWA STATE
+
+     These are intentionally used ONLY by the installed PWA
+     bottom navigation.
+  ============================================================= */
 
   const [mobilePlayOpen, setMobilePlayOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
   /* ============================================================
-     REFS
-  ============================================================ */
-
-  /* ============================================================
      ACTIVE ROUTES
-  ============================================================ */
+============================================================ */
 
   const isPlayActive =
     location.pathname.startsWith("/player/play-2d") ||
@@ -206,13 +237,14 @@ export default function PlayerLayout() {
 
   /* ============================================================
      DETECT PWA
-  ============================================================ */
+============================================================ */
 
   useEffect(() => {
     const updatePWAMode = () => {
       setIsPWA(isRunningAsPWA());
     };
 
+    /* Initial detection */
     updatePWAMode();
 
     const standaloneMedia = window.matchMedia("(display-mode: standalone)");
@@ -231,18 +263,36 @@ export default function PlayerLayout() {
 
     minimalUiMedia.addEventListener("change", handleDisplayModeChange);
 
+    /*
+     * Also re-check when the application becomes visible.
+     *
+     * This is useful when:
+     * - user installs the PWA
+     * - user returns from the Home Screen
+     * - browser changes display mode
+     */
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        updatePWAMode();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       standaloneMedia.removeEventListener("change", handleDisplayModeChange);
 
       fullscreenMedia.removeEventListener("change", handleDisplayModeChange);
 
       minimalUiMedia.removeEventListener("change", handleDisplayModeChange);
+
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
   /* ============================================================
      LOAD WALLET BALANCE
-  ============================================================ */
+============================================================ */
 
   const loadWalletBalance = useCallback(async () => {
     try {
@@ -322,7 +372,7 @@ export default function PlayerLayout() {
 
   /* ============================================================
      INITIAL WALLET BALANCE
-  ============================================================ */
+============================================================ */
 
   useEffect(() => {
     void loadWalletBalance();
@@ -330,7 +380,7 @@ export default function PlayerLayout() {
 
   /* ============================================================
      REFRESH WALLET BALANCE AFTER ROUTE CHANGE
-  ============================================================ */
+============================================================ */
 
   useEffect(() => {
     void loadWalletBalance();
@@ -338,7 +388,7 @@ export default function PlayerLayout() {
 
   /* ============================================================
      REFRESH WHEN PAGE BECOMES VISIBLE
-  ============================================================ */
+============================================================ */
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -356,7 +406,7 @@ export default function PlayerLayout() {
 
   /* ============================================================
      REAL-TIME WALLET BALANCE UPDATE EVENT
-  ============================================================ */
+============================================================ */
 
   useEffect(() => {
     const handleWalletBalanceUpdated = () => {
@@ -378,7 +428,7 @@ export default function PlayerLayout() {
 
   /* ============================================================
      WALLET BALANCE FALLBACK REFRESH
-  ============================================================ */
+============================================================ */
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -394,7 +444,7 @@ export default function PlayerLayout() {
 
   /* ============================================================
      CLOSE ALL MENUS
-  ============================================================ */
+============================================================ */
 
   const closeAllMenus = () => {
     setMobilePlayOpen(false);
@@ -406,8 +456,8 @@ export default function PlayerLayout() {
   };
 
   /* ============================================================
-     MOBILE NAVIGATION
-  ============================================================ */
+     MOBILE / PWA NAVIGATION
+============================================================ */
 
   const handleMobileNavigation = () => {
     closeAllMenus();
@@ -419,10 +469,13 @@ export default function PlayerLayout() {
   };
 
   /* ============================================================
-     MOBILE PLAY
-  ============================================================ */
+     MOBILE / PWA PLAY
+============================================================ */
 
   const toggleMobilePlay = () => {
+    /*
+     * Never open the PWA bottom menu in a normal browser.
+     */
     if (!isPWA) {
       return;
     }
@@ -436,10 +489,13 @@ export default function PlayerLayout() {
   };
 
   /* ============================================================
-     MOBILE MORE
-  ============================================================ */
+     MOBILE / PWA MORE
+============================================================ */
 
   const toggleMobileMore = () => {
+    /*
+     * Never open the PWA bottom menu in a normal browser.
+     */
     if (!isPWA) {
       return;
     }
@@ -454,7 +510,7 @@ export default function PlayerLayout() {
 
   /* ============================================================
      DESKTOP PLAY
-  ============================================================ */
+============================================================ */
 
   const togglePlayMenu = () => {
     setPlayMenuOpen((current) => !current);
@@ -465,7 +521,7 @@ export default function PlayerLayout() {
 
   /* ============================================================
      DESKTOP MORE
-  ============================================================ */
+============================================================ */
 
   const toggleMoreMenu = () => {
     setMoreMenuOpen((current) => !current);
@@ -476,7 +532,7 @@ export default function PlayerLayout() {
 
   /* ============================================================
      DESKTOP PROFILE
-  ============================================================ */
+============================================================ */
 
   const toggleProfileMenu = () => {
     setProfileMenuOpen((current) => !current);
@@ -487,7 +543,7 @@ export default function PlayerLayout() {
 
   /* ============================================================
      ROUTE CHANGE
-  ============================================================ */
+============================================================ */
 
   useEffect(() => {
     closeAllMenus();
@@ -500,7 +556,7 @@ export default function PlayerLayout() {
 
   /* ============================================================
      DESKTOP OUTSIDE CLICK
-  ============================================================ */
+============================================================ */
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -532,7 +588,7 @@ export default function PlayerLayout() {
 
   /* ============================================================
      LOGOUT
-  ============================================================ */
+============================================================ */
 
   const handleLogout = async () => {
     try {
@@ -551,7 +607,7 @@ export default function PlayerLayout() {
 
   /* ============================================================
      DESKTOP NAV CLASS
-  ============================================================ */
+============================================================ */
 
   const navClass = ({ isActive }: { isActive: boolean }) =>
     `group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
@@ -562,7 +618,7 @@ export default function PlayerLayout() {
 
   /* ============================================================
      PLAY ITEM CLASS
-  ============================================================ */
+============================================================ */
 
   const playItemClass = (isActive: boolean, is2D: boolean) =>
     `group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200 ${
@@ -577,19 +633,22 @@ export default function PlayerLayout() {
 
   /* ============================================================
      FORMATTED BALANCE
-  ============================================================ */
+============================================================ */
 
   const formattedWalletBalance = formatWalletBalance(walletBalance);
 
   /* ============================================================
      PWA BOTTOM SPACING
-  ============================================================ */
+
+     Only installed PWA receives extra bottom spacing.
+     Normal browser — including mobile browser — does not.
+  ============================================================= */
 
   const mainPaddingBottom = isPWA ? "pb-28" : "pb-6";
 
   /* ============================================================
      RENDER
-  ============================================================ */
+============================================================ */
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -599,7 +658,9 @@ export default function PlayerLayout() {
 
       <header className="sticky top-0 z-50 border-b border-slate-700/80 bg-slate-900/95 backdrop-blur-xl">
         <div className="mx-auto flex h-[64px] items-center justify-between gap-3 px-3 sm:h-[72px] sm:px-6 lg:max-w-7xl lg:px-8">
-          {/* LOGO */}
+          {/* ==================================================
+              LOGO
+          =================================================== */}
 
           <NavLink
             to="/player"
@@ -623,6 +684,14 @@ export default function PlayerLayout() {
 
           {/* ==================================================
               DESKTOP NAVIGATION
+
+              IMPORTANT:
+              This remains lg:flex exactly as before.
+
+              Therefore:
+              - Desktop browser = desktop menu
+              - Mobile browser = existing mobile header
+              - Installed PWA = PWA bottom menu
           ================================================== */}
 
           <nav className="hidden min-w-0 items-center justify-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 lg:flex">
@@ -630,6 +699,8 @@ export default function PlayerLayout() {
               <LayoutDashboard size={17} />
               Dashboard
             </NavLink>
+
+            {/* PLAY */}
 
             <div data-player-menu className="relative">
               <button
@@ -720,15 +791,21 @@ export default function PlayerLayout() {
               )}
             </div>
 
+            {/* MY TICKETS */}
+
             <NavLink to="/player/tickets" className={navClass}>
               <Ticket size={17} />
               My Tickets
             </NavLink>
 
+            {/* WALLET */}
+
             <NavLink to="/player/wallet" className={navClass}>
               <WalletCards size={17} />
               Wallet
             </NavLink>
+
+            {/* MORE */}
 
             <div data-player-menu className="relative">
               <button
@@ -928,7 +1005,9 @@ export default function PlayerLayout() {
 
       {/* ======================================================
           PWA MOBILE PLAY POPUP
-          ONLY VISIBLE WHEN INSTALLED / HOME SCREEN
+
+          IMPORTANT:
+          This can NEVER appear in a normal browser.
       ======================================================= */}
 
       {isPWA && mobilePlayOpen && (
@@ -989,7 +1068,9 @@ export default function PlayerLayout() {
 
       {/* ======================================================
           PWA MOBILE MORE POPUP
-          ONLY VISIBLE WHEN INSTALLED / HOME SCREEN
+
+          IMPORTANT:
+          This can NEVER appear in a normal browser.
       ======================================================= */}
 
       {isPWA && mobileMoreOpen && (
@@ -1079,7 +1160,20 @@ export default function PlayerLayout() {
 
       {/* ======================================================
           PWA MOBILE BOTTOM NAVIGATION
-          NOT DISPLAYED IN NORMAL BROWSER
+
+          THIS IS THE ONLY PLACE WHERE THE MOBILE BOTTOM
+          NAVIGATION IS RENDERED.
+
+          Normal browser:
+              isPWA === false
+              -> NOTHING RENDERED
+
+          Installed PWA / Home Screen:
+              isPWA === true
+              -> RENDERED
+
+          The lg:hidden class is intentionally retained so
+          desktop PWA still uses the normal desktop menu.
       ======================================================= */}
 
       {isPWA && (
@@ -1262,6 +1356,15 @@ export default function PlayerLayout() {
 
       {/* ======================================================
           MAIN CONTENT
+
+          Normal browser:
+              pb-6
+
+          Installed PWA:
+              pb-28
+
+          Therefore the browser never reserves space for a
+          bottom menu that is not present.
       ======================================================= */}
 
       <main

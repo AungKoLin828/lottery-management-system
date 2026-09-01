@@ -99,7 +99,7 @@ const moreNavigation = [
 ];
 
 /* ============================================================
-   ADMIN ROUTE CHECK
+   PLAYER / ADMIN ROUTE CHECK
 ============================================================ */
 
 function isAdminPath(path: string) {
@@ -107,43 +107,52 @@ function isAdminPath(path: string) {
 }
 
 /* ============================================================
-   PWA / STANDALONE DETECTION
+   PWA DISPLAY MODE CHECK
 ============================================================ */
 
-/**
- * Returns true only when the website is running as an
- * installed PWA / Add to Home Screen application.
- *
- * Browser:
- *   false
- *
- * Installed PWA:
- *   true
- *
- * iOS Add to Home Screen:
- *   true
- *
- * Android/Chrome installed PWA:
- *   true
- */
-function isPWAStandalone() {
+function checkIsPWA() {
   if (typeof window === "undefined") {
     return false;
   }
 
-  /* Android / Chrome / Edge / modern browsers */
+  /*
+   * Chrome / Edge / Android / installed PWA
+   */
   const standaloneMediaQuery = window.matchMedia(
     "(display-mode: standalone)",
   ).matches;
 
-  /* iOS Safari Add to Home Screen */
+  /*
+   * iOS Safari installed to Home Screen
+   */
   const iosStandalone =
     "standalone" in window.navigator &&
     Boolean(
-      (window.navigator as Navigator & { standalone?: boolean }).standalone,
+      (
+        window.navigator as Navigator & {
+          standalone?: boolean;
+        }
+      ).standalone,
     );
 
-  return standaloneMediaQuery || iosStandalone;
+  /*
+   * Some browsers can use fullscreen/minimal-ui
+   * when launched as an installed web app.
+   */
+  const fullscreenMediaQuery = window.matchMedia(
+    "(display-mode: fullscreen)",
+  ).matches;
+
+  const minimalUiMediaQuery = window.matchMedia(
+    "(display-mode: minimal-ui)",
+  ).matches;
+
+  return (
+    standaloneMediaQuery ||
+    iosStandalone ||
+    fullscreenMediaQuery ||
+    minimalUiMediaQuery
+  );
 }
 
 /* ============================================================
@@ -154,16 +163,10 @@ export default function AdminLayout() {
   const location = useLocation();
 
   /* ==========================================================
-     DESKTOP / MOBILE SIDEBAR
+     DESKTOP SIDEBAR
   ========================================================== */
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  /* ==========================================================
-     PWA DETECTION
-  ========================================================== */
-
-  const [isInstalledPWA, setIsInstalledPWA] = useState(false);
 
   /* ==========================================================
      MOBILE MORE
@@ -178,60 +181,46 @@ export default function AdminLayout() {
   const [mobileTransactionOpen, setMobileTransactionOpen] = useState(false);
 
   /* ==========================================================
-     MOBILE BACK BUTTON
+     PWA MODE
   ========================================================== */
 
-  const [showBackButton, setShowBackButton] = useState(false);
+  const [isPWA, setIsPWA] = useState(false);
 
   /* ==========================================================
-     ADMIN HISTORY STORAGE
+     PLAYER / ADMIN HISTORY STORAGE
   ========================================================== */
 
   const ADMIN_HISTORY_KEY = "lottery_admin_navigation_history";
 
   /* ==========================================================
-     DETECT PWA INSTALL / STANDALONE MODE
+     DETECT INSTALLED PWA / HOME SCREEN MODE
   ========================================================== */
 
   useEffect(() => {
-    const updatePWAState = () => {
-      setIsInstalledPWA(isPWAStandalone());
+    const updatePwaMode = () => {
+      setIsPWA(checkIsPWA());
     };
 
-    updatePWAState();
-
-    const mediaQuery = window.matchMedia("(display-mode: standalone)");
-
-    const handleMediaChange = () => {
-      updatePWAState();
-    };
+    updatePwaMode();
 
     /*
-     * Modern browsers
+     * display-mode can change while the application is running.
+     * Listen for changes so the bottom menu updates immediately.
      */
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", handleMediaChange);
-    } else {
-      /*
-       * Older Safari/browser fallback
-       */
-      mediaQuery.addListener(handleMediaChange);
-    }
+    const standaloneQuery = window.matchMedia("(display-mode: standalone)");
 
-    /*
-     * pageshow helps when the browser moves between
-     * normal browser mode and installed PWA mode.
-     */
-    window.addEventListener("pageshow", updatePWAState);
+    const fullscreenQuery = window.matchMedia("(display-mode: fullscreen)");
+
+    const minimalUiQuery = window.matchMedia("(display-mode: minimal-ui)");
+
+    standaloneQuery.addEventListener("change", updatePwaMode);
+    fullscreenQuery.addEventListener("change", updatePwaMode);
+    minimalUiQuery.addEventListener("change", updatePwaMode);
 
     return () => {
-      if (typeof mediaQuery.removeEventListener === "function") {
-        mediaQuery.removeEventListener("change", handleMediaChange);
-      } else {
-        mediaQuery.removeListener(handleMediaChange);
-      }
-
-      window.removeEventListener("pageshow", updatePWAState);
+      standaloneQuery.removeEventListener("change", updatePwaMode);
+      fullscreenQuery.removeEventListener("change", updatePwaMode);
+      minimalUiQuery.removeEventListener("change", updatePwaMode);
     };
   }, []);
 
@@ -298,6 +287,7 @@ export default function AdminLayout() {
 
   const toggleMobileTransaction = () => {
     setMobileTransactionOpen((current) => !current);
+
     setMobileMoreOpen(false);
   };
 
@@ -307,6 +297,7 @@ export default function AdminLayout() {
 
   const toggleMobileMore = () => {
     setMobileMoreOpen((current) => !current);
+
     setMobileTransactionOpen(false);
   };
 
@@ -428,96 +419,6 @@ export default function AdminLayout() {
       // Ignore sessionStorage errors.
     }
   }, [location.pathname]);
-
-  /* ==========================================================
-     PWA BACK BUTTON VISIBILITY
-  ========================================================== */
-
-  useEffect(() => {
-    /*
-     * Normal browser:
-     * Back button is completely disabled.
-     */
-    if (!isInstalledPWA) {
-      setShowBackButton(false);
-      return;
-    }
-
-    /*
-     * Installed PWA:
-     * Show back button after scrolling.
-     */
-    const handleScroll = () => {
-      setShowBackButton(window.scrollY > 120);
-    };
-
-    handleScroll();
-
-    window.addEventListener("scroll", handleScroll, {
-      passive: true,
-    });
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
-  }, [isInstalledPWA]);
-
-  /* ==========================================================
-     SAFE ADMIN BACK
-  ========================================================== */
-
-  const handleAdminBack = () => {
-    /*
-     * Extra safety:
-     * Never execute the PWA back action in normal browser mode.
-     */
-    if (!isInstalledPWA) {
-      return;
-    }
-
-    try {
-      const stored = sessionStorage.getItem(ADMIN_HISTORY_KEY);
-
-      let history: string[] = [];
-
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-
-          if (Array.isArray(parsed)) {
-            history = parsed.filter(
-              (item): item is string =>
-                typeof item === "string" && isAdminPath(item),
-            );
-          }
-        } catch {
-          history = [];
-        }
-      }
-
-      if (
-        history.length > 0 &&
-        history[history.length - 1] === location.pathname
-      ) {
-        history.pop();
-      }
-
-      const previousAdminPage = history[history.length - 1];
-
-      sessionStorage.setItem(ADMIN_HISTORY_KEY, JSON.stringify(history));
-
-      if (previousAdminPage && isAdminPath(previousAdminPage)) {
-        window.history.pushState(null, "", previousAdminPage);
-        window.dispatchEvent(new PopStateEvent("popstate"));
-        return;
-      }
-
-      window.history.pushState(null, "", "/admin");
-      window.dispatchEvent(new PopStateEvent("popstate"));
-    } catch {
-      window.location.href = "/admin";
-    }
-  };
 
   /* ==========================================================
      ROUTE CHANGE
@@ -645,6 +546,7 @@ export default function AdminLayout() {
         <nav className="flex-1 space-y-1 overflow-y-auto p-3 sm:p-4">
           {navigation.map((item) => {
             const Icon = item.icon;
+
             const active = isActive(item.path);
 
             return (
@@ -818,21 +720,19 @@ export default function AdminLayout() {
         ================================================== */}
 
         <section
-          className={`
+          className="
             min-w-0
             flex-1
             px-3
             py-4
+            pb-28
             sm:px-4
             sm:py-5
+            sm:pb-28
             md:px-6
             md:py-6
-            ${
-              isInstalledPWA
-                ? "pb-28 sm:pb-28 lg:pb-28"
-                : "pb-4 sm:pb-5 md:pb-6"
-            }
-          `}
+            lg:pb-6
+          "
         >
           <Outlet />
         </section>
@@ -863,14 +763,13 @@ export default function AdminLayout() {
       </main>
 
       {/* ======================================================
-          PWA MOBILE / MORE PANEL
+          MOBILE / PWA MORE PANEL
 
-          IMPORTANT:
-          This entire section only exists when the application
-          is running as an installed PWA.
+          This remains part of the existing mobile sidebar/menu
+          behavior. It is only opened by the PWA bottom menu.
       ======================================================= */}
 
-      {isInstalledPWA && mobileMoreOpen && (
+      {mobileMoreOpen && (
         <>
           {/* BACKDROP */}
 
@@ -983,10 +882,10 @@ export default function AdminLayout() {
       )}
 
       {/* ======================================================
-          PWA TRANSACTION SUBMENU
+          MOBILE TRANSACTION SUBMENU
       ======================================================= */}
 
-      {isInstalledPWA && mobileTransactionOpen && (
+      {mobileTransactionOpen && (
         <>
           {/* BACKDROP */}
 
@@ -1091,15 +990,17 @@ export default function AdminLayout() {
       )}
 
       {/* ======================================================
-          PWA MOBILE BOTTOM NAVIGATION
+          PWA BOTTOM NAVIGATION
 
           IMPORTANT:
-          NOT rendered in normal browser.
-          Only rendered after PWA installation / Add to Home
-          Screen and launch in standalone mode.
+          - Normal desktop browser: HIDDEN
+          - Normal mobile browser: HIDDEN
+          - Installed PWA / Home Screen: DISPLAYED
+          - Desktop PWA: DISPLAYED
+          - Mobile PWA: DISPLAYED
       ======================================================= */}
 
-      {isInstalledPWA && (
+      {isPWA && (
         <nav
           className="
             fixed
@@ -1197,112 +1098,6 @@ export default function AdminLayout() {
             </button>
           </div>
         </nav>
-      )}
-
-      {/* ======================================================
-          PWA MOBILE FLOATING BACK BUTTON
-
-          Hidden completely in normal browser.
-      ======================================================= */}
-
-      {isInstalledPWA && (
-        <div
-          className={`
-            fixed
-            bottom-[92px]
-            right-4
-            z-[75]
-            lg:hidden
-            ${
-              showBackButton
-                ? "translate-y-0 opacity-100"
-                : "pointer-events-none translate-y-6 opacity-0"
-            }
-            transition-all
-            duration-300
-            ease-out
-          `}
-        >
-          <button
-            type="button"
-            onClick={handleAdminBack}
-            aria-label="Go back"
-            className="
-              group
-              flex
-              items-center
-              gap-2
-              rounded-full
-              border
-              border-indigo-400/40
-              bg-gradient-to-r
-              from-indigo-600
-              to-violet-600
-              px-3
-              py-2.5
-              text-sm
-              font-bold
-              text-white
-              shadow-lg
-              shadow-indigo-900/40
-              ring-1
-              ring-white/10
-              backdrop-blur-md
-              transition-all
-              duration-200
-              hover:-translate-y-1
-              hover:border-indigo-300/60
-              hover:from-indigo-500
-              hover:to-violet-500
-              hover:shadow-xl
-              active:translate-y-0
-              active:scale-95
-              focus:outline-none
-              focus:ring-2
-              focus:ring-indigo-400/60
-              focus:ring-offset-2
-              focus:ring-offset-slate-50
-            "
-          >
-            <span
-              className="
-                flex
-                h-8
-                w-8
-                shrink-0
-                items-center
-                justify-center
-                rounded-full
-                bg-white/15
-                text-white
-                shadow-inner
-                shadow-white/10
-                ring-1
-                ring-white/20
-                transition-all
-                duration-200
-                group-hover:-translate-x-0.5
-                group-hover:bg-white/20
-              "
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-                aria-hidden="true"
-              >
-                <path d="M19 12H5" />
-                <path d="M12 19l-7-7 7-7" />
-              </svg>
-            </span>
-
-            <span className="pr-1 tracking-wide">Back</span>
-          </button>
-        </div>
       )}
     </div>
   );

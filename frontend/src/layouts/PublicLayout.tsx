@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 
 import {
   Home,
@@ -42,13 +42,33 @@ const playNavigation = [
 
 export default function PublicLayout() {
   const location = useLocation();
-  const navigate = useNavigate();
 
   /* ============================================================
-     PWA / MOBILE MENU STATE
+     PWA STATE
+     
+     IMPORTANT:
+     
+     Browser:
+       isInstalledPWA = false
+       => NO bottom navigation
+     
+     Installed PWA / Add to Home Screen:
+       isInstalledPWA = true
+       => MOBILE PWA bottom navigation is displayed
+     
+     Supported:
+       - Android Chrome / Edge standalone
+       - iOS Safari navigator.standalone
+       - fullscreen
+       - minimal-ui
   ============================================================ */
 
   const [isInstalledPWA, setIsInstalledPWA] = useState(false);
+
+  /* ============================================================
+     MOBILE / PWA MENU STATE
+  ============================================================ */
+
   const [mobilePlayOpen, setMobilePlayOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
@@ -67,19 +87,14 @@ export default function PublicLayout() {
   /* ============================================================
      DETECT INSTALLED PWA
      
-     Supported modes:
+     Browser:
+       false
      
-     1. Android / Chrome / Edge
-        display-mode: standalone
-
-     2. iOS / Safari
-        navigator.standalone
-
-     3. Fullscreen PWA
-        display-mode: fullscreen
-
-     4. Minimal UI PWA
-        display-mode: minimal-ui
+     Installed PWA:
+       true
+     
+     iOS:
+       navigator.standalone
   ============================================================ */
 
   useEffect(() => {
@@ -106,13 +121,16 @@ export default function PublicLayout() {
           ).standalone,
         );
 
-      setIsInstalledPWA(
-        standaloneMedia || fullscreenMedia || minimalUiMedia || iosStandalone,
-      );
+      const installed =
+        standaloneMedia || fullscreenMedia || minimalUiMedia || iosStandalone;
+
+      setIsInstalledPWA(installed);
     };
 
+    /* Initial check */
     checkPWAInstalled();
 
+    /* Media queries */
     const standaloneMedia = window.matchMedia("(display-mode: standalone)");
 
     const fullscreenMedia = window.matchMedia("(display-mode: fullscreen)");
@@ -123,10 +141,28 @@ export default function PublicLayout() {
     fullscreenMedia.addEventListener("change", checkPWAInstalled);
     minimalUiMedia.addEventListener("change", checkPWAInstalled);
 
+    /* Re-check when window becomes visible */
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkPWAInstalled();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    /* Re-check when window regains focus */
+    window.addEventListener("focus", checkPWAInstalled);
+
     return () => {
       standaloneMedia.removeEventListener("change", checkPWAInstalled);
+
       fullscreenMedia.removeEventListener("change", checkPWAInstalled);
+
       minimalUiMedia.removeEventListener("change", checkPWAInstalled);
+
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+
+      window.removeEventListener("focus", checkPWAInstalled);
     };
   }, []);
 
@@ -161,6 +197,9 @@ export default function PublicLayout() {
 
   /* ============================================================
      MOBILE NAVIGATION
+     
+     This is still used by PWA bottom navigation and
+     footer links.
   ============================================================ */
 
   const handleMobileNavigation = () => {
@@ -186,9 +225,10 @@ export default function PublicLayout() {
   }, [location.pathname]);
 
   /* ============================================================
-     MOBILE PLAY
+     MOBILE / PWA PLAY
      
-     Only available when running as installed PWA.
+     Only works when the application is running
+     as an installed PWA.
   ============================================================ */
 
   const toggleMobilePlay = () => {
@@ -203,9 +243,10 @@ export default function PublicLayout() {
   };
 
   /* ============================================================
-     MOBILE MORE
+     MOBILE / PWA MORE
      
-     Only available when running as installed PWA.
+     Only works when the application is running
+     as an installed PWA.
   ============================================================ */
 
   const toggleMobileMore = () => {
@@ -237,11 +278,13 @@ export default function PublicLayout() {
   const handlePlay = (destination: string) => {
     closeAllMenus();
 
-    navigate("/login", {
-      state: {
-        from: destination,
-      },
-    });
+    /*
+     * Use normal browser navigation instead of useNavigate.
+     *
+     * This preserves the existing login redirect behavior
+     * without requiring useNavigate in this layout.
+     */
+    window.location.href = `/login?from=${encodeURIComponent(destination)}`;
   };
 
   /* ============================================================
@@ -298,6 +341,19 @@ export default function PublicLayout() {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       {/* ======================================================
           HEADER
+          
+          IMPORTANT:
+          
+          Desktop browser:
+            Desktop navigation is unchanged.
+          
+          Mobile browser:
+            Desktop navigation remains hidden as before.
+            Existing mobile header remains.
+          
+          Installed PWA:
+            Existing mobile header remains and PWA
+            bottom navigation is displayed separately.
       ======================================================= */}
 
       <header className="sticky top-0 z-50 border-b border-slate-700/80 bg-slate-900/95 backdrop-blur-xl">
@@ -328,6 +384,11 @@ export default function PublicLayout() {
 
           {/* ==================================================
               DESKTOP NAVIGATION
+              
+              UNCHANGED
+              
+              It remains the normal desktop navigation and
+              is not replaced by PWA navigation.
           =================================================== */}
 
           <nav className="hidden min-w-0 items-center justify-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 lg:flex">
@@ -507,8 +568,12 @@ export default function PublicLayout() {
               MOBILE HEADER
               
               IMPORTANT:
-              This header is still shown in normal mobile
-              browser. Only the bottom PWA navigation is hidden.
+              
+              This remains visible in the normal mobile
+              browser exactly as before.
+              
+              The bottom PWA navigation is completely
+              independent from this header.
           =================================================== */}
 
           <div className="flex items-center lg:hidden">
@@ -521,8 +586,8 @@ export default function PublicLayout() {
 
       {/* ======================================================
           MOBILE PLAY POPUP
-
-          ONLY DISPLAY INSIDE INSTALLED PWA
+          
+          ONLY DISPLAY IN INSTALLED PWA
       ======================================================= */}
 
       {isInstalledPWA && mobilePlayOpen && (
@@ -581,8 +646,8 @@ export default function PublicLayout() {
 
       {/* ======================================================
           MOBILE MORE POPUP
-
-          ONLY DISPLAY INSIDE INSTALLED PWA
+          
+          ONLY DISPLAY IN INSTALLED PWA
       ======================================================= */}
 
       {isInstalledPWA && mobileMoreOpen && (
@@ -641,18 +706,20 @@ export default function PublicLayout() {
 
       {/* ======================================================
           MOBILE / PWA BOTTOM NAVIGATION
-
+          
           IMPORTANT:
-          This entire navigation is rendered ONLY when
-          the application is installed as a PWA.
-
-          Browser:
-             isInstalledPWA = false
-             => NOT rendered
-
-          Installed PWA:
-             isInstalledPWA = true
-             => rendered
+          
+          NORMAL MOBILE BROWSER:
+            isInstalledPWA = false
+            => THIS NAVIGATION DOES NOT EXIST
+          
+          INSTALLED PWA:
+            isInstalledPWA = true
+            => NAVIGATION IS DISPLAYED
+          
+          DESKTOP:
+            lg:hidden
+            => NAVIGATION IS NOT DISPLAYED
       ======================================================= */}
 
       {isInstalledPWA && (
@@ -818,12 +885,13 @@ export default function PublicLayout() {
 
       {/* ======================================================
           MAIN CONTENT
-
+          
           Browser:
-             Normal bottom padding
-
+            Normal bottom spacing.
+          
           Installed PWA:
-             Extra bottom padding for bottom navigation
+            Extra bottom spacing on mobile so the PWA
+            bottom navigation does not cover content.
       ======================================================= */}
 
       <main
@@ -956,12 +1024,12 @@ export default function PublicLayout() {
 
       {/* ======================================================
           PWA INSTALL BUTTON
-
-          This remains available in browser mode so the user
-          can install the PWA.
-
-          Once installed, the bottom navigation becomes
-          available automatically.
+          
+          Remains available in browser mode.
+          
+          After installation / Add to Home Screen, the
+          application detects standalone mode and the
+          bottom PWA navigation becomes available.
       ======================================================= */}
 
       <PWAInstallButton />
