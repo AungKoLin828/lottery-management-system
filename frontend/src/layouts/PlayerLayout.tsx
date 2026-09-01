@@ -186,45 +186,42 @@ function isRunningAsPWA(): boolean {
 export default function PlayerLayout() {
   const location = useLocation();
 
-  /* ============================================================
+  /* ==========================================================
      PWA STATE
 
-     IMPORTANT:
-     This state controls ONLY the PWA-specific bottom
-     navigation and PWA mobile popup menus.
+     Controls ONLY:
+     - PWA bottom navigation
+     - PWA mobile popup menus
 
-     It does NOT change the normal browser navigation.
-  ============================================================ */
+     Does NOT change normal browser navigation.
+  ========================================================== */
 
   const [isPWA, setIsPWA] = useState(false);
 
-  /* ============================================================
+  /* ==========================================================
      WALLET BALANCE
-============================================================ */
+  ========================================================== */
 
   const [walletBalance, setWalletBalance] = useState<number>(0);
 
-  /* ============================================================
+  /* ==========================================================
      DESKTOP DROPDOWN STATE
-============================================================ */
+  ========================================================== */
 
   const [playMenuOpen, setPlayMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
-  /* ============================================================
+  /* ==========================================================
      MOBILE / PWA STATE
-
-     These are intentionally used ONLY by the installed PWA
-     bottom navigation.
-  ============================================================= */
+  ========================================================== */
 
   const [mobilePlayOpen, setMobilePlayOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
-  /* ============================================================
+  /* ==========================================================
      ACTIVE ROUTES
-============================================================ */
+  ========================================================== */
 
   const isPlayActive =
     location.pathname.startsWith("/player/play-2d") ||
@@ -235,9 +232,9 @@ export default function PlayerLayout() {
     location.pathname.startsWith("/player/contact") ||
     location.pathname.startsWith("/player/profile");
 
-  /* ============================================================
+  /* ==========================================================
      DETECT PWA
-============================================================ */
+  ========================================================== */
 
   useEffect(() => {
     const updatePWAMode = () => {
@@ -263,14 +260,6 @@ export default function PlayerLayout() {
 
     minimalUiMedia.addEventListener("change", handleDisplayModeChange);
 
-    /*
-     * Also re-check when the application becomes visible.
-     *
-     * This is useful when:
-     * - user installs the PWA
-     * - user returns from the Home Screen
-     * - browser changes display mode
-     */
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         updatePWAMode();
@@ -290,9 +279,9 @@ export default function PlayerLayout() {
     };
   }, []);
 
-  /* ============================================================
+  /* ==========================================================
      LOAD WALLET BALANCE
-============================================================ */
+  ========================================================== */
 
   const loadWalletBalance = useCallback(async () => {
     try {
@@ -370,25 +359,25 @@ export default function PlayerLayout() {
     }
   }, []);
 
-  /* ============================================================
+  /* ==========================================================
      INITIAL WALLET BALANCE
-============================================================ */
+  ========================================================== */
 
   useEffect(() => {
     void loadWalletBalance();
   }, [loadWalletBalance]);
 
-  /* ============================================================
+  /* ==========================================================
      REFRESH WALLET BALANCE AFTER ROUTE CHANGE
-============================================================ */
+  ========================================================== */
 
   useEffect(() => {
     void loadWalletBalance();
   }, [location.pathname, loadWalletBalance]);
 
-  /* ============================================================
+  /* ==========================================================
      REFRESH WHEN PAGE BECOMES VISIBLE
-============================================================ */
+  ========================================================== */
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -404,9 +393,9 @@ export default function PlayerLayout() {
     };
   }, [loadWalletBalance]);
 
-  /* ============================================================
+  /* ==========================================================
      REAL-TIME WALLET BALANCE UPDATE EVENT
-============================================================ */
+  ========================================================== */
 
   useEffect(() => {
     const handleWalletBalanceUpdated = () => {
@@ -426,9 +415,9 @@ export default function PlayerLayout() {
     };
   }, [loadWalletBalance]);
 
-  /* ============================================================
+  /* ==========================================================
      WALLET BALANCE FALLBACK REFRESH
-============================================================ */
+  ========================================================== */
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -442,9 +431,9 @@ export default function PlayerLayout() {
     };
   }, [loadWalletBalance]);
 
-  /* ============================================================
+  /* ==========================================================
      CLOSE ALL MENUS
-============================================================ */
+  ========================================================== */
 
   const closeAllMenus = () => {
     setMobilePlayOpen(false);
@@ -455,9 +444,9 @@ export default function PlayerLayout() {
     setProfileMenuOpen(false);
   };
 
-  /* ============================================================
+  /* ==========================================================
      MOBILE / PWA NAVIGATION
-============================================================ */
+  ========================================================== */
 
   const handleMobileNavigation = () => {
     closeAllMenus();
@@ -468,9 +457,9 @@ export default function PlayerLayout() {
     });
   };
 
-  /* ============================================================
+  /* ==========================================================
      MOBILE / PWA PLAY
-============================================================ */
+  ========================================================== */
 
   const toggleMobilePlay = () => {
     /*
@@ -481,6 +470,7 @@ export default function PlayerLayout() {
     }
 
     setMobilePlayOpen((current) => !current);
+
     setMobileMoreOpen(false);
 
     setPlayMenuOpen(false);
@@ -488,9 +478,9 @@ export default function PlayerLayout() {
     setProfileMenuOpen(false);
   };
 
-  /* ============================================================
+  /* ==========================================================
      MOBILE / PWA MORE
-============================================================ */
+  ========================================================== */
 
   const toggleMobileMore = () => {
     /*
@@ -501,6 +491,7 @@ export default function PlayerLayout() {
     }
 
     setMobileMoreOpen((current) => !current);
+
     setMobilePlayOpen(false);
 
     setPlayMenuOpen(false);
@@ -508,9 +499,9 @@ export default function PlayerLayout() {
     setProfileMenuOpen(false);
   };
 
-  /* ============================================================
+  /* ==========================================================
      DESKTOP PLAY
-============================================================ */
+  ========================================================== */
 
   const togglePlayMenu = () => {
     setPlayMenuOpen((current) => !current);
@@ -519,9 +510,9 @@ export default function PlayerLayout() {
     setProfileMenuOpen(false);
   };
 
-  /* ============================================================
+  /* ==========================================================
      DESKTOP MORE
-============================================================ */
+  ========================================================== */
 
   const toggleMoreMenu = () => {
     setMoreMenuOpen((current) => !current);
@@ -530,9 +521,9 @@ export default function PlayerLayout() {
     setProfileMenuOpen(false);
   };
 
-  /* ============================================================
+  /* ==========================================================
      DESKTOP PROFILE
-============================================================ */
+  ========================================================== */
 
   const toggleProfileMenu = () => {
     setProfileMenuOpen((current) => !current);
@@ -541,9 +532,9 @@ export default function PlayerLayout() {
     setMoreMenuOpen(false);
   };
 
-  /* ============================================================
+  /* ==========================================================
      ROUTE CHANGE
-============================================================ */
+  ========================================================== */
 
   useEffect(() => {
     closeAllMenus();
@@ -554,9 +545,9 @@ export default function PlayerLayout() {
     });
   }, [location.pathname]);
 
-  /* ============================================================
+  /* ==========================================================
      DESKTOP OUTSIDE CLICK
-============================================================ */
+  ========================================================== */
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -586,9 +577,9 @@ export default function PlayerLayout() {
     };
   }, []);
 
-  /* ============================================================
+  /* ==========================================================
      LOGOUT
-============================================================ */
+  ========================================================== */
 
   const handleLogout = async () => {
     try {
@@ -605,9 +596,9 @@ export default function PlayerLayout() {
     }
   };
 
-  /* ============================================================
+  /* ==========================================================
      DESKTOP NAV CLASS
-============================================================ */
+  ========================================================== */
 
   const navClass = ({ isActive }: { isActive: boolean }) =>
     `group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
@@ -616,9 +607,9 @@ export default function PlayerLayout() {
         : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
     }`;
 
-  /* ============================================================
+  /* ==========================================================
      PLAY ITEM CLASS
-============================================================ */
+  ========================================================== */
 
   const playItemClass = (isActive: boolean, is2D: boolean) =>
     `group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200 ${
@@ -631,24 +622,21 @@ export default function PlayerLayout() {
           : "hover:bg-violet-500/15"
     }`;
 
-  /* ============================================================
+  /* ==========================================================
      FORMATTED BALANCE
-============================================================ */
+  ========================================================== */
 
   const formattedWalletBalance = formatWalletBalance(walletBalance);
 
-  /* ============================================================
+  /* ==========================================================
      PWA BOTTOM SPACING
-
-     Only installed PWA receives extra bottom spacing.
-     Normal browser — including mobile browser — does not.
-  ============================================================= */
+  ========================================================== */
 
   const mainPaddingBottom = isPWA ? "pb-28" : "pb-6";
 
-  /* ============================================================
+  /* ==========================================================
      RENDER
-============================================================ */
+  ========================================================== */
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -657,347 +645,369 @@ export default function PlayerLayout() {
       ======================================================= */}
 
       <header className="sticky top-0 z-50 border-b border-slate-700/80 bg-slate-900/95 backdrop-blur-xl">
-        <div className="mx-auto flex h-[64px] items-center justify-between gap-3 px-3 sm:h-[72px] sm:px-6 lg:max-w-7xl lg:px-8">
-          {/* ==================================================
-              LOGO
-          =================================================== */}
+        {/* ====================================================
+            PWA TOP SAFE AREA
 
-          <NavLink
-            to="/player"
-            onClick={closeAllMenus}
-            className="group flex shrink-0 items-center gap-2.5"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30 transition-transform duration-200 group-hover:scale-105">
-              <Ticket className="h-5 w-5" />
-            </div>
+            Important for:
+            - Installed PWA
+            - iPhone notch
+            - Android status bar
+            - Home Screen app mode
 
-            <div className="flex items-center">
-              <span className="text-lg font-extrabold tracking-tight text-white">
-                AB
-              </span>
+            Normal browser:
+            env(safe-area-inset-top) normally resolves to 0.
+        ==================================================== */}
 
-              <span className="text-lg font-extrabold tracking-tight text-indigo-400">
-                CD
-              </span>
-            </div>
-          </NavLink>
+        <div className="safe-area-top">
+          <div className="mx-auto flex h-[64px] items-center justify-between gap-2 px-2.5 sm:h-[72px] sm:gap-3 sm:px-6 lg:max-w-7xl lg:px-8">
+            {/* ==================================================
+                LOGO
+            =================================================== */}
 
-          {/* ==================================================
-              DESKTOP NAVIGATION
+            <NavLink
+              to="/player"
+              onClick={closeAllMenus}
+              className="group flex min-w-0 shrink-0 items-center gap-2 sm:gap-2.5"
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30 transition-transform duration-200 group-hover:scale-105">
+                <Ticket className="h-5 w-5" />
+              </div>
 
-              IMPORTANT:
-              This remains lg:flex exactly as before.
+              <div className="flex min-w-0 items-center">
+                <span className="text-lg font-extrabold tracking-tight text-white">
+                  AB
+                </span>
 
-              Therefore:
-              - Desktop browser = desktop menu
-              - Mobile browser = existing mobile header
-              - Installed PWA = PWA bottom menu
-          ================================================== */}
-
-          <nav className="hidden min-w-0 items-center justify-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 lg:flex">
-            <NavLink to="/player" end className={navClass}>
-              <LayoutDashboard size={17} />
-              Dashboard
+                <span className="text-lg font-extrabold tracking-tight text-indigo-400">
+                  CD
+                </span>
+              </div>
             </NavLink>
 
-            {/* PLAY */}
+            {/* ==================================================
+                DESKTOP NAVIGATION
+            =================================================== */}
 
-            <div data-player-menu className="relative">
-              <button
-                type="button"
-                onClick={togglePlayMenu}
-                aria-haspopup="menu"
-                aria-expanded={playMenuOpen}
-                className={`group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
-                  isPlayActive
-                    ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
-                    : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
-                }`}
-              >
-                <Dice5
-                  size={17}
-                  className={`transition-all duration-200 ${
-                    playMenuOpen ? "rotate-6 text-indigo-300" : ""
+            <nav className="hidden min-w-0 items-center justify-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 lg:flex">
+              {/* DASHBOARD */}
+
+              <NavLink to="/player" end className={navClass}>
+                <LayoutDashboard size={17} />
+                Dashboard
+              </NavLink>
+
+              {/* PLAY */}
+
+              <div data-player-menu className="relative">
+                <button
+                  type="button"
+                  onClick={togglePlayMenu}
+                  aria-haspopup="menu"
+                  aria-expanded={playMenuOpen}
+                  className={`group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                    isPlayActive
+                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
+                      : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
                   }`}
-                />
-
-                <span>Play</span>
-
-                <ChevronDown
-                  size={15}
-                  strokeWidth={2.5}
-                  className={`transition-transform duration-200 ${
-                    playMenuOpen ? "rotate-180" : ""
-                  }`}
-                />
-
-                {isPlayActive && (
-                  <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
-                )}
-              </button>
-
-              {playMenuOpen && (
-                <div
-                  className="absolute left-0 top-full z-[100] mt-2 w-64 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-2 shadow-2xl shadow-slate-950/50"
-                  role="menu"
                 >
-                  <div className="px-3 pb-2 pt-1">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                  <Dice5
+                    size={17}
+                    className={`transition-all duration-200 ${
+                      playMenuOpen ? "rotate-6 text-indigo-300" : ""
+                    }`}
+                  />
 
-                      <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                        Choose Game
-                      </p>
+                  <span>Play</span>
+
+                  <ChevronDown
+                    size={15}
+                    strokeWidth={2.5}
+                    className={`transition-transform duration-200 ${
+                      playMenuOpen ? "rotate-180" : ""
+                    }`}
+                  />
+
+                  {isPlayActive && (
+                    <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
+                  )}
+                </button>
+
+                {playMenuOpen && (
+                  <div
+                    className="absolute left-0 top-full z-[100] mt-2 w-64 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-2 shadow-2xl shadow-slate-950/50"
+                    role="menu"
+                  >
+                    <div className="px-3 pb-2 pt-1">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                          Choose Game
+                        </p>
+                      </div>
                     </div>
+
+                    {playNavigation.map((item, index) => {
+                      const Icon = item.icon;
+                      const is2D = index === 0;
+
+                      return (
+                        <NavLink
+                          key={item.path}
+                          to={item.path}
+                          role="menuitem"
+                          onClick={closeAllMenus}
+                          className={({ isActive }) =>
+                            playItemClass(isActive, is2D)
+                          }
+                        >
+                          <div
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                              is2D
+                                ? "bg-indigo-500/15 text-indigo-400"
+                                : "bg-violet-500/15 text-violet-400"
+                            }`}
+                          >
+                            <Icon className="h-5 w-5" />
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-white">
+                              {item.name}
+                            </p>
+
+                            <p className="mt-0.5 text-xs text-slate-400">
+                              {item.description}
+                            </p>
+                          </div>
+                        </NavLink>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* MY TICKETS */}
+
+              <NavLink to="/player/tickets" className={navClass}>
+                <Ticket size={17} />
+                My Tickets
+              </NavLink>
+
+              {/* WALLET */}
+
+              <NavLink to="/player/wallet" className={navClass}>
+                <WalletCards size={17} />
+                Wallet
+              </NavLink>
+
+              {/* MORE */}
+
+              <div data-player-menu className="relative">
+                <button
+                  type="button"
+                  onClick={toggleMoreMenu}
+                  aria-haspopup="menu"
+                  aria-expanded={moreMenuOpen}
+                  className={`relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                    isMoreActive
+                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
+                      : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
+                  }`}
+                >
+                  <span>More</span>
+
+                  <ChevronDown
+                    size={15}
+                    strokeWidth={2.5}
+                    className={`transition-transform duration-200 ${
+                      moreMenuOpen ? "rotate-180" : ""
+                    }`}
+                  />
+
+                  {isMoreActive && (
+                    <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
+                  )}
+                </button>
+
+                {moreMenuOpen && (
+                  <div className="absolute right-0 top-full z-[100] mt-2 w-56 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-2 shadow-2xl shadow-slate-950/50">
+                    {moreNavigation.map((item) => {
+                      const Icon = item.icon;
+
+                      return (
+                        <NavLink
+                          key={item.path}
+                          to={item.path}
+                          onClick={closeAllMenus}
+                          className={({ isActive }) =>
+                            `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
+                              isActive
+                                ? "bg-indigo-500/20 text-indigo-300"
+                                : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
+                            }`
+                          }
+                        >
+                          <Icon size={17} />
+
+                          {item.name}
+                        </NavLink>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </nav>
+
+            {/* ==================================================
+                RIGHT SIDE
+            =================================================== */}
+
+            <div className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-2">
+              {/* =================================================
+                  DESKTOP BALANCE
+              ================================================= */}
+
+              <NavLink
+                to="/player/wallet"
+                onClick={closeAllMenus}
+                className="hidden shrink-0 items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 transition-all hover:border-emerald-400/30 hover:bg-emerald-500/15 lg:flex"
+              >
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-emerald-400">
+                  <WalletCards size={16} />
+                </div>
+
+                <div className="leading-tight">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/70">
+                    Balance
+                  </p>
+
+                  <p className="whitespace-nowrap text-sm font-bold text-white">
+                    {formattedWalletBalance} MMK
+                  </p>
+                </div>
+              </NavLink>
+
+              {/* =================================================
+                  MOBILE BALANCE
+
+                  Protected against long wallet values.
+              ================================================= */}
+
+              <NavLink
+                to="/player/wallet"
+                onClick={closeAllMenus}
+                className="flex min-w-0 shrink-0 items-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-2 py-2 lg:hidden sm:px-2.5"
+              >
+                <WalletCards size={17} className="shrink-0 text-emerald-400" />
+
+                <span className="ml-1.5 max-w-[24vw] truncate text-xs font-bold text-white sm:max-w-none">
+                  {formattedWalletBalance}
+                </span>
+
+                <span className="ml-1 shrink-0 text-[9px] font-semibold text-emerald-400">
+                  MMK
+                </span>
+              </NavLink>
+
+              {/* =================================================
+                  NOTIFICATIONS
+              ================================================= */}
+
+              <div className="hidden shrink-0 rounded-xl lg:block">
+                <NotificationBell role="PLAYER" />
+              </div>
+
+              <div className="flex shrink-0 rounded-xl lg:hidden">
+                <NotificationBell role="PLAYER" />
+              </div>
+
+              {/* =================================================
+                  DESKTOP PROFILE
+              ================================================= */}
+
+              <div
+                data-player-menu
+                className="relative hidden shrink-0 lg:block"
+              >
+                <button
+                  type="button"
+                  onClick={toggleProfileMenu}
+                  aria-label="Open profile menu"
+                  aria-haspopup="menu"
+                  aria-expanded={profileMenuOpen}
+                  className={`flex items-center gap-2 rounded-xl px-2 py-1.5 transition-all ${
+                    profileMenuOpen
+                      ? "bg-indigo-500/20 text-indigo-300"
+                      : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
+                  }`}
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white">
+                    AK
                   </div>
 
-                  {playNavigation.map((item, index) => {
-                    const Icon = item.icon;
-                    const is2D = index === 0;
+                  <div className="hidden text-left xl:block">
+                    <p className="text-xs font-bold text-white">Player</p>
 
-                    return (
-                      <NavLink
-                        key={item.path}
-                        to={item.path}
-                        role="menuitem"
-                        onClick={closeAllMenus}
-                        className={({ isActive }) =>
-                          playItemClass(isActive, is2D)
-                        }
-                      >
-                        <div
-                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                            is2D
-                              ? "bg-indigo-500/15 text-indigo-400"
-                              : "bg-violet-500/15 text-violet-400"
-                          }`}
-                        >
-                          <Icon className="h-5 w-5" />
+                    <p className="max-w-[130px] truncate text-[10px] text-slate-400">
+                      player@example.com
+                    </p>
+                  </div>
+
+                  <ChevronDown
+                    size={15}
+                    className={`transition-transform duration-200 ${
+                      profileMenuOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {profileMenuOpen && (
+                  <div className="absolute right-0 top-full z-[100] mt-2 w-60 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 shadow-2xl shadow-slate-950/50">
+                    <div className="bg-gradient-to-r from-indigo-600/20 to-violet-600/20 px-4 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white">
+                          AK
                         </div>
 
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-white">
-                            {item.name}
-                          </p>
+                          <p className="text-sm font-bold text-white">Player</p>
 
-                          <p className="mt-0.5 text-xs text-slate-400">
-                            {item.description}
+                          <p className="truncate text-xs text-slate-400">
+                            player@example.com
                           </p>
                         </div>
-                      </NavLink>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                      </div>
+                    </div>
 
-            {/* MY TICKETS */}
-
-            <NavLink to="/player/tickets" className={navClass}>
-              <Ticket size={17} />
-              My Tickets
-            </NavLink>
-
-            {/* WALLET */}
-
-            <NavLink to="/player/wallet" className={navClass}>
-              <WalletCards size={17} />
-              Wallet
-            </NavLink>
-
-            {/* MORE */}
-
-            <div data-player-menu className="relative">
-              <button
-                type="button"
-                onClick={toggleMoreMenu}
-                aria-haspopup="menu"
-                aria-expanded={moreMenuOpen}
-                className={`relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
-                  isMoreActive
-                    ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
-                    : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
-                }`}
-              >
-                <span>More</span>
-
-                <ChevronDown
-                  size={15}
-                  strokeWidth={2.5}
-                  className={`transition-transform duration-200 ${
-                    moreMenuOpen ? "rotate-180" : ""
-                  }`}
-                />
-
-                {isMoreActive && (
-                  <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
-                )}
-              </button>
-
-              {moreMenuOpen && (
-                <div className="absolute right-0 top-full z-[100] mt-2 w-56 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-2 shadow-2xl shadow-slate-950/50">
-                  {moreNavigation.map((item) => {
-                    const Icon = item.icon;
-
-                    return (
+                    <div className="p-2">
                       <NavLink
-                        key={item.path}
-                        to={item.path}
+                        to="/player/profile"
                         onClick={closeAllMenus}
                         className={({ isActive }) =>
-                          `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
+                          `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
                             isActive
                               ? "bg-indigo-500/20 text-indigo-300"
                               : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
                           }`
                         }
                       >
-                        <Icon size={17} />
-
-                        {item.name}
+                        <User size={17} />
+                        Profile
                       </NavLink>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </nav>
 
-          {/* ==================================================
-              RIGHT SIDE
-          ================================================== */}
-
-          <div className="flex shrink-0 items-center gap-2">
-            {/* DESKTOP BALANCE */}
-
-            <NavLink
-              to="/player/wallet"
-              onClick={closeAllMenus}
-              className="hidden shrink-0 items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 transition-all hover:border-emerald-400/30 hover:bg-emerald-500/15 lg:flex"
-            >
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-800 text-emerald-400">
-                <WalletCards size={16} />
-              </div>
-
-              <div className="leading-tight">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/70">
-                  Balance
-                </p>
-
-                <p className="whitespace-nowrap text-sm font-bold text-white">
-                  {formattedWalletBalance} MMK
-                </p>
-              </div>
-            </NavLink>
-
-            {/* MOBILE BALANCE */}
-
-            <NavLink
-              to="/player/wallet"
-              onClick={closeAllMenus}
-              className="flex items-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-2 lg:hidden"
-            >
-              <WalletCards size={17} className="text-emerald-400" />
-
-              <span className="ml-1.5 text-xs font-bold text-white">
-                {formattedWalletBalance}
-              </span>
-
-              <span className="ml-1 text-[9px] font-semibold text-emerald-400">
-                MMK
-              </span>
-            </NavLink>
-
-            {/* NOTIFICATIONS */}
-
-            <div className="hidden shrink-0 rounded-xl lg:block">
-              <NotificationBell role="PLAYER" />
-            </div>
-
-            <div className="flex shrink-0 rounded-xl lg:hidden">
-              <NotificationBell role="PLAYER" />
-            </div>
-
-            {/* DESKTOP PROFILE */}
-
-            <div data-player-menu className="relative hidden shrink-0 lg:block">
-              <button
-                type="button"
-                onClick={toggleProfileMenu}
-                aria-label="Open profile menu"
-                aria-haspopup="menu"
-                aria-expanded={profileMenuOpen}
-                className={`flex items-center gap-2 rounded-xl px-2 py-1.5 transition-all ${
-                  profileMenuOpen
-                    ? "bg-indigo-500/20 text-indigo-300"
-                    : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
-                }`}
-              >
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white">
-                  AK
-                </div>
-
-                <div className="hidden text-left xl:block">
-                  <p className="text-xs font-bold text-white">Player</p>
-
-                  <p className="max-w-[130px] truncate text-[10px] text-slate-400">
-                    player@example.com
-                  </p>
-                </div>
-
-                <ChevronDown
-                  size={15}
-                  className={`transition-transform duration-200 ${
-                    profileMenuOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-
-              {profileMenuOpen && (
-                <div className="absolute right-0 top-full z-[100] mt-2 w-60 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 shadow-2xl shadow-slate-950/50">
-                  <div className="bg-gradient-to-r from-indigo-600/20 to-violet-600/20 px-4 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white">
-                        AK
-                      </div>
-
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-white">Player</p>
-
-                        <p className="truncate text-xs text-slate-400">
-                          player@example.com
-                        </p>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
+                      >
+                        <LogOut size={17} />
+                        Logout
+                      </button>
                     </div>
                   </div>
-
-                  <div className="p-2">
-                    <NavLink
-                      to="/player/profile"
-                      onClick={closeAllMenus}
-                      className={({ isActive }) =>
-                        `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
-                          isActive
-                            ? "bg-indigo-500/20 text-indigo-300"
-                            : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
-                        }`
-                      }
-                    >
-                      <User size={17} />
-                      Profile
-                    </NavLink>
-
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
-                    >
-                      <LogOut size={17} />
-                      Logout
-                    </button>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1005,9 +1015,6 @@ export default function PlayerLayout() {
 
       {/* ======================================================
           PWA MOBILE PLAY POPUP
-
-          IMPORTANT:
-          This can NEVER appear in a normal browser.
       ======================================================= */}
 
       {isPWA && mobilePlayOpen && (
@@ -1068,9 +1075,6 @@ export default function PlayerLayout() {
 
       {/* ======================================================
           PWA MOBILE MORE POPUP
-
-          IMPORTANT:
-          This can NEVER appear in a normal browser.
       ======================================================= */}
 
       {isPWA && mobileMoreOpen && (
@@ -1161,19 +1165,13 @@ export default function PlayerLayout() {
       {/* ======================================================
           PWA MOBILE BOTTOM NAVIGATION
 
-          THIS IS THE ONLY PLACE WHERE THE MOBILE BOTTOM
-          NAVIGATION IS RENDERED.
-
           Normal browser:
               isPWA === false
               -> NOTHING RENDERED
 
-          Installed PWA / Home Screen:
+          Installed PWA:
               isPWA === true
               -> RENDERED
-
-          The lg:hidden class is intentionally retained so
-          desktop PWA still uses the normal desktop menu.
       ======================================================= */}
 
       {isPWA && (
@@ -1356,15 +1354,6 @@ export default function PlayerLayout() {
 
       {/* ======================================================
           MAIN CONTENT
-
-          Normal browser:
-              pb-6
-
-          Installed PWA:
-              pb-28
-
-          Therefore the browser never reserves space for a
-          bottom menu that is not present.
       ======================================================= */}
 
       <main

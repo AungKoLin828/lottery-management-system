@@ -1,59 +1,496 @@
 @import "tailwindcss";
 
+/* ============================================================
+   GLOBAL HTML
+============================================================ */
+
 html {
   width: 100%;
   min-height: 100%;
   overflow-x: hidden;
+
+  /*
+   * Prevent mobile browsers from automatically enlarging
+   * text when the viewport changes.
+   */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
+
+/* ============================================================
+   GLOBAL BODY
+============================================================ */
 
 body {
   width: 100%;
   min-height: 100%;
   margin: 0;
+
   overflow-x: hidden;
+
+  /*
+   * Improve font rendering.
+   */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /*
+   * Remove the default tap highlight on mobile devices.
+   */
   -webkit-tap-highlight-color: transparent;
+
+  /*
+   * Prevent horizontal overscroll.
+   */
+  overscroll-behavior-x: none;
+
+  /*
+   * Use the full available viewport height.
+   */
+  min-height: 100dvh;
 }
+
+/* ============================================================
+   ROOT
+============================================================ */
 
 #root {
   width: 100%;
   min-height: 100%;
+
+  /*
+   * Dynamic viewport height is more reliable for mobile
+   * browsers and installed PWAs.
+   */
+  min-height: 100dvh;
 }
 
 /* ============================================================
-   PWA SAFE AREA SUPPORT
+   PWA SAFE AREA
 ============================================================ */
+
+/*
+ * TOP SAFE AREA
+ *
+ * Used by PlayerLayout around the header.
+ *
+ * Examples:
+ * - iPhone notch
+ * - Dynamic Island
+ * - Android status bar
+ * - Installed PWA fullscreen/standalone mode
+ *
+ * In a normal browser this normally evaluates to 0px.
+ */
 
 .safe-area-top {
   padding-top: env(safe-area-inset-top);
 }
 
+/*
+ * BOTTOM SAFE AREA
+ *
+ * Used for the installed PWA bottom navigation.
+ */
+
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
+
+/*
+ * LEFT SAFE AREA
+ */
 
 .safe-area-left {
   padding-left: env(safe-area-inset-left);
 }
 
+/*
+ * RIGHT SAFE AREA
+ */
+
 .safe-area-right {
   padding-right: env(safe-area-inset-right);
 }
+
+/*
+ * HORIZONTAL SAFE AREA
+ */
 
 .safe-area-x {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
 
+/*
+ * VERTICAL SAFE AREA
+ */
+
 .safe-area-y {
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
+
+/*
+ * ALL SIDES SAFE AREA
+ */
 
 .safe-area-all {
   padding-top: env(safe-area-inset-top);
   padding-right: env(safe-area-inset-right);
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
+}
+
+/* ============================================================
+   PWA HEADER
+============================================================ */
+
+/*
+ * PlayerLayout uses this class around the actual header row.
+ *
+ * IMPORTANT:
+ * The safe-area is kept OUTSIDE the 64px/72px header row.
+ *
+ * This prevents the logo and wallet balance from being
+ * vertically squeezed or pushed into the phone status area.
+ */
+
+.pwa-header-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+/*
+ * Stable header content height.
+ *
+ * The PlayerLayout currently uses Tailwind h-[64px] and
+ * sm:h-[72px], so this class is provided as an optional
+ * reusable helper.
+ */
+
+.pwa-header-content {
+  box-sizing: border-box;
+
+  min-height: 4rem;
+  height: 4rem;
+
+  display: flex;
+  align-items: center;
+}
+
+/* ============================================================
+   HEADER LOGO
+============================================================ */
+
+/*
+ * Prevent the logo from shrinking when the right side
+ * contains a long wallet balance or notification button.
+ */
+
+.header-logo {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+/*
+ * Keep logo images contained inside their available area.
+ */
+
+.header-logo img {
+  display: block;
+
+  max-width: 100%;
+  height: auto;
+
+  object-fit: contain;
+}
+
+/* ============================================================
+   HEADER BALANCE
+============================================================ */
+
+/*
+ * Prevent the balance from shrinking into an unreadable
+ * shape.
+ */
+
+.header-balance {
+  flex: 0 0 auto;
+  min-width: 0;
+
+  white-space: nowrap;
+}
+
+/*
+ * Prevent extremely long balances from breaking the header.
+ */
+
+.header-balance-value {
+  min-width: 0;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+}
+
+/* ============================================================
+   PWA BOTTOM NAVIGATION
+============================================================ */
+
+/*
+ * Bottom safe area helper.
+ *
+ * This is useful for devices with:
+ * - iPhone home indicator
+ * - Android gesture navigation
+ * - Installed PWA bottom system area
+ */
+
+.pwa-bottom-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/*
+ * Fixed bottom PWA navigation helper.
+ */
+
+.pwa-bottom-fixed {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ============================================================
+   FIXED ELEMENT SAFE AREA
+============================================================ */
+
+/*
+ * Useful for fixed UI that touches the top of the screen.
+ */
+
+.fixed-safe-top {
+  top: env(safe-area-inset-top);
+}
+
+/*
+ * Useful for fixed UI that touches the bottom of the screen.
+ */
+
+.fixed-safe-bottom {
+  bottom: env(safe-area-inset-bottom);
+}
+
+/* ============================================================
+   IMAGES / MEDIA
+============================================================ */
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+/*
+ * Prevent inline images from creating unwanted extra
+ * whitespace.
+ */
+
+img {
+  vertical-align: middle;
+}
+
+/* ============================================================
+   FORM CONTROLS
+============================================================ */
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+/*
+ * Prevent buttons from having unexpected browser
+ * appearance differences.
+ */
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================================
+   MOBILE VIEWPORT SUPPORT
+============================================================ */
+
+/*
+ * Dynamic viewport height support.
+ *
+ * This is especially useful for installed PWAs and
+ * mobile browsers where the browser UI can appear/disappear.
+ */
+
+.min-h-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* ============================================================
+   MOBILE PWA HEADER ADJUSTMENT
+============================================================ */
+
+@media (max-width: 767px) {
+  /*
+   * Keep the header content vertically centered.
+   */
+
+  .pwa-header-content {
+    min-height: 3.75rem;
+    height: 3.75rem;
+  }
+
+  /*
+   * Prevent the wallet balance from becoming wider than
+   * the available mobile header space.
+   */
+
+  .header-balance {
+    max-width: 45vw;
+  }
+
+  /*
+   * Long balance values should not force other header
+   * controls outside the viewport.
+   */
+
+  .header-balance-value {
+    max-width: 30vw;
+  }
+}
+
+/* ============================================================
+   VERY SMALL MOBILE DEVICES
+============================================================ */
+
+@media (max-width: 380px) {
+  /*
+   * Give the logo and balance a little more room on
+   * very narrow devices.
+   */
+
+  .header-balance {
+    max-width: 42vw;
+  }
+
+  .header-balance-value {
+    max-width: 25vw;
+  }
+}
+
+/* ============================================================
+   PWA / MOBILE TOUCH BEHAVIOR
+============================================================ */
+
+@media (pointer: coarse) {
+  /*
+   * Prevent accidental text selection while interacting
+   * with navigation controls.
+   */
+
+  button,
+  [role="button"] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* ============================================================
+   ACCESSIBILITY
+============================================================ */
+
+/*
+ * Respect users who prefer reduced motion.
+ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================================
+   PREVENT HORIZONTAL OVERFLOW
+============================================================ */
+
+html,
+body,
+#root {
+  max-width: 100%;
+}
+
+/*
+ * Ensure long text does not accidentally create a
+ * horizontal scrollbar.
+ */
+
+p,
+span,
+div {
+  overflow-wrap: break-word;
+}
+
+/*
+ * But don't break navigation labels or numbers unnecessarily.
+ */
+
+nav span,
+button span {
+  overflow-wrap: normal;
+}
+
+/* ============================================================
+   PWA DISPLAY MODE
+============================================================ */
+
+/*
+ * Installed PWA specific rules.
+ *
+ * These rules only activate when the browser reports
+ * standalone display mode.
+ */
+
+@media (display-mode: standalone) {
+  /*
+   * Keep the application at the full dynamic viewport.
+   */
+
+  html,
+  body,
+  #root {
+    min-height: 100dvh;
+  }
+}
+
+/* ============================================================
+   IOS HOME SCREEN PWA
+============================================================ */
+
+@supports (-webkit-touch-callout: none) {
+  /*
+   * iOS Safari / Home Screen safe-area support.
+   */
+
+  body {
+    min-height: -webkit-fill-available;
+  }
+
+  #root {
+    min-height: -webkit-fill-available;
+  }
 }
