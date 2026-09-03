@@ -161,16 +161,21 @@ export default function HeroSection() {
   ============================================================ */
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    /*
+     * Do not start dragging when clicking a button or link.
+     */
+    const target = event.target as HTMLElement;
+
+    if (target.closest("a, button")) {
+      return;
+    }
+
     pointerStartX.current = event.clientX;
     pointerCurrentX.current = event.clientX;
     hasDragged.current = false;
 
     setIsDragging(true);
 
-    /*
-     * Capture the pointer so dragging continues even if the
-     * pointer moves outside the slider.
-     */
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
@@ -221,12 +226,14 @@ export default function HeroSection() {
     setIsDragging(false);
 
     /*
-     * Small delay prevents a swipe from immediately triggering
-     * a button/link click.
+     * Prevent accidental link/button click immediately
+     * after a swipe.
      */
-    window.setTimeout(() => {
-      hasDragged.current = false;
-    }, 50);
+    if (hasDragged.current) {
+      window.setTimeout(() => {
+        hasDragged.current = false;
+      }, 100);
+    }
   };
 
   /* ============================================================
@@ -236,7 +243,9 @@ export default function HeroSection() {
   const handlePointerCancel = () => {
     pointerStartX.current = null;
     pointerCurrentX.current = null;
+
     setIsDragging(false);
+
     hasDragged.current = false;
   };
 
@@ -248,278 +257,10 @@ export default function HeroSection() {
     if (hasDragged.current) {
       event.preventDefault();
       event.stopPropagation();
+
+      hasDragged.current = false;
     }
   };
-
-  /* ============================================================
-     RENDER NUMBER VISUAL
-  ============================================================ */
-
-  const renderVisual = () => {
-    /* ==========================================================
-       2D VISUAL
-    ========================================================== */
-
-    if (slides[currentSlide].type === "2D") {
-      return (
-        <div className="relative flex h-full min-h-[220px] items-center justify-center">
-          {/* Glow */}
-
-          <div className="absolute h-52 w-52 rounded-full bg-white/10 blur-2xl" />
-
-          {/* Main Content */}
-
-          <div className="relative text-center">
-            <p className="text-xs font-semibold tracking-[0.35em] text-indigo-100">
-              TODAY&apos;S
-            </p>
-
-            <p
-              className="
-                mt-1
-                text-[100px]
-                font-black
-                leading-none
-                tracking-tighter
-                text-white
-                drop-shadow-2xl
-                sm:text-[125px]
-              "
-            >
-              2D
-            </p>
-
-            {/* AM / PM */}
-
-            <div
-              className="
-                mx-auto mt-2
-                flex w-fit items-center gap-2
-                rounded-full
-                border border-white/20
-                bg-white/10
-                px-4 py-1.5
-                backdrop-blur-md
-              "
-            >
-              <span className="h-2 w-2 rounded-full bg-emerald-300" />
-
-              <span className="text-xs font-semibold text-white">
-                AM &amp; PM
-              </span>
-            </div>
-
-            {/* 7X */}
-
-            <div
-              className="
-                mx-auto mt-4
-                flex w-fit
-                items-baseline gap-1
-                rounded-2xl
-                border border-amber-200/30
-                bg-amber-300/10
-                px-5 py-2
-                shadow-lg
-                backdrop-blur-md
-              "
-            >
-              <span className="text-xs font-semibold uppercase tracking-wider text-amber-100">
-                Win
-              </span>
-
-              <span className="text-3xl font-black leading-none text-amber-200">
-                7×
-              </span>
-            </div>
-          </div>
-
-          {/* Floating Card */}
-
-          <div
-            className="
-              absolute bottom-5 right-2
-              rounded-xl
-              border border-white/20
-              bg-white/10
-              px-4 py-3
-              shadow-xl
-              backdrop-blur-md
-              sm:right-8
-            "
-          >
-            <p className="text-[10px] uppercase tracking-wide text-indigo-100">
-              Results
-            </p>
-
-            <p className="mt-0.5 text-sm font-bold text-white">Updated Daily</p>
-          </div>
-        </div>
-      );
-    }
-
-    /* ==========================================================
-       3D VISUAL
-    ========================================================== */
-
-    if (slides[currentSlide].type === "3D") {
-      return (
-        <div className="relative flex h-full min-h-[220px] items-center justify-center">
-          {/* Glow */}
-
-          <div className="absolute h-56 w-56 rounded-full bg-violet-300/10 blur-3xl" />
-
-          {/* Main Content */}
-
-          <div className="relative text-center">
-            <p className="text-xs font-semibold tracking-[0.35em] text-violet-100">
-              LUCKY
-            </p>
-
-            {/* 3D */}
-
-            <div className="mt-2 flex items-center justify-center gap-2">
-              <span className="text-[78px] font-black leading-none text-white drop-shadow-2xl sm:text-[100px]">
-                3
-              </span>
-
-              <span className="text-[78px] font-black leading-none text-amber-200 drop-shadow-2xl sm:text-[100px]">
-                D
-              </span>
-            </div>
-
-            {/* Scheduled Draw */}
-
-            <div
-              className="
-                mx-auto mt-3
-                flex w-fit items-center gap-2
-                rounded-full
-                border border-white/20
-                bg-white/10
-                px-4 py-1.5
-                backdrop-blur-md
-              "
-            >
-              <CalendarDays
-                className="h-3.5 w-3.5 text-amber-200"
-                strokeWidth={2}
-              />
-
-              <span className="text-xs font-semibold text-white">
-                Scheduled Draw
-              </span>
-            </div>
-
-            {/* 500X */}
-
-            <div
-              className="
-                mx-auto mt-4
-                flex w-fit
-                items-baseline gap-1
-                rounded-2xl
-                border border-amber-200/30
-                bg-amber-300/10
-                px-5 py-2
-                shadow-lg
-                backdrop-blur-md
-              "
-            >
-              <span className="text-xs font-semibold uppercase tracking-wider text-amber-100">
-                Win
-              </span>
-
-              <span className="text-3xl font-black leading-none text-amber-200">
-                500×
-              </span>
-            </div>
-          </div>
-
-          {/* Decorative circles */}
-
-          <div className="absolute right-3 top-6 h-8 w-8 rounded-full border border-white/20" />
-
-          <div className="absolute bottom-8 left-5 h-5 w-5 rounded-full bg-amber-200/20" />
-        </div>
-      );
-    }
-
-    /* ==========================================================
-       RESULTS VISUAL
-    ========================================================== */
-
-    return (
-      <div className="relative flex h-full min-h-[220px] items-center justify-center">
-        {/* Glow */}
-
-        <div className="absolute h-60 w-60 rounded-full bg-amber-300/10 blur-3xl" />
-
-        {/* Trophy */}
-
-        <div className="relative text-center">
-          <div
-            className="
-              mx-auto
-              flex h-20 w-20
-              items-center justify-center
-              rounded-3xl
-              border border-white/20
-              bg-white/10
-              shadow-2xl
-              backdrop-blur-md
-            "
-          >
-            <Trophy className="h-10 w-10 text-amber-200" strokeWidth={2} />
-          </div>
-
-          <p className="mt-4 text-4xl font-black tracking-tight text-white sm:text-5xl">
-            2D <span className="text-amber-200">&amp;</span> 3D
-          </p>
-
-          <p className="mt-1 text-xs font-medium uppercase tracking-[0.25em] text-indigo-100">
-            Lottery Results
-          </p>
-
-          {/* Multipliers */}
-
-          <div className="mt-4 flex items-center justify-center gap-2">
-            <div
-              className="
-                rounded-xl
-                border border-white/15
-                bg-white/10
-                px-3 py-1.5
-                backdrop-blur-md
-              "
-            >
-              <span className="text-xs font-semibold text-indigo-100">2D</span>
-
-              <span className="ml-1 text-lg font-black text-amber-200">7×</span>
-            </div>
-
-            <div
-              className="
-                rounded-xl
-                border border-white/15
-                bg-white/10
-                px-3 py-1.5
-                backdrop-blur-md
-              "
-            >
-              <span className="text-xs font-semibold text-indigo-100">3D</span>
-
-              <span className="ml-1 text-lg font-black text-amber-200">
-                500×
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const slide = slides[currentSlide];
 
   /* ============================================================
      RENDER
@@ -562,7 +303,7 @@ export default function HeroSection() {
           </div>
 
           {/* ==================================================
-              SLIDER
+              SLIDER VIEWPORT
           ================================================== */}
 
           <div
@@ -581,6 +322,10 @@ export default function HeroSection() {
             onPointerCancel={handlePointerCancel}
             onClickCapture={handleClickCapture}
           >
+            {/* ==================================================
+                SLIDE TRACK
+            ================================================== */}
+
             <div
               className="
                 flex
@@ -695,7 +440,7 @@ export default function HeroSection() {
                       </p>
 
                       {/* ==================================================
-                          MULTIPLIER INFORMATION
+                          MULTIPLIER
                       ================================================== */}
 
                       {item.type !== "RESULT" && (
@@ -703,11 +448,15 @@ export default function HeroSection() {
                           {item.type === "2D" ? (
                             <div
                               className="
-                                flex items-center gap-2
+                                flex
+                                items-center
+                                gap-2
                                 rounded-xl
-                                border border-amber-200/20
+                                border
+                                border-amber-200/20
                                 bg-white/10
-                                px-3 py-2
+                                px-3
+                                py-2
                                 backdrop-blur-md
                               "
                             >
@@ -722,11 +471,15 @@ export default function HeroSection() {
                           ) : (
                             <div
                               className="
-                                flex items-center gap-2
+                                flex
+                                items-center
+                                gap-2
                                 rounded-xl
-                                border border-amber-200/20
+                                border
+                                border-amber-200/20
                                 bg-white/10
-                                px-3 py-2
+                                px-3
+                                py-2
                                 backdrop-blur-md
                               "
                             >
@@ -844,12 +597,10 @@ export default function HeroSection() {
                         lg:block
                       "
                     >
-                      {/*
-                       * Render based on the slide being mapped.
-                       * Temporarily use the mapped slide rather than
-                       * currentSlide so every slide renders correctly
-                       * while it is inside the slider.
-                       */}
+                      {/* ==================================================
+                          2D VISUAL
+                      ================================================== */}
+
                       {item.type === "2D" && (
                         <div className="relative flex h-full min-h-[220px] items-center justify-center">
                           <div className="absolute h-52 w-52 rounded-full bg-white/10 blur-2xl" />
@@ -874,14 +625,22 @@ export default function HeroSection() {
                               2D
                             </p>
 
+                            {/* AM / PM */}
+
                             <div
                               className="
-                                mx-auto mt-2
-                                flex w-fit items-center gap-2
+                                mx-auto
+                                mt-2
+                                flex
+                                w-fit
+                                items-center
+                                gap-2
                                 rounded-full
-                                border border-white/20
+                                border
+                                border-white/20
                                 bg-white/10
-                                px-4 py-1.5
+                                px-4
+                                py-1.5
                                 backdrop-blur-md
                               "
                             >
@@ -892,15 +651,22 @@ export default function HeroSection() {
                               </span>
                             </div>
 
+                            {/* 7X */}
+
                             <div
                               className="
-                                mx-auto mt-4
-                                flex w-fit
-                                items-baseline gap-1
+                                mx-auto
+                                mt-4
+                                flex
+                                w-fit
+                                items-baseline
+                                gap-1
                                 rounded-2xl
-                                border border-amber-200/30
+                                border
+                                border-amber-200/30
                                 bg-amber-300/10
-                                px-5 py-2
+                                px-5
+                                py-2
                                 shadow-lg
                                 backdrop-blur-md
                               "
@@ -915,13 +681,19 @@ export default function HeroSection() {
                             </div>
                           </div>
 
+                          {/* Floating Card */}
+
                           <div
                             className="
-                              absolute bottom-5 right-2
+                              absolute
+                              bottom-5
+                              right-2
                               rounded-xl
-                              border border-white/20
+                              border
+                              border-white/20
                               bg-white/10
-                              px-4 py-3
+                              px-4
+                              py-3
                               shadow-xl
                               backdrop-blur-md
                               sm:right-8
@@ -937,6 +709,10 @@ export default function HeroSection() {
                           </div>
                         </div>
                       )}
+
+                      {/* ==================================================
+                          3D VISUAL
+                      ================================================== */}
 
                       {item.type === "3D" && (
                         <div className="relative flex h-full min-h-[220px] items-center justify-center">
@@ -957,14 +733,22 @@ export default function HeroSection() {
                               </span>
                             </div>
 
+                            {/* Scheduled Draw */}
+
                             <div
                               className="
-                                mx-auto mt-3
-                                flex w-fit items-center gap-2
+                                mx-auto
+                                mt-3
+                                flex
+                                w-fit
+                                items-center
+                                gap-2
                                 rounded-full
-                                border border-white/20
+                                border
+                                border-white/20
                                 bg-white/10
-                                px-4 py-1.5
+                                px-4
+                                py-1.5
                                 backdrop-blur-md
                               "
                             >
@@ -978,15 +762,22 @@ export default function HeroSection() {
                               </span>
                             </div>
 
+                            {/* 500X */}
+
                             <div
                               className="
-                                mx-auto mt-4
-                                flex w-fit
-                                items-baseline gap-1
+                                mx-auto
+                                mt-4
+                                flex
+                                w-fit
+                                items-baseline
+                                gap-1
                                 rounded-2xl
-                                border border-amber-200/30
+                                border
+                                border-amber-200/30
                                 bg-amber-300/10
-                                px-5 py-2
+                                px-5
+                                py-2
                                 shadow-lg
                                 backdrop-blur-md
                               "
@@ -1001,24 +792,36 @@ export default function HeroSection() {
                             </div>
                           </div>
 
+                          {/* Decorative circles */}
+
                           <div className="absolute right-3 top-6 h-8 w-8 rounded-full border border-white/20" />
 
                           <div className="absolute bottom-8 left-5 h-5 w-5 rounded-full bg-amber-200/20" />
                         </div>
                       )}
 
+                      {/* ==================================================
+                          RESULTS VISUAL
+                      ================================================== */}
+
                       {item.type === "RESULT" && (
                         <div className="relative flex h-full min-h-[220px] items-center justify-center">
                           <div className="absolute h-60 w-60 rounded-full bg-amber-300/10 blur-3xl" />
 
                           <div className="relative text-center">
+                            {/* Trophy */}
+
                             <div
                               className="
                                 mx-auto
-                                flex h-20 w-20
-                                items-center justify-center
+                                flex
+                                h-20
+                                w-20
+                                items-center
+                                justify-center
                                 rounded-3xl
-                                border border-white/20
+                                border
+                                border-white/20
                                 bg-white/10
                                 shadow-2xl
                                 backdrop-blur-md
@@ -1030,6 +833,8 @@ export default function HeroSection() {
                               />
                             </div>
 
+                            {/* Title */}
+
                             <p className="mt-4 text-4xl font-black tracking-tight text-white sm:text-5xl">
                               2D <span className="text-amber-200">&amp;</span>{" "}
                               3D
@@ -1039,13 +844,17 @@ export default function HeroSection() {
                               Lottery Results
                             </p>
 
+                            {/* Multipliers */}
+
                             <div className="mt-4 flex items-center justify-center gap-2">
                               <div
                                 className="
                                   rounded-xl
-                                  border border-white/15
+                                  border
+                                  border-white/15
                                   bg-white/10
-                                  px-3 py-1.5
+                                  px-3
+                                  py-1.5
                                   backdrop-blur-md
                                 "
                               >
@@ -1061,9 +870,11 @@ export default function HeroSection() {
                               <div
                                 className="
                                   rounded-xl
-                                  border border-white/15
+                                  border
+                                  border-white/15
                                   bg-white/10
-                                  px-3 py-1.5
+                                  px-3
+                                  py-1.5
                                   backdrop-blur-md
                                 "
                               >
