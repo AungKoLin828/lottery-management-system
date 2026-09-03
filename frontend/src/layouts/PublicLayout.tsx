@@ -420,19 +420,24 @@ export default function PublicLayout() {
             to="/"
             onClick={closeAllMenus}
             className="
-              header-logo
-              group
-              flex
-              min-w-0
-              shrink-0
-              items-center
-              gap-2.5
-            "
+    header-logo
+    group
+    flex
+    min-w-0
+    shrink-0
+    items-center
+    gap-2.5
+  "
+            aria-label="LotteryPlay Home"
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30 transition-transform duration-200 group-hover:scale-105">
-              <Ticket className="h-5 w-5" />
-            </div>
+            {/* New image logo */}
+            <img
+              src="/logo.png"
+              alt="Logo"
+              className="block h-9 w-auto max-w-[120px] object-contain transition-transform duration-200 group-hover:scale-105"
+            />
 
+            {/* Existing text */}
             <div className="flex min-w-0 items-center">
               <span className="text-lg font-extrabold tracking-tight text-white">
                 AB
