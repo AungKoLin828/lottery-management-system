@@ -14,6 +14,8 @@ import {
   Sparkles,
   Bell,
   MoreHorizontal,
+  Menu,
+  X,
 } from "lucide-react";
 
 import { useCallback, useEffect, useState } from "react";
@@ -218,6 +220,20 @@ export default function PlayerLayout() {
 
   const [mobilePlayOpen, setMobilePlayOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+
+  /* ==========================================================
+     MOBILE BROWSER SIDEBAR
+
+     Normal mobile browser:
+       - Hamburger displayed
+       - Sidebar available
+
+     Installed PWA:
+       - Hamburger hidden
+       - Sidebar unavailable
+       - Bottom navigation is used instead
+  ========================================================== */
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   /* ==========================================================
      ACTIVE ROUTES
@@ -438,10 +454,44 @@ export default function PlayerLayout() {
   const closeAllMenus = () => {
     setMobilePlayOpen(false);
     setMobileMoreOpen(false);
+    setMobileSidebarOpen(false);
 
     setPlayMenuOpen(false);
     setMoreMenuOpen(false);
     setProfileMenuOpen(false);
+  };
+
+  /* ==========================================================
+     MOBILE BROWSER SIDEBAR
+  ========================================================== */
+
+  const toggleMobileSidebar = () => {
+    /* Never open the sidebar inside an installed PWA. */
+    if (isPWA) {
+      return;
+    }
+
+    setMobileSidebarOpen((current) => !current);
+
+    setMobilePlayOpen(false);
+    setMobileMoreOpen(false);
+    setPlayMenuOpen(false);
+    setMoreMenuOpen(false);
+    setProfileMenuOpen(false);
+  };
+
+  /* ==========================================================
+     MOBILE BROWSER SIDEBAR NAVIGATION
+  ========================================================== */
+
+  const handleMobileSidebarNavigation = () => {
+    setMobileSidebarOpen(false);
+    closeAllMenus();
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   };
 
   /* ==========================================================
@@ -877,6 +927,39 @@ export default function PlayerLayout() {
 
             <div className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-2">
               {/* =================================================
+                  MOBILE BROWSER HAMBURGER
+
+                  Normal mobile browser:
+                    DISPLAYED
+
+                  Installed PWA:
+                    HIDDEN
+
+                  Desktop:
+                    HIDDEN
+              ================================================= */}
+
+              {!isPWA && (
+                <button
+                  type="button"
+                  onClick={toggleMobileSidebar}
+                  aria-label={
+                    mobileSidebarOpen
+                      ? "Close navigation menu"
+                      : "Open navigation menu"
+                  }
+                  aria-expanded={mobileSidebarOpen}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-300 transition-all duration-200 hover:bg-slate-700 hover:text-white active:scale-95 lg:hidden"
+                >
+                  {mobileSidebarOpen ? (
+                    <X className="h-5 w-5" />
+                  ) : (
+                    <Menu className="h-5 w-5" />
+                  )}
+                </button>
+              )}
+
+              {/* =================================================
                   DESKTOP BALANCE
               ================================================= */}
 
@@ -1024,6 +1107,332 @@ export default function PlayerLayout() {
           </div>
         </div>
       </header>
+
+      {/* ======================================================
+          MOBILE BROWSER SIDEBAR
+
+          Normal mobile browser:
+            - Hamburger opens this sidebar
+
+          Installed PWA:
+            - Sidebar is never rendered
+            - Bottom navigation is used instead
+
+          Desktop:
+            - Sidebar is hidden
+      ======================================================= */}
+
+      {!isPWA && mobileSidebarOpen && (
+        <>
+          {/* BACKDROP */}
+
+          <button
+            type="button"
+            aria-label="Close navigation menu"
+            onClick={() => setMobileSidebarOpen(false)}
+            className="fixed inset-0 z-[90] bg-slate-950/60 backdrop-blur-[2px] lg:hidden"
+          />
+
+          {/* SIDEBAR */}
+
+          <aside
+            className="fixed inset-y-0 left-0 z-[100] flex w-[min(84vw,320px)] flex-col border-r border-slate-700 bg-slate-900 shadow-2xl shadow-slate-950/60 lg:hidden"
+            aria-label="Player navigation"
+          >
+            {/* SIDEBAR HEADER */}
+
+            <div className="safe-area-top flex min-h-[64px] shrink-0 items-center justify-between border-b border-slate-700/80 px-3 sm:min-h-[72px] sm:px-6">
+              <NavLink
+                to="/player"
+                onClick={handleMobileSidebarNavigation}
+                className="header-logo group flex min-w-0 items-center gap-2.5"
+                aria-label="LotteryPlay Dashboard"
+              >
+                <img
+                  src="/logo.png"
+                  alt="Logo"
+                  className="block h-7 w-7 shrink-0 rounded-lg object-contain"
+                />
+
+                <div className="flex min-w-0 items-center">
+                  <span className="text-lg font-extrabold tracking-tight text-white">
+                    AB
+                  </span>
+
+                  <span className="text-lg font-extrabold tracking-tight text-indigo-400">
+                    CD
+                  </span>
+                </div>
+              </NavLink>
+
+              <button
+                type="button"
+                onClick={() => setMobileSidebarOpen(false)}
+                aria-label="Close navigation menu"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* SIDEBAR CONTENT */}
+
+            <div className="flex-1 overflow-y-auto px-3 py-4">
+              <div className="space-y-1">
+                {/* DASHBOARD */}
+
+                <NavLink
+                  to="/player"
+                  end
+                  onClick={handleMobileSidebarNavigation}
+                  className={({ isActive }) =>
+                    `flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
+                      isActive
+                        ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
+                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                    }`
+                  }
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                    <LayoutDashboard size={17} />
+                  </span>
+
+                  <span>Dashboard</span>
+                </NavLink>
+
+                {/* PLAY */}
+
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobilePlayOpen((current) => !current);
+                      setMobileMoreOpen(false);
+                    }}
+                    aria-haspopup="menu"
+                    aria-expanded={mobilePlayOpen}
+                    className={`flex min-h-12 w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm font-semibold transition-all ${
+                      isPlayActive || mobilePlayOpen
+                        ? "bg-indigo-500/15 text-indigo-300"
+                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                    }`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                        <Dice5 size={17} />
+                      </span>
+
+                      <span>Play</span>
+                    </span>
+
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform duration-200 ${
+                        mobilePlayOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {mobilePlayOpen && (
+                    <div className="mt-1 space-y-1 pl-3">
+                      {playNavigation.map((item, index) => {
+                        const Icon = item.icon;
+                        const is2D = index === 0;
+
+                        return (
+                          <NavLink
+                            key={item.path}
+                            to={item.path}
+                            onClick={handleMobileSidebarNavigation}
+                            className={({ isActive }) =>
+                              playItemClass(isActive, is2D)
+                            }
+                          >
+                            <div
+                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                                is2D
+                                  ? "bg-indigo-500/15 text-indigo-400"
+                                  : "bg-violet-500/15 text-violet-400"
+                              }`}
+                            >
+                              <Icon className="h-4 w-4" />
+                            </div>
+
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-white">
+                                {item.name}
+                              </p>
+
+                              <p className="mt-0.5 text-xs text-slate-400">
+                                {item.description}
+                              </p>
+                            </div>
+                          </NavLink>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* MY TICKETS */}
+
+                <NavLink
+                  to="/player/tickets"
+                  onClick={handleMobileSidebarNavigation}
+                  className={({ isActive }) =>
+                    `flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
+                      isActive
+                        ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
+                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                    }`
+                  }
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                    <Ticket size={17} />
+                  </span>
+
+                  <span>My Tickets</span>
+                </NavLink>
+
+                {/* WALLET */}
+
+                <NavLink
+                  to="/player/wallet"
+                  onClick={handleMobileSidebarNavigation}
+                  className={({ isActive }) =>
+                    `flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
+                      isActive
+                        ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
+                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                    }`
+                  }
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                    <WalletCards size={17} />
+                  </span>
+
+                  <span>Wallet</span>
+                </NavLink>
+
+                {/* MORE */}
+
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMoreOpen((current) => !current);
+                      setMobilePlayOpen(false);
+                    }}
+                    aria-haspopup="menu"
+                    aria-expanded={mobileMoreOpen}
+                    className={`flex min-h-12 w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm font-semibold transition-all ${
+                      isMoreActive || mobileMoreOpen
+                        ? "bg-indigo-500/15 text-indigo-300"
+                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                    }`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                        <MoreHorizontal size={17} />
+                      </span>
+
+                      <span>More</span>
+                    </span>
+
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform duration-200 ${
+                        mobileMoreOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {mobileMoreOpen && (
+                    <div className="mt-1 space-y-1 pl-3">
+                      {moreNavigation.map((item) => {
+                        const Icon = item.icon;
+
+                        return (
+                          <NavLink
+                            key={item.path}
+                            to={item.path}
+                            onClick={handleMobileSidebarNavigation}
+                            className={({ isActive }) =>
+                              `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
+                                isActive
+                                  ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                              }`
+                            }
+                          >
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                              <Icon size={17} />
+                            </span>
+
+                            <span>{item.name}</span>
+                          </NavLink>
+                        );
+                      })}
+
+                      {/* NOTIFICATIONS */}
+
+                      <div className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold text-slate-300">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                          <Bell size={17} />
+                        </span>
+
+                        <span>Notifications</span>
+
+                        <div className="ml-auto">
+                          <NotificationBell role="PLAYER" />
+                        </div>
+                      </div>
+
+                      {/* PROFILE */}
+
+                      <NavLink
+                        to="/player/profile"
+                        onClick={handleMobileSidebarNavigation}
+                        className={({ isActive }) =>
+                          `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
+                            isActive
+                              ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                              : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                          }`
+                        }
+                      >
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                          <User size={17} />
+                        </span>
+
+                        <span>Profile</span>
+                      </NavLink>
+
+                      {/* LOGOUT */}
+
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold text-red-400 transition-all hover:bg-red-500/10 hover:text-red-300"
+                      >
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-500/10">
+                          <LogOut size={17} />
+                        </span>
+
+                        <span>Logout</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* SIDEBAR FOOTER */}
+
+            <div className="shrink-0 border-t border-slate-800 px-4 py-4 text-center text-[11px] text-slate-500">
+              LotteryPlay
+            </div>
+          </aside>
+        </>
+      )}
 
       {/* ======================================================
           PWA MOBILE PLAY POPUP

@@ -10,6 +10,8 @@ import {
   Sparkles,
   Ticket,
   MoreHorizontal,
+  Menu,
+  X,
   LogIn,
   UserPlus,
 } from "lucide-react";
@@ -116,10 +118,12 @@ export default function PublicLayout() {
      Normal browser:
        false
        -> No PWA bottom navigation
+       -> Mobile hamburger/sidebar displayed
 
      Installed PWA:
        true
        -> PWA mobile bottom navigation displayed
+       -> Mobile hamburger/sidebar hidden
   ============================================================ */
 
   const [isInstalledPWA, setIsInstalledPWA] = useState(false);
@@ -130,6 +134,12 @@ export default function PublicLayout() {
 
   const [mobilePlayOpen, setMobilePlayOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+
+  /* ============================================================
+     MOBILE BROWSER SIDEBAR STATE
+  ============================================================ */
+
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   /* ============================================================
      DESKTOP MENU STATE
@@ -241,7 +251,48 @@ export default function PublicLayout() {
   const closeAllMenus = () => {
     setMobilePlayOpen(false);
     setMobileMoreOpen(false);
+    setMobileSidebarOpen(false);
     setDesktopPlayOpen(false);
+  };
+
+  /* ============================================================
+     MOBILE BROWSER SIDEBAR
+     
+     Normal mobile browser:
+       -> Hamburger + sidebar displayed
+
+     Installed PWA:
+       -> Hamburger + sidebar hidden
+       -> PWA bottom navigation is used instead
+  ============================================================ */
+
+  const toggleMobileSidebar = () => {
+    /*
+     * Never open the sidebar in an installed PWA.
+     */
+    if (isInstalledPWA) {
+      return;
+    }
+
+    setMobileSidebarOpen((current) => !current);
+
+    setMobilePlayOpen(false);
+    setMobileMoreOpen(false);
+    setDesktopPlayOpen(false);
+  };
+
+  /* ============================================================
+     MOBILE BROWSER SIDEBAR NAVIGATION
+  ============================================================ */
+
+  const handleMobileSidebarNavigation = () => {
+    setMobileSidebarOpen(false);
+    closeAllMenus();
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   };
 
   /* ============================================================
@@ -263,6 +314,7 @@ export default function PublicLayout() {
 
   useEffect(() => {
     closeAllMenus();
+    setMobileSidebarOpen(false);
 
     window.scrollTo({
       top: 0,
@@ -285,6 +337,7 @@ export default function PublicLayout() {
     setMobilePlayOpen((current) => !current);
 
     setMobileMoreOpen(false);
+    setMobileSidebarOpen(false);
     setDesktopPlayOpen(false);
   };
 
@@ -303,6 +356,7 @@ export default function PublicLayout() {
     setMobileMoreOpen((current) => !current);
 
     setMobilePlayOpen(false);
+    setMobileSidebarOpen(false);
     setDesktopPlayOpen(false);
   };
 
@@ -315,6 +369,7 @@ export default function PublicLayout() {
 
     setMobilePlayOpen(false);
     setMobileMoreOpen(false);
+    setMobileSidebarOpen(false);
   };
 
   /* ============================================================
@@ -422,19 +477,21 @@ export default function PublicLayout() {
             className="header-logo group flex min-w-0 shrink-0 items-center gap-2.5"
             aria-label="LotteryPlay Home"
           >
-            {/* New image logo */}
+            {/* Image Logo */}
             <img
               src="/logo.png"
               alt="Logo"
-              className="block
-                        h-7
-                        w-7
-                        shrink-0
-                        rounded-lg
-                        object-contain
-                        transition-transform
-                        duration-200
-                        group-hover:scale-105"
+              className="
+                block
+                h-7
+                w-7
+                shrink-0
+                rounded-lg
+                object-contain
+                transition-transform
+                duration-200
+                group-hover:scale-105
+              "
             />
 
             {/* Existing text */}
@@ -634,25 +691,287 @@ export default function PublicLayout() {
 
           {/* ==================================================
               MOBILE HEADER
-              
-              This stays intentionally simple.
 
-              The logo above is the primary branding.
-              This right-side icon does not compete with
-              the PWA bottom navigation.
+              Normal mobile browser:
+                Hamburger displayed.
+
+              Installed PWA:
+                Hamburger hidden.
+
+              Desktop:
+                Desktop navigation is displayed.
           =================================================== */}
 
           <div className="flex shrink-0 items-center lg:hidden">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-300">
-              <Ticket className="h-[18px] w-[18px]" />
-            </div>
+            {!isInstalledPWA && (
+              <button
+                type="button"
+                onClick={toggleMobileSidebar}
+                aria-label={mobileSidebarOpen ? "Close menu" : "Open menu"}
+                aria-expanded={mobileSidebarOpen}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-300 transition-all duration-200 hover:bg-slate-700 hover:text-white active:scale-95"
+              >
+                {mobileSidebarOpen ? (
+                  <X className="h-5 w-5" />
+                ) : (
+                  <Menu className="h-5 w-5" />
+                )}
+              </button>
+            )}
           </div>
         </div>
       </header>
 
       {/* ======================================================
+          MOBILE BROWSER HAMBURGER SIDEBAR
+
+          Normal mobile browser:
+            DISPLAYED
+
+          Installed PWA:
+            NOT DISPLAYED
+
+          Desktop:
+            NOT DISPLAYED
+      ======================================================= */}
+
+      {!isInstalledPWA && mobileSidebarOpen && (
+        <>
+          {/* BACKDROP */}
+
+          <button
+            type="button"
+            aria-label="Close mobile menu"
+            onClick={() => setMobileSidebarOpen(false)}
+            className="fixed inset-0 z-[90] bg-slate-950/60 backdrop-blur-[2px] lg:hidden"
+          />
+
+          {/* SIDEBAR */}
+
+          <aside
+            className="fixed inset-y-0 left-0 z-[100] flex w-[min(84vw,320px)] flex-col border-r border-slate-700 bg-slate-900 shadow-2xl shadow-slate-950/60 lg:hidden"
+            aria-label="Mobile navigation"
+          >
+            {/* SIDEBAR HEADER */}
+
+            <div className="pwa-header-safe flex min-h-[64px] shrink-0 items-center justify-between border-b border-slate-700/80 px-4 sm:min-h-[72px] sm:px-6">
+              <Link
+                to="/"
+                onClick={handleMobileSidebarNavigation}
+                className="flex min-w-0 items-center gap-2.5"
+                aria-label="LotteryPlay Home"
+              >
+                <img
+                  src="/logo.png"
+                  alt="Logo"
+                  className="block h-7 w-7 shrink-0 rounded-lg object-contain"
+                />
+
+                <div className="flex min-w-0 items-center">
+                  <span className="text-lg font-extrabold tracking-tight text-white">
+                    AB
+                  </span>
+
+                  <span className="text-lg font-extrabold tracking-tight text-indigo-400">
+                    CD
+                  </span>
+                </div>
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => setMobileSidebarOpen(false)}
+                aria-label="Close menu"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* SIDEBAR CONTENT */}
+
+            <div className="flex-1 overflow-y-auto px-3 py-4">
+              <div className="space-y-1">
+                {/* HOME */}
+
+                <Link
+                  to="/"
+                  onClick={handleMobileSidebarNavigation}
+                  className={`flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
+                    isActive("/")
+                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
+                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                  }`}
+                >
+                  <Home className="h-5 w-5 shrink-0" />
+
+                  <span>Home</span>
+                </Link>
+
+                {/* PLAY */}
+
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobilePlayOpen((current) => !current);
+                      setMobileMoreOpen(false);
+                    }}
+                    aria-haspopup="menu"
+                    aria-expanded={mobilePlayOpen}
+                    className={`flex min-h-12 w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm font-semibold transition-all ${
+                      isPlayActive || mobilePlayOpen
+                        ? "bg-indigo-500/15 text-indigo-300"
+                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                    }`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Dice5 className="h-5 w-5 shrink-0" />
+
+                      <span>Play</span>
+                    </span>
+
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform duration-200 ${
+                        mobilePlayOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {mobilePlayOpen && (
+                    <div className="mt-1 space-y-1 pl-3">
+                      {playNavigation.map((item, index) => {
+                        const Icon = item.icon;
+                        const is2D = index === 0;
+
+                        return (
+                          <button
+                            key={item.path}
+                            type="button"
+                            onClick={() => handlePlay(item.path)}
+                            className={playItemClass(
+                              location.pathname === item.path,
+                              is2D,
+                            )}
+                          >
+                            <div
+                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                                is2D
+                                  ? "bg-indigo-500/15 text-indigo-400"
+                                  : "bg-violet-500/15 text-violet-400"
+                              }`}
+                            >
+                              <Icon className="h-4 w-4" />
+                            </div>
+
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-white">
+                                {item.name}
+                              </p>
+
+                              <p className="mt-0.5 text-xs text-slate-400">
+                                {item.description}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* RESULTS HISTORY */}
+
+                <Link
+                  to="/results-history"
+                  onClick={handleMobileSidebarNavigation}
+                  className={`flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
+                    isActive("/results-history")
+                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
+                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                  }`}
+                >
+                  <BarChart3 className="h-5 w-5 shrink-0" />
+
+                  <span>Results History</span>
+                </Link>
+
+                {/* ABOUT */}
+
+                <Link
+                  to="/about"
+                  onClick={handleMobileSidebarNavigation}
+                  className={`flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
+                    isActive("/about")
+                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
+                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                  }`}
+                >
+                  <Info className="h-5 w-5 shrink-0" />
+
+                  <span>About</span>
+                </Link>
+              </div>
+
+              {/* AUTH */}
+
+              <div className="mt-6 border-t border-slate-800 pt-4">
+                <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Account
+                </p>
+
+                <div className="space-y-1">
+                  {/* LOGIN */}
+
+                  <Link
+                    to="/login"
+                    onClick={handleMobileSidebarNavigation}
+                    className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all ${
+                      isActive("/login")
+                        ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                    }`}
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                      <LogIn size={17} />
+                    </span>
+
+                    <span>Login</span>
+                  </Link>
+
+                  {/* REGISTER */}
+
+                  <Link
+                    to="/register"
+                    onClick={handleMobileSidebarNavigation}
+                    className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all ${
+                      isActive("/register")
+                        ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                    }`}
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                      <UserPlus size={17} />
+                    </span>
+
+                    <span>Register</span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            {/* SIDEBAR FOOTER */}
+
+            <div className="shrink-0 border-t border-slate-800 px-4 py-4 text-center text-[11px] text-slate-500">
+              LotteryPlay
+            </div>
+          </aside>
+        </>
+      )}
+
+      {/* ======================================================
           MOBILE / PWA PLAY POPUP
-          
+
           ONLY INSTALLED PWA
       ======================================================= */}
 
@@ -712,7 +1031,7 @@ export default function PublicLayout() {
 
       {/* ======================================================
           MOBILE / PWA MORE POPUP
-          
+
           ONLY INSTALLED PWA
       ======================================================= */}
 
@@ -772,13 +1091,13 @@ export default function PublicLayout() {
 
       {/* ======================================================
           MOBILE / PWA BOTTOM NAVIGATION
-          
+
           Normal mobile browser:
             NOT rendered
-          
+
           Installed PWA:
             Rendered
-          
+
           Desktop:
             Hidden by lg:hidden
       ======================================================= */}
@@ -968,11 +1287,11 @@ export default function PublicLayout() {
 
       {/* ======================================================
           MAIN CONTENT
-          
+
           Installed PWA:
             Extra bottom space for bottom navigation
             + safe-area
-          
+
           Normal browser:
             Normal spacing
       ======================================================= */}
@@ -1120,7 +1439,7 @@ export default function PublicLayout() {
 
       {/* ======================================================
           PWA INSTALL BUTTON
-          
+
           Still available in normal browser mode.
       ======================================================= */}
 
