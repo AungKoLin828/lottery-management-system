@@ -14,11 +14,13 @@ import {
   X,
   LogIn,
   UserPlus,
+  Download,
+  Smartphone,
+  Apple,
+  CheckCircle2,
 } from "lucide-react";
 
 import { useEffect, useRef, useState } from "react";
-
-import PWAInstallButton from "@/components/PWAInstallButton";
 
 /* ============================================================
    PUBLIC PLAY NAVIGATION
@@ -106,6 +108,27 @@ function isRunningAsPWA(): boolean {
 }
 
 /* ============================================================
+   MOBILE IOS DETECTION
+============================================================ */
+
+function isIOSDevice(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const userAgent = window.navigator.userAgent || "";
+
+  const platform = window.navigator.platform || "";
+
+  const maxTouchPoints = window.navigator.maxTouchPoints || 0;
+
+  return (
+    /iPad|iPhone|iPod/i.test(userAgent) ||
+    (platform === "MacIntel" && maxTouchPoints > 1)
+  );
+}
+
+/* ============================================================
    COMPONENT
 ============================================================ */
 
@@ -127,6 +150,17 @@ export default function PublicLayout() {
   ============================================================ */
 
   const [isInstalledPWA, setIsInstalledPWA] = useState(false);
+
+  /* ============================================================
+     PWA INSTALL STATE
+  ============================================================ */
+
+  const [deferredInstallPrompt, setDeferredInstallPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+
+  const [showInstallMenu, setShowInstallMenu] = useState(false);
+
+  const [isInstalling, setIsInstalling] = useState(false);
 
   /* ============================================================
      MOBILE / PWA MENU STATE
@@ -152,6 +186,54 @@ export default function PublicLayout() {
   ============================================================ */
 
   const playMenuRef = useRef<HTMLDivElement>(null);
+
+  /* ============================================================
+     IOS
+  ============================================================ */
+
+  const iosDevice = isIOSDevice();
+
+  /* ============================================================
+     PWA INSTALL EVENT
+  ============================================================ */
+
+  useEffect(() => {
+    /**
+     * Chrome / Edge / Android install prompt.
+     *
+     * The browser fires this event when the application
+     * satisfies the PWA installation requirements.
+     */
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+
+      setDeferredInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
+    /**
+     * Fires after successful PWA installation.
+     */
+    const handleAppInstalled = () => {
+      setDeferredInstallPrompt(null);
+      setIsInstalling(false);
+      setShowInstallMenu(false);
+
+      setIsInstalledPWA(true);
+    };
+
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener(
+        "beforeinstallprompt",
+        handleBeforeInstallPrompt,
+      );
+
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
 
   /* ============================================================
      DETECT PWA
@@ -187,11 +269,6 @@ export default function PublicLayout() {
 
     /* ==========================================================
        VISIBILITY CHANGE
-
-       Useful after:
-       - Installing PWA
-       - Returning to Home Screen
-       - Switching applications
     ========================================================== */
 
     const handleVisibilityChange = () => {
@@ -253,17 +330,58 @@ export default function PublicLayout() {
     setMobileMoreOpen(false);
     setMobileSidebarOpen(false);
     setDesktopPlayOpen(false);
+    setShowInstallMenu(false);
+  };
+
+  /* ============================================================
+     OPEN INSTALL MENU
+  ============================================================ */
+
+  const openInstallMenu = () => {
+    setShowInstallMenu(true);
+
+    setMobilePlayOpen(false);
+    setMobileMoreOpen(false);
+    setMobileSidebarOpen(false);
+    setDesktopPlayOpen(false);
+  };
+
+  /* ============================================================
+     CLOSE INSTALL MENU
+  ============================================================ */
+
+  const closeInstallMenu = () => {
+    setShowInstallMenu(false);
+  };
+
+  /* ============================================================
+     NATIVE PWA INSTALL
+  ============================================================ */
+
+  const installPWA = async () => {
+    if (!deferredInstallPrompt) {
+      return;
+    }
+
+    try {
+      setIsInstalling(true);
+
+      await deferredInstallPrompt.prompt();
+
+      const choiceResult = await deferredInstallPrompt.userChoice;
+
+      if (choiceResult.outcome === "accepted") {
+        setDeferredInstallPrompt(null);
+      }
+    } catch (error) {
+      console.error("PWA installation error:", error);
+    } finally {
+      setIsInstalling(false);
+    }
   };
 
   /* ============================================================
      MOBILE BROWSER SIDEBAR
-     
-     Normal mobile browser:
-       -> Hamburger + sidebar displayed
-
-     Installed PWA:
-       -> Hamburger + sidebar hidden
-       -> PWA bottom navigation is used instead
   ============================================================ */
 
   const toggleMobileSidebar = () => {
@@ -279,6 +397,7 @@ export default function PublicLayout() {
     setMobilePlayOpen(false);
     setMobileMoreOpen(false);
     setDesktopPlayOpen(false);
+    setShowInstallMenu(false);
   };
 
   /* ============================================================
@@ -339,6 +458,7 @@ export default function PublicLayout() {
     setMobileMoreOpen(false);
     setMobileSidebarOpen(false);
     setDesktopPlayOpen(false);
+    setShowInstallMenu(false);
   };
 
   /* ============================================================
@@ -358,6 +478,7 @@ export default function PublicLayout() {
     setMobilePlayOpen(false);
     setMobileSidebarOpen(false);
     setDesktopPlayOpen(false);
+    setShowInstallMenu(false);
   };
 
   /* ============================================================
@@ -370,6 +491,7 @@ export default function PublicLayout() {
     setMobilePlayOpen(false);
     setMobileMoreOpen(false);
     setMobileSidebarOpen(false);
+    setShowInstallMenu(false);
   };
 
   /* ============================================================
@@ -439,14 +561,6 @@ export default function PublicLayout() {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       {/* ======================================================
           HEADER SAFE AREA
-
-          IMPORTANT:
-
-          The safe-area padding is OUTSIDE the actual
-          64px / 72px header row.
-
-          This prevents the phone status bar / notch /
-          Dynamic Island from covering the logo.
       ======================================================= */}
 
       <header className="pwa-header-safe sticky top-0 z-50 border-b border-slate-700/80 bg-slate-900/95 backdrop-blur-xl">
@@ -477,7 +591,6 @@ export default function PublicLayout() {
             className="header-logo group flex min-w-0 shrink-0 items-center gap-2.5"
             aria-label="LotteryPlay Home"
           >
-            {/* Image Logo */}
             <img
               src="/logo.png"
               alt="Logo"
@@ -494,7 +607,6 @@ export default function PublicLayout() {
               "
             />
 
-            {/* Existing text */}
             <div className="flex min-w-0 items-center">
               <span className="text-lg font-extrabold tracking-tight text-white">
                 AB
@@ -654,11 +766,27 @@ export default function PublicLayout() {
                 <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
               )}
             </Link>
+
+            {/* =================================================
+                INSTALL APP
+            ================================================= */}
+
+            {!isInstalledPWA && (
+              <button
+                type="button"
+                onClick={openInstallMenu}
+                className={navClass(showInstallMenu)}
+              >
+                <Download size={17} />
+
+                <span>Install App</span>
+              </button>
+            )}
           </nav>
 
           {/* ==================================================
               DESKTOP AUTH
-          =================================================== */}
+          ================================================== */}
 
           <div className="hidden shrink-0 items-center gap-2 lg:flex">
             {/* LOGIN */}
@@ -691,16 +819,7 @@ export default function PublicLayout() {
 
           {/* ==================================================
               MOBILE HEADER
-
-              Normal mobile browser:
-                Hamburger displayed.
-
-              Installed PWA:
-                Hamburger hidden.
-
-              Desktop:
-                Desktop navigation is displayed.
-          =================================================== */}
+          ================================================== */}
 
           <div className="flex shrink-0 items-center lg:hidden">
             {!isInstalledPWA && (
@@ -723,16 +842,285 @@ export default function PublicLayout() {
       </header>
 
       {/* ======================================================
+          INSTALL APP MENU / GUIDE
+      ======================================================= */}
+
+      {!isInstalledPWA && showInstallMenu && (
+        <>
+          {/* BACKDROP */}
+
+          <button
+            type="button"
+            aria-label="Close installation guide"
+            onClick={closeInstallMenu}
+            className="fixed inset-0 z-[150] bg-slate-950/60 backdrop-blur-[2px]"
+          />
+
+          {/* INSTALL MENU */}
+
+          <div
+            className="
+                fixed
+                inset-x-4
+                top-1/2
+                z-[160]
+                max-h-[85vh]
+                -translate-y-1/2
+                overflow-y-auto
+                rounded-2xl
+                border
+                border-slate-700
+                bg-slate-900
+                shadow-2xl
+                shadow-slate-950/70
+                sm:left-1/2
+                sm:right-auto
+                sm:w-[440px]
+                sm:-translate-x-1/2
+              "
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="install-app-title"
+          >
+            {/* HEADER */}
+
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-700 bg-slate-900/98 px-4 py-4 backdrop-blur-xl">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white">
+                  <Download className="h-5 w-5" />
+                </div>
+
+                <div>
+                  <h2
+                    id="install-app-title"
+                    className="text-base font-bold text-white"
+                  >
+                    Install LotteryPlay
+                  </h2>
+
+                  <p className="text-xs text-slate-400">
+                    Install the app on your device
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeInstallMenu}
+                aria-label="Close installation guide"
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-400 transition-colors hover:bg-slate-700 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 p-4">
+              {/* =================================================
+                    ANDROID
+                ================================================= */}
+
+              <div className="rounded-2xl border border-slate-700 bg-slate-800/70 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-400">
+                    <Smartphone className="h-5 w-5" />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-bold text-white">Android</h3>
+
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      Recommended: Google Chrome
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {/* NATIVE INSTALL */}
+
+                  {deferredInstallPrompt ? (
+                    <button
+                      type="button"
+                      onClick={installPWA}
+                      disabled={isInstalling}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3 text-sm font-bold text-white shadow-md shadow-indigo-900/30 transition-all hover:from-indigo-500 hover:to-violet-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Download className="h-4 w-4" />
+
+                      {isInstalling ? "Installing..." : "Install App"}
+                    </button>
+                  ) : (
+                    <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-3">
+                      <p className="text-xs font-semibold text-slate-300">
+                        If the Install button is not shown:
+                      </p>
+
+                      <ol className="mt-2 space-y-2 text-xs leading-5 text-slate-400">
+                        <li>
+                          <span className="font-semibold text-slate-300">
+                            1.
+                          </span>{" "}
+                          Open this website in Chrome.
+                        </li>
+
+                        <li>
+                          <span className="font-semibold text-slate-300">
+                            2.
+                          </span>{" "}
+                          Tap the{" "}
+                          <span className="font-semibold text-white">⋮</span>{" "}
+                          menu.
+                        </li>
+
+                        <li>
+                          <span className="font-semibold text-slate-300">
+                            3.
+                          </span>{" "}
+                          Select{" "}
+                          <span className="font-semibold text-indigo-300">
+                            Install app
+                          </span>{" "}
+                          or{" "}
+                          <span className="font-semibold text-indigo-300">
+                            Add to Home screen
+                          </span>
+                          .
+                        </li>
+
+                        <li>
+                          <span className="font-semibold text-slate-300">
+                            4.
+                          </span>{" "}
+                          Confirm the installation.
+                        </li>
+                      </ol>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* =================================================
+                    IOS
+                ================================================= */}
+
+              <div className="rounded-2xl border border-slate-700 bg-slate-800/70 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-700 text-slate-200">
+                    <Apple className="h-5 w-5" />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-bold text-white">iPhone / iPad</h3>
+
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      Add LotteryPlay to your Home Screen
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/70 p-3">
+                  <ol className="space-y-3 text-xs leading-5 text-slate-400">
+                    <li className="flex gap-2">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-[10px] font-bold text-indigo-300">
+                        1
+                      </span>
+
+                      <span>
+                        Open LotteryPlay in{" "}
+                        <span className="font-semibold text-white">Safari</span>
+                        .
+                      </span>
+                    </li>
+
+                    <li className="flex gap-2">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-[10px] font-bold text-indigo-300">
+                        2
+                      </span>
+
+                      <span>
+                        Tap the{" "}
+                        <span className="font-semibold text-white">Share</span>{" "}
+                        button in Safari.
+                      </span>
+                    </li>
+
+                    <li className="flex gap-2">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-[10px] font-bold text-indigo-300">
+                        3
+                      </span>
+
+                      <span>
+                        Scroll down and select{" "}
+                        <span className="font-semibold text-white">
+                          Add to Home Screen
+                        </span>
+                        .
+                      </span>
+                    </li>
+
+                    <li className="flex gap-2">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-[10px] font-bold text-indigo-300">
+                        4
+                      </span>
+
+                      <span>
+                        Tap{" "}
+                        <span className="font-semibold text-white">Add</span> to
+                        confirm.
+                      </span>
+                    </li>
+                  </ol>
+                </div>
+
+                {iosDevice && (
+                  <div className="mt-3 flex gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/10 p-3">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-indigo-400" />
+
+                    <p className="text-xs leading-5 text-indigo-200">
+                      You appear to be using an Apple device. For the best PWA
+                      installation experience, use Safari.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* =================================================
+                    WHAT HAPPENS AFTER INSTALL
+                ================================================= */}
+
+              <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  After installation
+                </p>
+
+                <div className="mt-3 space-y-2 text-xs leading-5 text-slate-400">
+                  <p>
+                    <span className="font-semibold text-slate-300">
+                      Android:
+                    </span>{" "}
+                    LotteryPlay opens as an installed app without normal browser
+                    controls.
+                  </p>
+
+                  <p>
+                    <span className="font-semibold text-slate-300">
+                      iPhone / iPad:
+                    </span>{" "}
+                    open LotteryPlay from your Home Screen after adding it.
+                  </p>
+
+                  <p>
+                    The mobile bottom navigation will then automatically be used
+                    inside the installed PWA.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ======================================================
           MOBILE BROWSER HAMBURGER SIDEBAR
-
-          Normal mobile browser:
-            DISPLAYED
-
-          Installed PWA:
-            NOT DISPLAYED
-
-          Desktop:
-            NOT DISPLAYED
       ======================================================= */}
 
       {!isInstalledPWA && mobileSidebarOpen && (
@@ -815,6 +1203,7 @@ export default function PublicLayout() {
                     type="button"
                     onClick={() => {
                       setMobilePlayOpen((current) => !current);
+
                       setMobileMoreOpen(false);
                     }}
                     aria-haspopup="menu"
@@ -842,6 +1231,7 @@ export default function PublicLayout() {
                     <div className="mt-1 space-y-1 pl-3">
                       {playNavigation.map((item, index) => {
                         const Icon = item.icon;
+
                         const is2D = index === 0;
 
                         return (
@@ -911,6 +1301,26 @@ export default function PublicLayout() {
 
                   <span>About</span>
                 </Link>
+
+                {/* =================================================
+                      INSTALL APP
+                  ================================================= */}
+
+                {!isInstalledPWA && (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={openInstallMenu}
+                      className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-300 transition-all hover:bg-slate-800 hover:text-white"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400">
+                        <Download className="h-5 w-5" />
+                      </span>
+
+                      <span>Install App</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* AUTH */}
@@ -971,8 +1381,6 @@ export default function PublicLayout() {
 
       {/* ======================================================
           MOBILE / PWA PLAY POPUP
-
-          ONLY INSTALLED PWA
       ======================================================= */}
 
       {isInstalledPWA && mobilePlayOpen && (
@@ -991,6 +1399,7 @@ export default function PublicLayout() {
             <div className="grid grid-cols-2 gap-2">
               {playNavigation.map((item, index) => {
                 const Icon = item.icon;
+
                 const is2D = index === 0;
 
                 return (
@@ -1031,8 +1440,6 @@ export default function PublicLayout() {
 
       {/* ======================================================
           MOBILE / PWA MORE POPUP
-
-          ONLY INSTALLED PWA
       ======================================================= */}
 
       {isInstalledPWA && mobileMoreOpen && (
@@ -1091,15 +1498,6 @@ export default function PublicLayout() {
 
       {/* ======================================================
           MOBILE / PWA BOTTOM NAVIGATION
-
-          Normal mobile browser:
-            NOT rendered
-
-          Installed PWA:
-            Rendered
-
-          Desktop:
-            Hidden by lg:hidden
       ======================================================= */}
 
       {isInstalledPWA && (
@@ -1287,13 +1685,6 @@ export default function PublicLayout() {
 
       {/* ======================================================
           MAIN CONTENT
-
-          Installed PWA:
-            Extra bottom space for bottom navigation
-            + safe-area
-
-          Normal browser:
-            Normal spacing
       ======================================================= */}
 
       <main
@@ -1436,14 +1827,19 @@ export default function PublicLayout() {
           </div>
         </div>
       </footer>
-
-      {/* ======================================================
-          PWA INSTALL BUTTON
-
-          Still available in normal browser mode.
-      ======================================================= */}
-
-      <PWAInstallButton />
     </div>
   );
+}
+
+/* ============================================================
+   BEFORE INSTALL PROMPT TYPE
+============================================================ */
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+
+  userChoice: Promise<{
+    outcome: "accepted" | "dismissed";
+    platform: string;
+  }>;
 }
