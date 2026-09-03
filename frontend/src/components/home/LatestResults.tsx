@@ -56,7 +56,7 @@ export default function LatestResults() {
   const latest3DResult = sortedLatest3DResults[0];
 
   return (
-    <section className="w-full bg-slate-50 py-7 sm:py-9">
+    <section className="w-full">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* ========================================================
             SECTION HEADER

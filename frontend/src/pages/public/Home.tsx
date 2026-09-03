@@ -17,17 +17,37 @@ function SectionLoader() {
 export default function Home() {
   return (
     <div className="min-h-screen bg-white">
-      {/* Load immediately */}
+      {/* ============================================================
+          HERO
+          HeroSection already contains its own max-w-6xl container.
+      ============================================================ */}
       <HeroSection />
 
-      {/* Load after initial page rendering */}
-      <Suspense fallback={<SectionLoader />}>
-        <LatestResults />
-      </Suspense>
+      {/* ============================================================
+          HOMEPAGE CONTENT
+          Shared width container for all following sections.
+      ============================================================ */}
+      <main className="w-full bg-white">
+        <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
+          {/* ========================================================
+              LATEST RESULTS
+          ======================================================== */}
+          <section className="py-6">
+            <Suspense fallback={<SectionLoader />}>
+              <LatestResults />
+            </Suspense>
+          </section>
 
-      <Suspense fallback={<SectionLoader />}>
-        <PublicHoliday />
-      </Suspense>
+          {/* ========================================================
+              PUBLIC HOLIDAYS
+          ======================================================== */}
+          <section className="py-6">
+            <Suspense fallback={<SectionLoader />}>
+              <PublicHoliday />
+            </Suspense>
+          </section>
+        </div>
+      </main>
     </div>
   );
 }
