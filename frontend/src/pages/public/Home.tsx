@@ -4,13 +4,7 @@ import HeroSection from "@/components/home/HeroSection";
 
 const LatestResults = lazy(() => import("@/components/home/LatestResults"));
 
-// const Weekly2DResults = lazy(() => import("@/components/home/Weekly2DResults"));
-
-// const ThreeDResults = lazy(() => import("@/components/home/ThreeDResults"));
-
-const LotteryInformation = lazy(
-  () => import("@/components/home/LotteryInformation"),
-);
+const PublicHoliday = lazy(() => import("@/components/home/PublicHoliday"));
 
 function SectionLoader() {
   return (
@@ -31,16 +25,8 @@ export default function Home() {
         <LatestResults />
       </Suspense>
 
-      {/* <Suspense fallback={<SectionLoader />}>
-        <Weekly2DResults />
-      </Suspense>
-
       <Suspense fallback={<SectionLoader />}>
-        <ThreeDResults />
-      </Suspense> */}
-
-      <Suspense fallback={<SectionLoader />}>
-        <LotteryInformation />
+        <PublicHoliday />
       </Suspense>
     </div>
   );
