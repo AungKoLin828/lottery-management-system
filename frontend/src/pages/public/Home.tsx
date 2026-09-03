@@ -16,7 +16,7 @@ function SectionLoader() {
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen">
       {/* ============================================================
           HERO
           HeroSection already contains its own max-w-6xl container.
@@ -27,7 +27,7 @@ export default function Home() {
           HOMEPAGE CONTENT
           Shared width container for all following sections.
       ============================================================ */}
-      <main className="w-full bg-white">
+      <main className="w-full">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
           {/* ========================================================
               LATEST RESULTS
