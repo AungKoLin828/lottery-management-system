@@ -45,9 +45,7 @@ interface LotteryResult3D {
 
 interface Grouped2DResult {
   date: string;
-
   morning: LotteryResult2D | null;
-
   evening: LotteryResult2D | null;
 }
 
@@ -92,16 +90,13 @@ async function fetchResults<T>(
     params.set("session", session);
   }
 
-  const response = await fetch(
-    `/api/results-history?${params.toString()}`,
-    {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
-      credentials: "include",
+  const response = await fetch(`/api/results-history?${params.toString()}`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
     },
-  );
+    credentials: "include",
+  });
 
   let body: ApiResponse<T[]>;
 
@@ -112,9 +107,7 @@ async function fetchResults<T>(
   }
 
   if (!response.ok || !body.success) {
-    throw new Error(
-      body.message || "Failed to load lottery results",
-    );
+    throw new Error(body.message || "Failed to load lottery results");
   }
 
   return body.data ?? [];
@@ -133,25 +126,19 @@ export default function ResultsHistory() {
 
   const [toDate, setToDate] = useState("");
 
-  const [session, setSession] = useState<
-    "All" | DrawSession
-  >("All");
+  const [session, setSession] = useState<"All" | DrawSession>("All");
 
   const [currentPage, setCurrentPage] = useState(1);
 
-  const [results2D, setResults2D] = useState<
-    LotteryResult2D[]
-  >([]);
+  const [results2D, setResults2D] = useState<LotteryResult2D[]>([]);
 
-  const [results3D, setResults3D] = useState<
-    LotteryResult3D[]
-  >([]);
+  const [results3D, setResults3D] = useState<LotteryResult3D[]>([]);
 
   const [loading, setLoading] = useState(false);
 
   const [error, setError] = useState("");
 
-  const itemsPerPage = 8;
+  const itemsPerPage = 10;
 
   /* ==========================================================
      FORMAT DATE
@@ -169,9 +156,9 @@ export default function ResultsHistory() {
     }
 
     return parsed.toLocaleDateString("en-US", {
-      year: "numeric",
       month: "short",
       day: "numeric",
+      year: "numeric",
     });
   };
 
@@ -215,15 +202,10 @@ export default function ResultsHistory() {
           return;
         }
 
-        console.error(
-          "Failed to load lottery results:",
-          err,
-        );
+        console.error("Failed to load lottery results:", err);
 
         setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load lottery results",
+          err instanceof Error ? err.message : "Failed to load lottery results",
         );
 
         if (activeTab === "2D") {
@@ -237,13 +219,7 @@ export default function ResultsHistory() {
         }
       }
     },
-    [
-      activeTab,
-      search,
-      fromDate,
-      toDate,
-      session,
-    ],
+    [activeTab, search, fromDate, toDate, session],
   );
 
   /* ==========================================================
@@ -262,9 +238,7 @@ export default function ResultsHistory() {
 
   /* ==========================================================
      GROUP 2D BY DATE
-     
-     AM + PM become ONE ROW.
-========================================================== */
+  ========================================================== */
 
   const groupedResults2D = useMemo<Grouped2DResult[]>(() => {
     const grouped = new Map<string, Grouped2DResult>();
@@ -275,14 +249,8 @@ export default function ResultsHistory() {
       if (!existing) {
         grouped.set(item.date, {
           date: item.date,
-          morning:
-            item.session === "Morning"
-              ? item
-              : null,
-          evening:
-            item.session === "Evening"
-              ? item
-              : null,
+          morning: item.session === "Morning" ? item : null,
+          evening: item.session === "Evening" ? item : null,
         });
 
         continue;
@@ -304,7 +272,7 @@ export default function ResultsHistory() {
 
   /* ==========================================================
      CHANGE TAB
-========================================================== */
+  ========================================================== */
 
   const handleTabChange = (tab: ResultTab) => {
     setActiveTab(tab);
@@ -323,124 +291,71 @@ export default function ResultsHistory() {
   };
 
   /* ==========================================================
-     SEARCH
-========================================================== */
+     FILTER HANDLERS
+  ========================================================== */
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
-
     setCurrentPage(1);
   };
 
-  /* ==========================================================
-     SESSION
-========================================================== */
-
-  const handleSessionChange = (
-    value: "All" | DrawSession,
-  ) => {
+  const handleSessionChange = (value: "All" | DrawSession) => {
     setSession(value);
-
     setCurrentPage(1);
   };
-
-  /* ==========================================================
-     FROM DATE
-========================================================== */
 
   const handleFromDateChange = (value: string) => {
     setFromDate(value);
-
     setCurrentPage(1);
   };
 
-  /* ==========================================================
-     TO DATE
-========================================================== */
-
   const handleToDateChange = (value: string) => {
     setToDate(value);
-
     setCurrentPage(1);
   };
 
   /* ==========================================================
      CLEAR FILTERS
-========================================================== */
+  ========================================================== */
 
   const clearFilters = () => {
     setSearch("");
-
     setSession("All");
-
     setFromDate("");
-
     setToDate("");
-
     setCurrentPage(1);
-
     setError("");
   };
 
   /* ==========================================================
-     ACTIVE RESULT COUNT
-     
-     IMPORTANT:
-     2D count is grouped date count.
-========================================================== */
+     RESULT COUNT
+  ========================================================== */
 
   const activeResultCount =
-    activeTab === "2D"
-      ? groupedResults2D.length
-      : results3D.length;
+    activeTab === "2D" ? groupedResults2D.length : results3D.length;
 
   /* ==========================================================
      PAGINATION
-========================================================== */
+  ========================================================== */
 
-  const totalPages = Math.ceil(
-    activeResultCount / itemsPerPage,
-  );
+  const totalPages = Math.ceil(activeResultCount / itemsPerPage);
 
   const safeCurrentPage =
-    totalPages > 0
-      ? Math.min(currentPage, totalPages)
-      : 1;
+    totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
 
-  const startIndex =
-    (safeCurrentPage - 1) * itemsPerPage;
-
-  /* ==========================================================
-     PAGINATED 2D
-========================================================== */
+  const startIndex = (safeCurrentPage - 1) * itemsPerPage;
 
   const paginatedResults2D = useMemo(() => {
-    return groupedResults2D.slice(
-      startIndex,
-      startIndex + itemsPerPage,
-    );
-  }, [
-    groupedResults2D,
-    startIndex,
-  ]);
-
-  /* ==========================================================
-     PAGINATED 3D
-========================================================== */
+    return groupedResults2D.slice(startIndex, startIndex + itemsPerPage);
+  }, [groupedResults2D, startIndex]);
 
   const paginatedResults3D = useMemo(() => {
-    return results3D.slice(
-      startIndex,
-      startIndex + itemsPerPage,
-    );
-  }, [
-    results3D,
-    startIndex,
-  ]);
+    return results3D.slice(startIndex, startIndex + itemsPerPage);
+  }, [results3D, startIndex]);
 
   /* ==========================================================
      RENDER
-========================================================== */
+  ========================================================== */
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -448,35 +363,36 @@ export default function ResultsHistory() {
           HERO
       ======================================================= */}
 
-      <section className="w-full bg-indigo-50/40 px-4 py-6 sm:px-6 lg:px-8">
-        <div className="relative mx-auto max-w-6xl overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-600 px-5 py-7 text-white shadow-lg shadow-indigo-200/60 sm:px-8 sm:py-9">
-          <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-white/10" />
+      <section className="w-full px-4 py-5 sm:px-6 lg:px-8">
+        <div className="relative mx-auto max-w-6xl overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-600 px-5 py-6 text-white shadow-md sm:px-7 sm:py-7">
+          {/* Decorative shapes */}
 
-          <div className="absolute -bottom-24 right-24 h-56 w-56 rounded-full bg-violet-300/10" />
+          <div className="absolute -right-14 -top-16 h-40 w-40 rounded-full bg-white/10" />
 
-          <div className="absolute -left-16 bottom-0 h-36 w-36 rounded-full bg-indigo-300/10" />
+          <div className="absolute -bottom-20 right-24 h-44 w-44 rounded-full bg-violet-300/10" />
 
-          <div className="absolute right-20 top-10 h-20 w-20 rounded-full bg-amber-300/5" />
+          <div className="absolute -left-14 bottom-0 h-28 w-28 rounded-full bg-indigo-300/10" />
 
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-2xl">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-sm">
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            {/* HERO TEXT */}
+
+            <div className="min-w-0">
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white ring-1 ring-white/15">
                 <Trophy className="h-3.5 w-3.5 text-amber-300" />
 
                 <span>Lottery Results</span>
               </div>
 
-              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
                 Results History
               </h1>
 
-              <p className="mt-2 max-w-xl text-sm leading-relaxed text-indigo-100 sm:text-base">
-                Browse previous 2D and 3D lottery results,
-                search winning numbers, and filter results by
-                date or session.
+              <p className="mt-1.5 max-w-xl text-xs leading-relaxed text-indigo-100 sm:text-sm">
+                Browse previous 2D and 3D lottery results, search winning
+                numbers, and filter by date or session.
               </p>
 
-              <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-indigo-100">
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-indigo-100">
                 <span className="flex items-center gap-1">
                   <span className="text-amber-300">✓</span>
                   2D Results
@@ -496,18 +412,18 @@ export default function ResultsHistory() {
 
             {/* RESULT TYPE SWITCHER */}
 
-            <div className="relative flex w-full rounded-xl bg-indigo-950/25 p-1.5 ring-1 ring-white/10 backdrop-blur-sm lg:w-auto">
+            <div className="flex w-full shrink-0 rounded-lg bg-indigo-950/25 p-1 ring-1 ring-white/10 lg:w-auto">
               <button
                 type="button"
                 onClick={() => handleTabChange("2D")}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all lg:min-w-[125px] ${
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-4 py-2 text-xs font-semibold transition lg:min-w-[105px] ${
                   activeTab === "2D"
-                    ? "bg-white text-indigo-700 shadow-md"
+                    ? "bg-white text-indigo-700 shadow-sm"
                     : "text-indigo-100 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <span
-                  className={`flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ${
+                  className={`flex h-5 w-5 items-center justify-center rounded text-[9px] font-bold ${
                     activeTab === "2D"
                       ? "bg-indigo-100 text-indigo-700"
                       : "bg-white/10 text-white"
@@ -515,21 +431,20 @@ export default function ResultsHistory() {
                 >
                   2D
                 </span>
-
-                <span>Results</span>
+                Results
               </button>
 
               <button
                 type="button"
                 onClick={() => handleTabChange("3D")}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all lg:min-w-[125px] ${
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-4 py-2 text-xs font-semibold transition lg:min-w-[105px] ${
                   activeTab === "3D"
-                    ? "bg-white text-violet-700 shadow-md"
+                    ? "bg-white text-violet-700 shadow-sm"
                     : "text-indigo-100 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <span
-                  className={`flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ${
+                  className={`flex h-5 w-5 items-center justify-center rounded text-[9px] font-bold ${
                     activeTab === "3D"
                       ? "bg-violet-100 text-violet-700"
                       : "bg-white/10 text-white"
@@ -537,8 +452,7 @@ export default function ResultsHistory() {
                 >
                   3D
                 </span>
-
-                <span>Results</span>
+                Results
               </button>
             </div>
           </div>
@@ -549,31 +463,33 @@ export default function ResultsHistory() {
           MAIN
       ======================================================= */}
 
-      <main className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
-        {/* CURRENT TYPE */}
+      <main className="mx-auto max-w-6xl px-4 pb-8 pt-1 sm:px-6 lg:px-8">
+        {/* ====================================================
+            SECTION HEADER
+        ===================================================== */}
 
-        <div className="mb-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex min-w-0 items-center gap-2.5">
             <div
-              className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
                 activeTab === "2D"
                   ? "bg-indigo-100 text-indigo-700"
                   : "bg-violet-100 text-violet-700"
               }`}
             >
               {activeTab === "2D" ? (
-                <Hash className="h-5 w-5" />
+                <Hash className="h-4 w-4" />
               ) : (
-                <Sparkles className="h-5 w-5" />
+                <Sparkles className="h-4 w-4" />
               )}
             </div>
 
-            <div>
-              <h2 className="text-base font-bold text-slate-800">
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-slate-800">
                 {activeTab} Results
               </h2>
 
-              <p className="text-xs text-slate-500">
+              <p className="truncate text-[11px] text-slate-500">
                 {activeTab === "2D"
                   ? "AM and PM results grouped by date"
                   : "Three-digit lottery results"}
@@ -582,14 +498,13 @@ export default function ResultsHistory() {
           </div>
 
           <div
-            className={`hidden rounded-full px-3 py-1.5 text-[11px] font-semibold sm:block ${
+            className={`hidden shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold sm:block ${
               activeTab === "2D"
                 ? "bg-indigo-100 text-indigo-700"
                 : "bg-violet-100 text-violet-700"
             }`}
           >
-            {activeResultCount} date
-            {activeResultCount !== 1 ? "s" : ""}
+            {activeResultCount} {activeTab === "2D" ? "dates" : "results"}
           </div>
         </div>
 
@@ -597,38 +512,32 @@ export default function ResultsHistory() {
             FILTER CARD
         ===================================================== */}
 
-        <div className="mb-5 overflow-hidden rounded-xl border border-indigo-100 bg-white shadow-sm">
-          <div className="border-b border-indigo-100 bg-gradient-to-r from-indigo-50 to-violet-50 px-5 py-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-slate-800">
-                  Search & Filter
-                </h3>
+        <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 py-3">
+            <div>
+              <h3 className="text-xs font-bold text-slate-800">
+                Search & Filter
+              </h3>
 
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Search and filter previous {activeTab}{" "}
-                  results.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-50"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-
-                Clear Filters
-              </button>
+              <p className="mt-0.5 text-[10px] text-slate-500">
+                Filter {activeTab} results by number, date, or session.
+              </p>
             </div>
+
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Clear
+            </button>
           </div>
 
-          <div className="p-5">
+          <div className="p-4">
             <div
-              className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${
-                activeTab === "2D"
-                  ? "lg:grid-cols-4"
-                  : "lg:grid-cols-3"
+              className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${
+                activeTab === "2D" ? "lg:grid-cols-4" : "lg:grid-cols-3"
               }`}
             >
               {/* SEARCH */}
@@ -636,23 +545,21 @@ export default function ResultsHistory() {
               <div>
                 <label
                   htmlFor="result-search"
-                  className="mb-1.5 block text-xs font-semibold text-slate-600"
+                  className="mb-1 block text-[10px] font-semibold text-slate-500"
                 >
                   Search
                 </label>
 
                 <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-400" />
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-indigo-400" />
 
                   <input
                     id="result-search"
                     type="text"
                     value={search}
-                    onChange={(e) =>
-                      handleSearchChange(e.target.value)
-                    }
+                    onChange={(e) => handleSearchChange(e.target.value)}
                     placeholder="Number or date"
-                    className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    className="w-full rounded-md border border-slate-200 bg-white py-2 pl-8 pr-2.5 text-xs text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                   />
                 </div>
               </div>
@@ -663,37 +570,25 @@ export default function ResultsHistory() {
                 <div>
                   <label
                     htmlFor="session"
-                    className="mb-1.5 block text-xs font-semibold text-slate-600"
+                    className="mb-1 block text-[10px] font-semibold text-slate-500"
                   >
                     Session
                   </label>
 
-                  <div className="relative">
-                    <select
-                      id="session"
-                      value={session}
-                      onChange={(e) =>
-                        handleSessionChange(
-                          e.target.value as
-                            | "All"
-                            | DrawSession,
-                        )
-                      }
-                      className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2.5 px-3 text-sm text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                    >
-                      <option value="All">
-                        All Sessions
-                      </option>
+                  <select
+                    id="session"
+                    value={session}
+                    onChange={(e) =>
+                      handleSessionChange(e.target.value as "All" | DrawSession)
+                    }
+                    className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  >
+                    <option value="All">All Sessions</option>
 
-                      <option value="Morning">
-                        Morning
-                      </option>
+                    <option value="Morning">Morning</option>
 
-                      <option value="Evening">
-                        Evening
-                      </option>
-                    </select>
-                  </div>
+                    <option value="Evening">Evening</option>
+                  </select>
                 </div>
               )}
 
@@ -702,22 +597,20 @@ export default function ResultsHistory() {
               <div>
                 <label
                   htmlFor="from-date"
-                  className="mb-1.5 block text-xs font-semibold text-slate-600"
+                  className="mb-1 block text-[10px] font-semibold text-slate-500"
                 >
                   From Date
                 </label>
 
                 <div className="relative">
-                  <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-400" />
+                  <CalendarDays className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-indigo-400" />
 
                   <input
                     id="from-date"
                     type="date"
                     value={fromDate}
-                    onChange={(e) =>
-                      handleFromDateChange(e.target.value)
-                    }
-                    className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    onChange={(e) => handleFromDateChange(e.target.value)}
+                    className="w-full rounded-md border border-slate-200 bg-white py-2 pl-8 pr-2.5 text-xs text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                   />
                 </div>
               </div>
@@ -727,22 +620,20 @@ export default function ResultsHistory() {
               <div>
                 <label
                   htmlFor="to-date"
-                  className="mb-1.5 block text-xs font-semibold text-slate-600"
+                  className="mb-1 block text-[10px] font-semibold text-slate-500"
                 >
                   To Date
                 </label>
 
                 <div className="relative">
-                  <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-400" />
+                  <CalendarDays className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-indigo-400" />
 
                   <input
                     id="to-date"
                     type="date"
                     value={toDate}
-                    onChange={(e) =>
-                      handleToDateChange(e.target.value)
-                    }
-                    className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    onChange={(e) => handleToDateChange(e.target.value)}
+                    className="w-full rounded-md border border-slate-200 bg-white py-2 pl-8 pr-2.5 text-xs text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                   />
                 </div>
               </div>
@@ -750,35 +641,37 @@ export default function ResultsHistory() {
           </div>
         </div>
 
-        {/* ERROR */}
+        {/* ====================================================
+            ERROR
+        ===================================================== */}
 
         {error && (
-          <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700">
             {error}
           </div>
         )}
 
-        {/* RESULTS COUNT */}
+        {/* ====================================================
+            RESULT SUMMARY
+        ===================================================== */}
 
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs text-slate-500">
+        <div className="mb-2.5 flex items-center justify-between">
+          <p className="text-[10px] text-slate-500">
             Showing{" "}
             <span className="font-semibold text-slate-700">
               {activeResultCount}
             </span>{" "}
-            {activeTab === "2D" ? "date" : "result"}
-            {activeResultCount !== 1 ? "s" : ""}
+            {activeTab === "2D" ? "dates" : "results"}
           </p>
 
-          <div className="flex items-center gap-1.5 text-xs text-indigo-500">
-            <Trophy className="h-3.5 w-3.5" />
-
-            Latest results
+          <div className="flex items-center gap-1 text-[10px] text-slate-400">
+            <Trophy className="h-3 w-3 text-amber-500" />
+            Latest first
           </div>
         </div>
 
         {/* ====================================================
-            LOADING
+            RESULTS
         ===================================================== */}
 
         {loading ? (
@@ -790,28 +683,36 @@ export default function ResultsHistory() {
             ================================================== */}
 
             {activeTab === "2D" && (
-              <div className="overflow-hidden rounded-xl border border-indigo-100 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[600px]">
+                  <table className="w-full min-w-[540px] table-fixed">
+                    <colgroup>
+                      <col className="w-[42px]" />
+                      <col className="w-[32%]" />
+                      <col className="w-[19%]" />
+                      <col className="w-[19%]" />
+                      <col className="w-[20%]" />
+                    </colgroup>
+
                     <thead>
-                      <tr className="border-b border-indigo-100 bg-gradient-to-r from-indigo-50 to-violet-50">
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                      <tr className="border-b border-slate-100 bg-slate-50">
+                        <th className="px-3 py-2.5 text-left text-[9px] font-bold uppercase tracking-wider text-slate-400">
                           #
                         </th>
 
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                        <th className="px-3 py-2.5 text-left text-[9px] font-bold uppercase tracking-wider text-slate-500">
                           Date
                         </th>
 
-                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-amber-600">
+                        <th className="px-3 py-2.5 text-center text-[9px] font-bold uppercase tracking-wider text-amber-600">
                           AM
                         </th>
 
-                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                        <th className="px-3 py-2.5 text-center text-[9px] font-bold uppercase tracking-wider text-indigo-600">
                           PM
                         </th>
 
-                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                        <th className="px-3 py-2.5 text-center text-[9px] font-bold uppercase tracking-wider text-slate-500">
                           Status
                         </th>
                       </tr>
@@ -819,110 +720,89 @@ export default function ResultsHistory() {
 
                     <tbody>
                       {paginatedResults2D.length > 0 ? (
-                        paginatedResults2D.map(
-                          (item, index) => {
-                            const am = item.morning;
+                        paginatedResults2D.map((item, index) => {
+                          const am = item.morning;
 
-                            const pm = item.evening;
+                          const pm = item.evening;
 
-                            const hasAm =
-                              Boolean(am);
+                          const isPublished =
+                            am?.status === "Published" ||
+                            pm?.status === "Published";
 
-                            const hasPm =
-                              Boolean(pm);
+                          return (
+                            <tr
+                              key={item.date}
+                              className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/80"
+                            >
+                              {/* NUMBER */}
 
-                            const isPublished =
-                              am?.status ===
-                                "Published" ||
-                              pm?.status ===
-                                "Published";
+                              <td className="px-3 py-2.5 align-middle text-[10px] font-medium text-slate-400">
+                                {startIndex + index + 1}
+                              </td>
 
-                            return (
-                              <tr
-                                key={item.date}
-                                className="border-b border-slate-100 last:border-b-0 transition-colors hover:bg-indigo-50/40"
-                              >
-                                {/* NUMBER */}
+                              {/* DATE */}
 
-                                <td className="whitespace-nowrap px-4 py-4 text-xs font-medium text-slate-400">
-                                  {startIndex +
-                                    index +
-                                    1}
-                                </td>
+                              <td className="px-3 py-2.5 align-middle">
+                                <div className="flex items-center gap-2">
+                                  <div className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-md bg-indigo-50 text-indigo-500 sm:flex">
+                                    <CalendarDays className="h-3.5 w-3.5" />
+                                  </div>
 
-                                {/* DATE */}
-
-                                <td className="whitespace-nowrap px-4 py-4 text-sm font-semibold text-slate-700">
-                                  {formatDate(
-                                    item.date,
-                                  )}
-                                </td>
-
-                                {/* AM */}
-
-                                <td className="px-4 py-4 text-center">
-                                  {hasAm ? (
-                                    <div className="flex flex-col items-center gap-1">
-                                      <span className="inline-flex h-11 w-12 items-center justify-center rounded-lg bg-amber-50 text-lg font-bold tracking-wide text-amber-600 ring-1 ring-amber-100">
-                                        {am?.result}
-                                      </span>
-
-                                      <span className="text-[10px] font-medium text-amber-500">
-                                        Morning
-                                      </span>
+                                  <div className="min-w-0">
+                                    <div className="whitespace-nowrap text-xs font-semibold text-slate-700">
+                                      {formatDate(item.date)}
                                     </div>
-                                  ) : (
-                                    <span className="text-sm text-slate-300">
-                                      —
-                                    </span>
-                                  )}
-                                </td>
 
-                                {/* PM */}
-
-                                <td className="px-4 py-4 text-center">
-                                  {hasPm ? (
-                                    <div className="flex flex-col items-center gap-1">
-                                      <span className="inline-flex h-11 w-12 items-center justify-center rounded-lg bg-indigo-50 text-lg font-bold tracking-wide text-indigo-700 ring-1 ring-indigo-100">
-                                        {pm?.result}
-                                      </span>
-
-                                      <span className="text-[10px] font-medium text-indigo-500">
-                                        Evening
-                                      </span>
+                                    <div className="hidden text-[9px] text-slate-400 sm:block">
+                                      Draw date
                                     </div>
-                                  ) : (
-                                    <span className="text-sm text-slate-300">
-                                      —
-                                    </span>
-                                  )}
-                                </td>
+                                  </div>
+                                </div>
+                              </td>
 
-                                {/* STATUS */}
+                              {/* AM */}
 
-                                <td className="px-4 py-4 text-center">
-                                  <span
-                                    className={`inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold ${
-                                      isPublished
-                                        ? "bg-emerald-50 text-emerald-600"
-                                        : "bg-amber-50 text-amber-600"
-                                    }`}
-                                  >
-                                    {isPublished
-                                      ? "Published"
-                                      : "Pending"}
+                              <td className="px-3 py-2.5 text-center align-middle">
+                                {am ? (
+                                  <ResultNumber
+                                    value={am.result}
+                                    variant="am"
+                                  />
+                                ) : (
+                                  <span className="text-xs text-slate-300">
+                                    —
                                   </span>
-                                </td>
-                              </tr>
-                            );
-                          },
-                        )
+                                )}
+                              </td>
+
+                              {/* PM */}
+
+                              <td className="px-3 py-2.5 text-center align-middle">
+                                {pm ? (
+                                  <ResultNumber
+                                    value={pm.result}
+                                    variant="pm"
+                                  />
+                                ) : (
+                                  <span className="text-xs text-slate-300">
+                                    —
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* STATUS */}
+
+                              <td className="px-3 py-2.5 text-center align-middle">
+                                <StatusBadge
+                                  status={isPublished ? "Published" : "Pending"}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })
                       ) : (
                         <tr>
-                          <td
-                            colSpan={5}
-                            className="px-4 py-10 text-center"
-                          >
+                          <td colSpan={5} className="px-3 py-8 text-center">
                             <EmptyResults />
                           </td>
                         </tr>
@@ -938,24 +818,31 @@ export default function ResultsHistory() {
             ================================================== */}
 
             {activeTab === "3D" && (
-              <div className="overflow-hidden rounded-xl border border-violet-100 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[600px]">
+                  <table className="w-full min-w-[480px] table-fixed">
+                    <colgroup>
+                      <col className="w-[48px]" />
+                      <col className="w-[34%]" />
+                      <col className="w-[32%]" />
+                      <col className="w-[22%]" />
+                    </colgroup>
+
                     <thead>
-                      <tr className="border-b border-violet-100 bg-gradient-to-r from-violet-50 to-indigo-50">
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-violet-700">
+                      <tr className="border-b border-slate-100 bg-slate-50">
+                        <th className="px-3 py-2.5 text-left text-[9px] font-bold uppercase tracking-wider text-slate-400">
                           #
                         </th>
 
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-violet-700">
+                        <th className="px-3 py-2.5 text-left text-[9px] font-bold uppercase tracking-wider text-slate-500">
                           Draw Date
                         </th>
 
-                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-violet-700">
-                          3D Winning Number
+                        <th className="px-3 py-2.5 text-center text-[9px] font-bold uppercase tracking-wider text-violet-600">
+                          Winning Number
                         </th>
 
-                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-violet-700">
+                        <th className="px-3 py-2.5 text-center text-[9px] font-bold uppercase tracking-wider text-slate-500">
                           Status
                         </th>
                       </tr>
@@ -963,44 +850,55 @@ export default function ResultsHistory() {
 
                     <tbody>
                       {paginatedResults3D.length > 0 ? (
-                        paginatedResults3D.map(
-                          (result, index) => (
-                            <tr
-                              key={result.id}
-                              className="border-b border-slate-100 last:border-b-0 transition-colors hover:bg-violet-50/40"
-                            >
-                              <td className="whitespace-nowrap px-4 py-4 text-xs font-medium text-slate-400">
-                                {startIndex +
-                                  index +
-                                  1}
-                              </td>
+                        paginatedResults3D.map((result, index) => (
+                          <tr
+                            key={result.id}
+                            className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/80"
+                          >
+                            {/* NUMBER */}
 
-                              <td className="whitespace-nowrap px-4 py-4 text-sm font-semibold text-slate-700">
-                                {formatDate(
-                                  result.date,
-                                )}
-                              </td>
+                            <td className="px-3 py-2.5 text-[10px] font-medium text-slate-400">
+                              {startIndex + index + 1}
+                            </td>
 
-                              <td className="px-4 py-4 text-center">
-                                <span className="inline-flex h-11 min-w-[82px] items-center justify-center rounded-lg bg-violet-50 px-3 text-lg font-bold tracking-widest text-violet-700 ring-1 ring-violet-100">
-                                  {result.result}
-                                </span>
-                              </td>
+                            {/* DATE */}
 
-                              <td className="px-4 py-4 text-center">
-                                <span className="inline-flex rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-600">
-                                  {result.status}
-                                </span>
-                              </td>
-                            </tr>
-                          ),
-                        )
+                            <td className="px-3 py-2.5">
+                              <div className="flex items-center gap-2">
+                                <div className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-md bg-violet-50 text-violet-500 sm:flex">
+                                  <CalendarDays className="h-3.5 w-3.5" />
+                                </div>
+
+                                <div>
+                                  <div className="whitespace-nowrap text-xs font-semibold text-slate-700">
+                                    {formatDate(result.date)}
+                                  </div>
+
+                                  <div className="hidden text-[9px] text-slate-400 sm:block">
+                                    Draw date
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* RESULT */}
+
+                            <td className="px-3 py-2.5 text-center">
+                              <span className="inline-flex h-8 min-w-[64px] items-center justify-center rounded-md bg-violet-50 px-3 text-sm font-bold tracking-[0.18em] text-violet-700 ring-1 ring-violet-100">
+                                {result.result}
+                              </span>
+                            </td>
+
+                            {/* STATUS */}
+
+                            <td className="px-3 py-2.5 text-center">
+                              <StatusBadge status={result.status} />
+                            </td>
+                          </tr>
+                        ))
                       ) : (
                         <tr>
-                          <td
-                            colSpan={4}
-                            className="px-4 py-10 text-center"
-                          >
+                          <td colSpan={4} className="px-3 py-8 text-center">
                             <EmptyResults />
                           </td>
                         </tr>
@@ -1018,66 +916,54 @@ export default function ResultsHistory() {
         ===================================================== */}
 
         {!loading && totalPages > 1 && (
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5">
-            {/* PREVIOUS */}
-
+          <div className="mt-4 flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
             <button
               type="button"
               disabled={safeCurrentPage === 1}
-              onClick={() =>
-                setCurrentPage((page) =>
-                  Math.max(page - 1, 1),
-                )
-              }
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+              className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <ChevronLeft className="h-3.5 w-3.5" />
+              <ChevronLeft className="h-3 w-3" />
 
-              Previous
+              <span className="hidden sm:inline">Previous</span>
+
+              <span className="sm:hidden">Prev</span>
             </button>
 
-            {/* PAGES */}
-
-            {Array.from(
-              { length: totalPages },
-              (_, index) => index + 1,
-            ).map((page) => (
-              <button
-                key={page}
-                type="button"
-                onClick={() => setCurrentPage(page)}
-                className={`min-w-9 rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                  safeCurrentPage === page
-                    ? activeTab === "2D"
-                      ? "bg-indigo-600 text-white shadow-sm"
-                      : "bg-violet-600 text-white shadow-sm"
-                    : "border border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-
-            {/* NEXT */}
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, index) => index + 1).map(
+                (page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    className={`h-7 min-w-7 rounded-md px-2 text-[10px] font-semibold transition ${
+                      safeCurrentPage === page
+                        ? activeTab === "2D"
+                          ? "bg-indigo-600 text-white"
+                          : "bg-violet-600 text-white"
+                        : "text-slate-500 hover:bg-slate-100"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ),
+              )}
+            </div>
 
             <button
               type="button"
-              disabled={
-                safeCurrentPage === totalPages
-              }
+              disabled={safeCurrentPage === totalPages}
               onClick={() =>
-                setCurrentPage((page) =>
-                  Math.min(
-                    page + 1,
-                    totalPages,
-                  ),
-                )
+                setCurrentPage((page) => Math.min(page + 1, totalPages))
               }
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Next
+              <span className="hidden sm:inline">Next</span>
 
-              <ChevronRight className="h-3.5 w-3.5" />
+              <span className="sm:hidden">Next</span>
+
+              <ChevronRight className="h-3 w-3" />
             </button>
           </div>
         )}
@@ -1087,32 +973,88 @@ export default function ResultsHistory() {
 }
 
 /* ============================================================
+   RESULT NUMBER
+============================================================ */
+
+function ResultNumber({
+  value,
+  variant,
+}: {
+  value: string;
+  variant: "am" | "pm";
+}) {
+  return (
+    <span
+      className={`inline-flex h-8 min-w-[48px] items-center justify-center rounded-md px-2 text-sm font-bold tracking-wider ${
+        variant === "am"
+          ? "bg-amber-50 text-amber-600 ring-1 ring-amber-100"
+          : "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100"
+      }`}
+    >
+      {value}
+    </span>
+  );
+}
+
+/* ============================================================
+   STATUS BADGE
+============================================================ */
+
+function StatusBadge({ status }: { status: "Published" | "Pending" }) {
+  const isPublished = status === "Published";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-semibold ${
+        isPublished
+          ? "bg-emerald-50 text-emerald-600"
+          : "bg-amber-50 text-amber-600"
+      }`}
+    >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${
+          isPublished ? "bg-emerald-500" : "bg-amber-500"
+        }`}
+      />
+
+      {status}
+    </span>
+  );
+}
+
+/* ============================================================
    LOADING
 ============================================================ */
 
-function LoadingResults({
-  activeTab,
-}: {
-  activeTab: ResultTab;
-}) {
+function LoadingResults({ activeTab }: { activeTab: ResultTab }) {
   if (activeTab === "2D") {
     return (
-      <div className="overflow-hidden rounded-xl border border-indigo-100 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 bg-slate-50 px-3 py-2.5">
+          <div className="grid grid-cols-5 gap-3">
+            <div className="h-2.5 rounded bg-slate-200" />
+            <div className="h-2.5 rounded bg-slate-200" />
+            <div className="h-2.5 rounded bg-slate-200" />
+            <div className="h-2.5 rounded bg-slate-200" />
+            <div className="h-2.5 rounded bg-slate-200" />
+          </div>
+        </div>
+
         <div className="animate-pulse">
-          {Array.from({ length: 6 }).map((_, index) => (
+          {Array.from({ length: 8 }).map((_, index) => (
             <div
               key={index}
-              className="grid grid-cols-5 gap-4 border-b border-slate-100 px-4 py-4"
+              className="grid grid-cols-5 items-center gap-3 border-b border-slate-100 px-3 py-3 last:border-b-0"
             >
-              <div className="h-4 rounded bg-slate-100" />
+              <div className="h-3 rounded bg-slate-100" />
 
-              <div className="h-4 rounded bg-slate-100" />
+              <div className="h-3 rounded bg-slate-100" />
 
-              <div className="mx-auto h-11 w-12 rounded-lg bg-slate-100" />
+              <div className="mx-auto h-8 w-12 rounded-md bg-slate-100" />
 
-              <div className="mx-auto h-11 w-12 rounded-lg bg-slate-100" />
+              <div className="mx-auto h-8 w-12 rounded-md bg-slate-100" />
 
-              <div className="mx-auto h-5 w-20 rounded bg-slate-100" />
+              <div className="mx-auto h-4 w-16 rounded-full bg-slate-100" />
             </div>
           ))}
         </div>
@@ -1121,20 +1063,29 @@ function LoadingResults({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-violet-100 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-100 bg-slate-50 px-3 py-2.5">
+        <div className="grid grid-cols-4 gap-3">
+          <div className="h-2.5 rounded bg-slate-200" />
+          <div className="h-2.5 rounded bg-slate-200" />
+          <div className="h-2.5 rounded bg-slate-200" />
+          <div className="h-2.5 rounded bg-slate-200" />
+        </div>
+      </div>
+
       <div className="animate-pulse">
-        {Array.from({ length: 6 }).map((_, index) => (
+        {Array.from({ length: 8 }).map((_, index) => (
           <div
             key={index}
-            className="grid grid-cols-4 gap-4 border-b border-slate-100 px-4 py-4"
+            className="grid grid-cols-4 items-center gap-3 border-b border-slate-100 px-3 py-3 last:border-b-0"
           >
-            <div className="h-4 rounded bg-slate-100" />
+            <div className="h-3 rounded bg-slate-100" />
 
-            <div className="h-4 rounded bg-slate-100" />
+            <div className="h-3 rounded bg-slate-100" />
 
-            <div className="mx-auto h-11 w-20 rounded-lg bg-slate-100" />
+            <div className="mx-auto h-8 w-16 rounded-md bg-slate-100" />
 
-            <div className="mx-auto h-5 w-16 rounded bg-slate-100" />
+            <div className="mx-auto h-4 w-16 rounded-full bg-slate-100" />
           </div>
         ))}
       </div>
@@ -1149,15 +1100,13 @@ function LoadingResults({
 function EmptyResults() {
   return (
     <div className="flex flex-col items-center justify-center text-center">
-      <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-full bg-indigo-50">
-        <Search className="h-5 w-5 text-indigo-400" />
+      <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50">
+        <Search className="h-4 w-4 text-indigo-400" />
       </div>
 
-      <p className="text-sm font-semibold text-slate-600">
-        No results found
-      </p>
+      <p className="text-xs font-semibold text-slate-600">No results found</p>
 
-      <p className="mt-1 text-xs text-slate-400">
+      <p className="mt-0.5 text-[10px] text-slate-400">
         Try changing your search or filters.
       </p>
     </div>
