@@ -55,7 +55,7 @@ export default function LatestResults() {
         {/* ========================================================
             SECTION HEADER
         ======================================================== */}
-        <div className="mb-4 flex items-end justify-between gap-4">
+        <div className="mb-5 flex items-end justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <span className="h-4 w-1 rounded-full bg-emerald-500" />
@@ -65,14 +65,14 @@ export default function LatestResults() {
               </h2>
             </div>
 
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-slate-500">
               Check the latest 2D and 3D winning numbers
             </p>
           </div>
 
           <Link
             to="/results-history"
-            className="group inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-emerald-600 transition-colors hover:text-emerald-700"
+            className="group inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
           >
             View All
             <ArrowRight
@@ -83,46 +83,80 @@ export default function LatestResults() {
         </div>
 
         {/* ========================================================
-            RESULTS
+            RESULTS CARDS
         ======================================================== */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {/* ======================================================
-              2D RESULT PANEL
+              2D CARD
           ====================================================== */}
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div
+            className="
+              overflow-hidden rounded-2xl
+              border border-emerald-100
+              bg-emerald-50/50
+              shadow-sm
+            "
+          >
             {/* ----------------------------------------------------
-                HEADER
+                CARD HEADER
             ---------------------------------------------------- */}
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 sm:px-5">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+            <div className="flex items-center justify-between px-4 py-3.5 sm:px-5">
+              <div className="flex items-center gap-3">
+                <div
+                  className="
+                    flex h-9 w-9 shrink-0 items-center justify-center
+                    rounded-xl
+                    border border-emerald-100
+                    bg-white
+                    text-emerald-600
+                    shadow-sm
+                  "
+                >
                   <Trophy className="h-4 w-4" strokeWidth={2} />
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Latest 2D Results
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Latest 2D
+                    </h3>
 
-                  <p className="text-[11px] text-slate-400">
+                    <span
+                      className="
+                        rounded-full
+                        bg-emerald-100
+                        px-2 py-0.5
+                        text-[9px]
+                        font-bold
+                        uppercase
+                        tracking-wide
+                        text-emerald-700
+                      "
+                    >
+                      2D
+                    </span>
+                  </div>
+
+                  <p className="mt-0.5 text-[11px] text-slate-500">
                     Today&apos;s winning numbers
                   </p>
                 </div>
               </div>
-
-              <span className="rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
-                2D
-              </span>
             </div>
 
             {latest2DDate ? (
-              <div className="px-4 py-4 sm:px-5">
+              <div className="px-4 pb-4 sm:px-5 sm:pb-5">
                 {/* ------------------------------------------------
                     DATE
                 ------------------------------------------------ */}
-                <div className="mb-3 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                <div
+                  className="
+                    mb-3 flex items-center gap-1.5
+                    text-[11px] font-medium text-slate-500
+                  "
+                >
                   <CalendarDays
-                    className="h-3.5 w-3.5 text-emerald-500"
+                    className="h-3.5 w-3.5 text-emerald-600"
                     strokeWidth={2}
                   />
 
@@ -130,68 +164,131 @@ export default function LatestResults() {
                 </div>
 
                 {/* ------------------------------------------------
-                    AM / PM
+                    AM / PM RESULT BOX
                 ------------------------------------------------ */}
-                <div className="divide-y divide-slate-100 rounded-lg border border-slate-100">
+                <div
+                  className="
+                    overflow-hidden
+                    rounded-xl
+                    border border-emerald-100
+                    bg-white
+                    shadow-sm
+                  "
+                >
                   {/* ==================================================
                       AM
                   ================================================== */}
-                  <div className="flex items-center justify-between px-4 py-3">
+                  <div
+                    className="
+                      flex items-center justify-between
+                      px-4 py-3.5
+                    "
+                  >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-50">
-                        <Clock3
-                          className="h-3.5 w-3.5 text-slate-400"
-                          strokeWidth={2}
-                        />
+                      <div
+                        className="
+                          flex h-8 w-8 items-center justify-center
+                          rounded-lg
+                          bg-slate-50
+                          text-slate-400
+                        "
+                      >
+                        <Clock3 className="h-3.5 w-3.5" strokeWidth={2} />
                       </div>
 
                       <div>
-                        <p className="text-xs font-semibold text-slate-700">
-                          AM
-                        </p>
+                        <p className="text-xs font-bold text-slate-700">AM</p>
 
-                        <p className="text-[10px] text-slate-400">10:30 AM</p>
+                        <p className="mt-0.5 text-[10px] text-slate-400">
+                          10:30 AM
+                        </p>
                       </div>
                     </div>
 
                     {latest2DAM ? (
-                      <span className="text-2xl font-bold tracking-tight text-emerald-600 sm:text-3xl">
-                        {latest2DAM.result}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-medium text-slate-400">
+                          Result
+                        </span>
+
+                        <span
+                          className="
+                            min-w-[58px]
+                            text-right
+                            text-2xl
+                            font-bold
+                            leading-none
+                            tracking-tight
+                            text-emerald-600
+                          "
+                        >
+                          {latest2DAM.result}
+                        </span>
+                      </div>
                     ) : (
-                      <span className="text-xl font-semibold text-slate-300">
+                      <span className="text-lg font-semibold text-slate-300">
                         —
                       </span>
                     )}
                   </div>
 
                   {/* ==================================================
+                      DIVIDER
+                  ================================================== */}
+                  <div className="mx-4 border-t border-slate-100" />
+
+                  {/* ==================================================
                       PM
                   ================================================== */}
-                  <div className="flex items-center justify-between px-4 py-3">
+                  <div
+                    className="
+                      flex items-center justify-between
+                      px-4 py-3.5
+                    "
+                  >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-50">
-                        <Clock3
-                          className="h-3.5 w-3.5 text-slate-400"
-                          strokeWidth={2}
-                        />
+                      <div
+                        className="
+                          flex h-8 w-8 items-center justify-center
+                          rounded-lg
+                          bg-slate-50
+                          text-slate-400
+                        "
+                      >
+                        <Clock3 className="h-3.5 w-3.5" strokeWidth={2} />
                       </div>
 
                       <div>
-                        <p className="text-xs font-semibold text-slate-700">
-                          PM
-                        </p>
+                        <p className="text-xs font-bold text-slate-700">PM</p>
 
-                        <p className="text-[10px] text-slate-400">4:30 PM</p>
+                        <p className="mt-0.5 text-[10px] text-slate-400">
+                          4:30 PM
+                        </p>
                       </div>
                     </div>
 
                     {latest2DPM ? (
-                      <span className="text-2xl font-bold tracking-tight text-emerald-600 sm:text-3xl">
-                        {latest2DPM.result}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-medium text-slate-400">
+                          Result
+                        </span>
+
+                        <span
+                          className="
+                            min-w-[58px]
+                            text-right
+                            text-2xl
+                            font-bold
+                            leading-none
+                            tracking-tight
+                            text-emerald-600
+                          "
+                        >
+                          {latest2DPM.result}
+                        </span>
+                      </div>
                     ) : (
-                      <span className="text-xl font-semibold text-slate-300">
+                      <span className="text-lg font-semibold text-slate-300">
                         —
                       </span>
                     )}
@@ -203,7 +300,14 @@ export default function LatestResults() {
                 ------------------------------------------------ */}
                 <Link
                   to="/results-history"
-                  className="group mt-3 inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 transition-colors hover:text-emerald-700"
+                  className="
+                    group mt-3 inline-flex items-center gap-1
+                    rounded-md px-1 py-1
+                    text-xs font-semibold
+                    text-emerald-600
+                    transition-colors
+                    hover:text-emerald-700
+                  "
                 >
                   View 2D Results
                   <ArrowRight
@@ -213,49 +317,83 @@ export default function LatestResults() {
                 </Link>
               </div>
             ) : (
-              <div className="px-4 py-8 text-center text-xs text-slate-400 sm:px-5">
+              <div className="px-4 pb-5 text-center text-xs text-slate-400">
                 No 2D result available.
               </div>
             )}
           </div>
 
           {/* ======================================================
-              3D RESULT PANEL
+              3D CARD
           ====================================================== */}
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div
+            className="
+              overflow-hidden rounded-2xl
+              border border-sky-100
+              bg-sky-50/40
+              shadow-sm
+            "
+          >
             {/* ----------------------------------------------------
-                HEADER
+                CARD HEADER
             ---------------------------------------------------- */}
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 sm:px-5">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+            <div className="flex items-center justify-between px-4 py-3.5 sm:px-5">
+              <div className="flex items-center gap-3">
+                <div
+                  className="
+                    flex h-9 w-9 shrink-0 items-center justify-center
+                    rounded-xl
+                    border border-sky-100
+                    bg-white
+                    text-sky-600
+                    shadow-sm
+                  "
+                >
                   <Trophy className="h-4 w-4" strokeWidth={2} />
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Latest 3D Draw
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Latest 3D
+                    </h3>
 
-                  <p className="text-[11px] text-slate-400">
+                    <span
+                      className="
+                        rounded-full
+                        bg-sky-100
+                        px-2 py-0.5
+                        text-[9px]
+                        font-bold
+                        uppercase
+                        tracking-wide
+                        text-sky-700
+                      "
+                    >
+                      3D
+                    </span>
+                  </div>
+
+                  <p className="mt-0.5 text-[11px] text-slate-500">
                     Most recent winning number
                   </p>
                 </div>
               </div>
-
-              <span className="rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
-                3D
-              </span>
             </div>
 
             {latest3DResult ? (
-              <div className="px-4 py-4 sm:px-5">
+              <div className="px-4 pb-4 sm:px-5 sm:pb-5">
                 {/* ------------------------------------------------
                     DATE
                 ------------------------------------------------ */}
-                <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                <div
+                  className="
+                    mb-3 flex items-center gap-1.5
+                    text-[11px] font-medium text-slate-500
+                  "
+                >
                   <CalendarDays
-                    className="h-3.5 w-3.5 text-emerald-500"
+                    className="h-3.5 w-3.5 text-sky-600"
                     strokeWidth={2}
                   />
 
@@ -263,18 +401,52 @@ export default function LatestResults() {
                 </div>
 
                 {/* ------------------------------------------------
-                    RESULT
+                    3D RESULT
                 ------------------------------------------------ */}
-                <div className="mt-3 flex min-h-[124px] flex-col items-center justify-center rounded-lg bg-slate-50">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                <div
+                  className="
+                    flex min-h-[138px]
+                    flex-col items-center justify-center
+                    rounded-xl
+                    border border-sky-100
+                    bg-white
+                    shadow-sm
+                  "
+                >
+                  <div
+                    className="
+                      flex items-center gap-1.5
+                      text-[10px]
+                      font-semibold
+                      uppercase
+                      tracking-wider
+                      text-slate-400
+                    "
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
                     Winning Number
-                  </p>
+                  </div>
 
-                  <div className="mt-1 text-4xl font-bold leading-none tracking-[0.08em] text-emerald-600 sm:text-5xl">
+                  <div
+                    className="
+                      mt-2
+                      text-4xl
+                      font-bold
+                      leading-none
+                      tracking-[0.12em]
+                      text-sky-600
+                      sm:text-[2.75rem]
+                    "
+                  >
                     {latest3DResult.result}
                   </div>
 
-                  <div className="mt-2 flex items-center gap-1 text-[10px] text-slate-400">
+                  <div
+                    className="
+                      mt-3 flex items-center gap-1
+                      text-[10px] text-slate-400
+                    "
+                  >
                     <Clock3 className="h-3 w-3" strokeWidth={2} />
 
                     <span>3D Draw</span>
@@ -286,7 +458,14 @@ export default function LatestResults() {
                 ------------------------------------------------ */}
                 <Link
                   to="/results-history"
-                  className="group mt-3 inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 transition-colors hover:text-emerald-700"
+                  className="
+                    group mt-3 inline-flex items-center gap-1
+                    rounded-md px-1 py-1
+                    text-xs font-semibold
+                    text-sky-600
+                    transition-colors
+                    hover:text-sky-700
+                  "
                 >
                   View 3D Results
                   <ArrowRight
@@ -296,7 +475,7 @@ export default function LatestResults() {
                 </Link>
               </div>
             ) : (
-              <div className="px-4 py-8 text-center text-xs text-slate-400 sm:px-5">
+              <div className="px-4 pb-5 text-center text-xs text-slate-400">
                 No 3D result available.
               </div>
             )}
