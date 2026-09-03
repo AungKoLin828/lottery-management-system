@@ -1,6 +1,12 @@
 import type { PublicHoliday as PublicHolidayType } from "@/types/lottery";
 
+import { CalendarDays, CalendarOff } from "lucide-react";
+
 import { twoDOffDays } from "@/data/home/publicHolidays";
+
+/* ============================================================
+   HELPERS
+============================================================ */
 
 function getDayName(date: string): string {
   return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
@@ -8,25 +14,27 @@ function getDayName(date: string): string {
   });
 }
 
-function formatDate(date: string): {
-  day: string;
-  month: string;
-  year: string;
-} {
-  const parsed = new Date(`${date}T00:00:00`);
-
-  return {
-    day: parsed.toLocaleDateString("en-US", {
-      day: "2-digit",
-    }),
-    month: parsed.toLocaleDateString("en-US", {
-      month: "short",
-    }),
-    year: parsed.toLocaleDateString("en-US", {
-      year: "numeric",
-    }),
-  };
+function getMonthName(date: string): string {
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+  });
 }
+
+function getDayNumber(date: string): string {
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
+    day: "2-digit",
+  });
+}
+
+function getYear(date: string): string {
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
+    year: "numeric",
+  });
+}
+
+/* ============================================================
+   COMPONENT
+============================================================ */
 
 export default function PublicHoliday() {
   const publicHolidays: PublicHolidayType[] = Object.entries(twoDOffDays)
@@ -39,23 +47,23 @@ export default function PublicHoliday() {
 
   return (
     <section className="w-full">
-      {/* ============================================================
-          SECTION HEADER
-      ============================================================ */}
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
+      {/* ========================================================
+          HEADER
+      ======================================================== */}
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
           {/* Icon */}
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-red-100 bg-red-50">
-            <span className="text-lg">📅</span>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-red-100 bg-red-50">
+            <CalendarDays className="h-4.5 w-4.5 text-red-500" />
           </div>
 
-          {/* Title */}
+          {/* Heading */}
           <div className="min-w-0">
-            <h2 className="text-base font-bold tracking-tight text-gray-900 sm:text-lg">
+            <h2 className="truncate text-base font-bold text-gray-900 sm:text-lg">
               Public Holidays
             </h2>
 
-            <p className="mt-0.5 text-[11px] text-gray-500 sm:text-xs">
+            <p className="truncate text-[10px] text-gray-500 sm:text-xs">
               2D draw off-days and public holidays
             </p>
           </div>
@@ -64,127 +72,154 @@ export default function PublicHoliday() {
         {/* Count */}
         {publicHolidays.length > 0 && (
           <div className="shrink-0 rounded-full border border-red-100 bg-red-50 px-2.5 py-1">
-            <span className="text-[10px] font-semibold text-red-600 sm:text-[11px]">
+            <span className="text-[10px] font-semibold text-red-600">
               {publicHolidays.length}{" "}
-              {publicHolidays.length === 1 ? "Day" : "Days"}
+              {publicHolidays.length === 1 ? "Holiday" : "Holidays"}
             </span>
           </div>
         )}
       </div>
 
-      {/* ============================================================
+      {/* ========================================================
           EMPTY STATE
-      ============================================================ */}
+      ======================================================== */}
       {publicHolidays.length === 0 ? (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col items-center justify-center text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
-              <span className="text-xl text-emerald-600">✓</span>
-            </div>
-
-            <p className="mt-3 text-sm font-semibold text-gray-800">
-              No public holidays
-            </p>
-
-            <p className="mt-1 max-w-sm text-xs leading-5 text-gray-500">
-              There are no configured 2D public holidays at this time.
-            </p>
+        <div className="rounded-2xl border border-gray-200 bg-white px-4 py-8 text-center shadow-sm">
+          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50">
+            <CalendarDays className="h-5 w-5 text-emerald-500" />
           </div>
+
+          <p className="mt-3 text-sm font-semibold text-gray-800">
+            No public holidays
+          </p>
+
+          <p className="mx-auto mt-1 max-w-xs text-[11px] leading-5 text-gray-500">
+            There are no configured 2D public holidays at this time.
+          </p>
         </div>
       ) : (
-        /* ============================================================
-           HOLIDAY LIST
-        ============================================================ */
+        /* ========================================================
+           TABLE CARD
+        ======================================================== */
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          {/* Top accent */}
-          <div className="h-1 bg-red-500" />
-
-          {/* Scroll Area */}
+          {/* ======================================================
+              TABLE
+          ====================================================== */}
           <div className="max-h-[320px] overflow-y-auto">
-            <div className="divide-y divide-gray-100">
-              {publicHolidays.map((holiday) => {
-                const formatted = formatDate(holiday.date);
+            <table className="w-full border-collapse">
+              {/* ==================================================
+                  TABLE HEADER
+              ================================================== */}
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  {/* Date */}
+                  <th className="w-[34%] px-3 py-2.5 text-left sm:w-[30%] sm:px-4">
+                    <div className="flex items-center gap-1.5">
+                      <CalendarDays className="h-3.5 w-3.5 text-red-500" />
 
-                return (
-                  <div
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-gray-600">
+                        Date
+                      </span>
+                    </div>
+                  </th>
+
+                  {/* Holiday */}
+                  <th className="px-3 py-2.5 text-left sm:px-4">
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-gray-600">
+                      Public Holiday
+                    </span>
+                  </th>
+                </tr>
+              </thead>
+
+              {/* ==================================================
+                  TABLE BODY
+              ================================================== */}
+              <tbody>
+                {publicHolidays.map((holiday, index) => (
+                  <tr
                     key={holiday.date}
-                    className="group px-3 py-3 transition-colors hover:bg-gray-50 sm:px-4"
+                    className={`group border-b border-gray-100 last:border-b-0 transition-colors duration-200 hover:bg-red-50/40 ${
+                      index % 2 === 0 ? "bg-white" : "bg-gray-50/40"
+                    }`}
                   >
-                    <div className="flex items-center gap-3">
-                      {/* ==================================================
-                          DATE BADGE
-                      ================================================== */}
-                      <div className="flex w-[52px] shrink-0 flex-col overflow-hidden rounded-xl border border-red-100 bg-white text-center shadow-sm">
-                        {/* Month */}
-                        <div className="bg-red-500 px-1 py-1">
-                          <span className="text-[9px] font-bold uppercase tracking-wide text-white">
-                            {formatted.month}
-                          </span>
+                    {/* =================================================
+                        DATE COLUMN
+                    ================================================= */}
+                    <td className="px-3 py-2.5 align-middle sm:px-4 sm:py-3">
+                      <div className="flex items-center gap-2.5">
+                        {/* Calendar Date */}
+                        <div className="flex h-9 w-9 shrink-0 flex-col overflow-hidden rounded-lg border border-red-100 bg-white shadow-sm">
+                          {/* Month */}
+                          <div className="flex h-3.5 items-center justify-center bg-red-500">
+                            <span className="text-[7px] font-bold uppercase tracking-wide text-white">
+                              {getMonthName(holiday.date)}
+                            </span>
+                          </div>
+
+                          {/* Day */}
+                          <div className="flex flex-1 items-center justify-center">
+                            <span className="text-xs font-bold leading-none text-gray-800">
+                              {getDayNumber(holiday.date)}
+                            </span>
+                          </div>
                         </div>
 
-                        {/* Day */}
-                        <div className="px-1 py-1.5">
-                          <span className="text-base font-bold leading-none text-gray-900">
-                            {formatted.day}
-                          </span>
+                        {/* Full Date */}
+                        <div className="min-w-0">
+                          <p className="truncate text-[10px] font-semibold text-gray-800 sm:text-[11px]">
+                            {holiday.date}
+                          </p>
+
+                          <p className="mt-0.5 truncate text-[9px] text-gray-400 sm:text-[10px]">
+                            {holiday.day}
+                          </p>
                         </div>
                       </div>
+                    </td>
 
-                      {/* ==================================================
-                          HOLIDAY INFORMATION
-                      ================================================== */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <p className="truncate text-xs font-bold text-gray-900 sm:text-sm">
+                    {/* =================================================
+                        HOLIDAY COLUMN
+                    ================================================= */}
+                    <td className="px-3 py-2.5 align-middle sm:px-4 sm:py-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="break-words text-[10px] font-semibold leading-4 text-gray-800 sm:text-[11px]">
                             {holiday.name}
                           </p>
 
-                          {/* Status */}
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[9px] font-semibold text-red-600">
-                            <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                            2D Draw Off
-                          </span>
+                          <p className="mt-0.5 text-[9px] leading-3.5 text-gray-400 sm:text-[10px]">
+                            {getYear(holiday.date)} · 2D draw unavailable
+                          </p>
                         </div>
 
-                        {/* Day + date */}
-                        <p className="mt-1 text-[10px] text-gray-500 sm:text-[11px]">
-                          {holiday.day} · {formatted.year}
-                        </p>
-
-                        <p className="mt-1 text-[9px] leading-4 text-gray-400 sm:text-[10px]">
-                          2D results are not available on this date
-                        </p>
+                        {/* Status */}
+                        <span className="hidden shrink-0 rounded-full bg-red-50 px-2 py-1 text-[8px] font-semibold text-red-600 sm:inline-flex">
+                          DRAW OFF
+                        </span>
                       </div>
-
-                      {/* ==================================================
-                          RIGHT ARROW / STATUS ICON
-                      ================================================== */}
-                      <div className="hidden shrink-0 sm:flex">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-50 text-gray-400 transition-colors group-hover:bg-red-50 group-hover:text-red-500">
-                          <span className="text-sm">›</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
 
-          {/* ============================================================
+          {/* ========================================================
               FOOTER
-          ============================================================ */}
-          <div className="border-t border-gray-100 bg-gray-50/70 px-3 py-2.5 sm:px-4">
-            <div className="flex items-center justify-center gap-2">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-100 text-[10px]">
-                📅
-              </span>
+          ======================================================== */}
+          <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/70 px-3 py-2 sm:px-4">
+            <div className="flex items-center gap-1.5">
+              <CalendarOff className="h-3 w-3 text-red-400" />
 
-              <p className="text-[10px] text-gray-500 sm:text-[11px]">
-                {publicHolidays.length} public holiday
-                {publicHolidays.length !== 1 ? "s" : ""} configured
-              </p>
+              <span className="text-[9px] text-gray-500 sm:text-[10px]">
+                2D draw is unavailable on public holidays
+              </span>
             </div>
+
+            <span className="text-[9px] font-medium text-gray-400 sm:text-[10px]">
+              {publicHolidays.length} total
+            </span>
           </div>
         </div>
       )}
