@@ -58,10 +58,6 @@ export default function PublicHoliday() {
                     Date
                   </th>
 
-                  <th className="w-[23%] px-2 py-2 text-left text-[11px] font-semibold text-red-800">
-                    Day
-                  </th>
-
                   <th className="w-[50%] px-2 py-2 text-left text-[11px] font-semibold text-red-800">
                     Holiday
                   </th>
@@ -87,13 +83,6 @@ export default function PublicHoliday() {
                           {holiday.date}
                         </span>
                       </div>
-                    </td>
-
-                    {/* Day */}
-                    <td className="px-2 py-1.5 align-middle">
-                      <span className="inline-flex max-w-full rounded-full bg-orange-100 px-1.5 py-0.5 text-[9px] font-semibold text-orange-700">
-                        <span className="truncate">{holiday.day}</span>
-                      </span>
                     </td>
 
                     {/* Holiday */}
