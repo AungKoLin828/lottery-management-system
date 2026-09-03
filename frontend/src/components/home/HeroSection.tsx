@@ -1,6 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Trophy, Sparkles, ArrowRight, CalendarDays } from "lucide-react";
+import {
+  Trophy,
+  Sparkles,
+  ArrowRight,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 /* ============================================================
    TYPES
@@ -68,38 +75,181 @@ const slides: HeroSlide[] = [
 ];
 
 /* ============================================================
+   CONSTANTS
+============================================================ */
+
+const AUTO_SLIDE_INTERVAL = 4500;
+const SWIPE_THRESHOLD = 50;
+
+/* ============================================================
    COMPONENT
 ============================================================ */
 
 export default function HeroSection() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  /* ============================================================
+     DRAG / SWIPE REFS
+  ============================================================ */
+
+  const pointerStartX = useRef<number | null>(null);
+  const pointerCurrentX = useRef<number | null>(null);
+  const hasDragged = useRef(false);
 
   /* ============================================================
      AUTO PLAY
   ============================================================ */
 
   useEffect(() => {
-    if (paused) {
+    if (paused || isDragging) {
       return;
     }
 
     const timer = window.setInterval(() => {
-      setCurrentSlide((current) => {
-        if (current === slides.length - 1) {
-          return 0;
-        }
-
-        return current + 1;
-      });
-    }, 4500);
+      setCurrentSlide((current) =>
+        current === slides.length - 1 ? 0 : current + 1,
+      );
+    }, AUTO_SLIDE_INTERVAL);
 
     return () => {
       window.clearInterval(timer);
     };
-  }, [paused]);
+  }, [paused, isDragging, currentSlide]);
 
-  const slide = slides[currentSlide];
+  /* ============================================================
+     GO TO SLIDE
+  ============================================================ */
+
+  const goToSlide = (index: number) => {
+    if (index < 0) {
+      setCurrentSlide(slides.length - 1);
+      return;
+    }
+
+    if (index >= slides.length) {
+      setCurrentSlide(0);
+      return;
+    }
+
+    setCurrentSlide(index);
+  };
+
+  /* ============================================================
+     NEXT SLIDE
+  ============================================================ */
+
+  const nextSlide = () => {
+    setCurrentSlide((current) =>
+      current === slides.length - 1 ? 0 : current + 1,
+    );
+  };
+
+  /* ============================================================
+     PREVIOUS SLIDE
+  ============================================================ */
+
+  const previousSlide = () => {
+    setCurrentSlide((current) =>
+      current === 0 ? slides.length - 1 : current - 1,
+    );
+  };
+
+  /* ============================================================
+     POINTER DOWN
+  ============================================================ */
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    pointerStartX.current = event.clientX;
+    pointerCurrentX.current = event.clientX;
+    hasDragged.current = false;
+
+    setIsDragging(true);
+
+    /*
+     * Capture the pointer so dragging continues even if the
+     * pointer moves outside the slider.
+     */
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  /* ============================================================
+     POINTER MOVE
+  ============================================================ */
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (pointerStartX.current === null) {
+      return;
+    }
+
+    pointerCurrentX.current = event.clientX;
+
+    const distance = event.clientX - pointerStartX.current;
+
+    if (Math.abs(distance) > 10) {
+      hasDragged.current = true;
+    }
+  };
+
+  /* ============================================================
+     POINTER UP
+  ============================================================ */
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (pointerStartX.current === null) {
+      setIsDragging(false);
+      return;
+    }
+
+    const startX = pointerStartX.current;
+    const endX = pointerCurrentX.current ?? event.clientX;
+
+    const distance = endX - startX;
+
+    if (Math.abs(distance) >= SWIPE_THRESHOLD) {
+      if (distance < 0) {
+        nextSlide();
+      } else {
+        previousSlide();
+      }
+    }
+
+    pointerStartX.current = null;
+    pointerCurrentX.current = null;
+
+    setIsDragging(false);
+
+    /*
+     * Small delay prevents a swipe from immediately triggering
+     * a button/link click.
+     */
+    window.setTimeout(() => {
+      hasDragged.current = false;
+    }, 50);
+  };
+
+  /* ============================================================
+     POINTER CANCEL
+  ============================================================ */
+
+  const handlePointerCancel = () => {
+    pointerStartX.current = null;
+    pointerCurrentX.current = null;
+    setIsDragging(false);
+    hasDragged.current = false;
+  };
+
+  /* ============================================================
+     PREVENT CLICK AFTER SWIPE
+  ============================================================ */
+
+  const handleClickCapture = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (hasDragged.current) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
 
   /* ============================================================
      RENDER NUMBER VISUAL
@@ -110,7 +260,7 @@ export default function HeroSection() {
        2D VISUAL
     ========================================================== */
 
-    if (slide.type === "2D") {
+    if (slides[currentSlide].type === "2D") {
       return (
         <div className="relative flex h-full min-h-[220px] items-center justify-center">
           {/* Glow */}
@@ -121,7 +271,7 @@ export default function HeroSection() {
 
           <div className="relative text-center">
             <p className="text-xs font-semibold tracking-[0.35em] text-indigo-100">
-              TODAY'S
+              TODAY&apos;S
             </p>
 
             <p
@@ -141,28 +291,35 @@ export default function HeroSection() {
 
             {/* AM / PM */}
 
-            <div className="mx-auto mt-2 flex w-fit items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 backdrop-blur-md">
+            <div
+              className="
+                mx-auto mt-2
+                flex w-fit items-center gap-2
+                rounded-full
+                border border-white/20
+                bg-white/10
+                px-4 py-1.5
+                backdrop-blur-md
+              "
+            >
               <span className="h-2 w-2 rounded-full bg-emerald-300" />
 
-              <span className="text-xs font-semibold text-white">AM & PM</span>
+              <span className="text-xs font-semibold text-white">
+                AM &amp; PM
+              </span>
             </div>
 
             {/* 7X */}
 
             <div
               className="
-                mx-auto
-                mt-4
-                flex
-                w-fit
-                items-baseline
-                gap-1
+                mx-auto mt-4
+                flex w-fit
+                items-baseline gap-1
                 rounded-2xl
-                border
-                border-amber-200/30
+                border border-amber-200/30
                 bg-amber-300/10
-                px-5
-                py-2
+                px-5 py-2
                 shadow-lg
                 backdrop-blur-md
               "
@@ -181,15 +338,11 @@ export default function HeroSection() {
 
           <div
             className="
-              absolute
-              bottom-5
-              right-2
+              absolute bottom-5 right-2
               rounded-xl
-              border
-              border-white/20
+              border border-white/20
               bg-white/10
-              px-4
-              py-3
+              px-4 py-3
               shadow-xl
               backdrop-blur-md
               sm:right-8
@@ -209,7 +362,7 @@ export default function HeroSection() {
        3D VISUAL
     ========================================================== */
 
-    if (slide.type === "3D") {
+    if (slides[currentSlide].type === "3D") {
       return (
         <div className="relative flex h-full min-h-[220px] items-center justify-center">
           {/* Glow */}
@@ -237,8 +390,21 @@ export default function HeroSection() {
 
             {/* Scheduled Draw */}
 
-            <div className="mx-auto mt-3 flex w-fit items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 backdrop-blur-md">
-              <CalendarDays className="h-3.5 w-3.5 text-amber-200" />
+            <div
+              className="
+                mx-auto mt-3
+                flex w-fit items-center gap-2
+                rounded-full
+                border border-white/20
+                bg-white/10
+                px-4 py-1.5
+                backdrop-blur-md
+              "
+            >
+              <CalendarDays
+                className="h-3.5 w-3.5 text-amber-200"
+                strokeWidth={2}
+              />
 
               <span className="text-xs font-semibold text-white">
                 Scheduled Draw
@@ -249,18 +415,13 @@ export default function HeroSection() {
 
             <div
               className="
-                mx-auto
-                mt-4
-                flex
-                w-fit
-                items-baseline
-                gap-1
+                mx-auto mt-4
+                flex w-fit
+                items-baseline gap-1
                 rounded-2xl
-                border
-                border-amber-200/30
+                border border-amber-200/30
                 bg-amber-300/10
-                px-5
-                py-2
+                px-5 py-2
                 shadow-lg
                 backdrop-blur-md
               "
@@ -297,12 +458,23 @@ export default function HeroSection() {
         {/* Trophy */}
 
         <div className="relative text-center">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-white/20 bg-white/10 shadow-2xl backdrop-blur-md">
-            <Trophy className="h-10 w-10 text-amber-200" />
+          <div
+            className="
+              mx-auto
+              flex h-20 w-20
+              items-center justify-center
+              rounded-3xl
+              border border-white/20
+              bg-white/10
+              shadow-2xl
+              backdrop-blur-md
+            "
+          >
+            <Trophy className="h-10 w-10 text-amber-200" strokeWidth={2} />
           </div>
 
           <p className="mt-4 text-4xl font-black tracking-tight text-white sm:text-5xl">
-            2D <span className="text-amber-200">&</span> 3D
+            2D <span className="text-amber-200">&amp;</span> 3D
           </p>
 
           <p className="mt-1 text-xs font-medium uppercase tracking-[0.25em] text-indigo-100">
@@ -312,13 +484,29 @@ export default function HeroSection() {
           {/* Multipliers */}
 
           <div className="mt-4 flex items-center justify-center gap-2">
-            <div className="rounded-xl border border-white/15 bg-white/10 px-3 py-1.5 backdrop-blur-md">
+            <div
+              className="
+                rounded-xl
+                border border-white/15
+                bg-white/10
+                px-3 py-1.5
+                backdrop-blur-md
+              "
+            >
               <span className="text-xs font-semibold text-indigo-100">2D</span>
 
               <span className="ml-1 text-lg font-black text-amber-200">7×</span>
             </div>
 
-            <div className="rounded-xl border border-white/15 bg-white/10 px-3 py-1.5 backdrop-blur-md">
+            <div
+              className="
+                rounded-xl
+                border border-white/15
+                bg-white/10
+                px-3 py-1.5
+                backdrop-blur-md
+              "
+            >
               <span className="text-xs font-semibold text-indigo-100">3D</span>
 
               <span className="ml-1 text-lg font-black text-amber-200">
@@ -330,6 +518,8 @@ export default function HeroSection() {
       </div>
     );
   };
+
+  const slide = slides[currentSlide];
 
   /* ============================================================
      RENDER
@@ -366,7 +556,7 @@ export default function HeroSection() {
 
             <div className="absolute right-1/3 top-10 h-2 w-2 rounded-full bg-amber-200/70" />
 
-            <div className="absolute right-1/4 bottom-14 h-1.5 w-1.5 rounded-full bg-white/50" />
+            <div className="absolute bottom-14 right-1/4 h-1.5 w-1.5 rounded-full bg-white/50" />
 
             <div className="absolute left-1/2 top-20 h-1.5 w-1.5 rounded-full bg-violet-200/50" />
           </div>
@@ -375,9 +565,30 @@ export default function HeroSection() {
               SLIDER
           ================================================== */}
 
-          <div className="relative overflow-hidden">
+          <div
+            className={`
+              relative
+              overflow-hidden
+              select-none
+              ${isDragging ? "cursor-grabbing" : "cursor-grab"}
+            `}
+            style={{
+              touchAction: "pan-y",
+            }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+            onClickCapture={handleClickCapture}
+          >
             <div
-              className="flex transition-transform duration-700 ease-out"
+              className="
+                flex
+                transition-transform
+                duration-700
+                ease-out
+                will-change-transform
+              "
               style={{
                 transform: `translateX(-${currentSlide * 100}%)`,
               }}
@@ -490,7 +701,16 @@ export default function HeroSection() {
                       {item.type !== "RESULT" && (
                         <div className="mt-4 flex items-center gap-3">
                           {item.type === "2D" ? (
-                            <div className="flex items-center gap-2 rounded-xl border border-amber-200/20 bg-white/10 px-3 py-2 backdrop-blur-md">
+                            <div
+                              className="
+                                flex items-center gap-2
+                                rounded-xl
+                                border border-amber-200/20
+                                bg-white/10
+                                px-3 py-2
+                                backdrop-blur-md
+                              "
+                            >
                               <span className="text-xs font-medium text-indigo-100">
                                 2D Winning Payout
                               </span>
@@ -500,7 +720,16 @@ export default function HeroSection() {
                               </span>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-2 rounded-xl border border-amber-200/20 bg-white/10 px-3 py-2 backdrop-blur-md">
+                            <div
+                              className="
+                                flex items-center gap-2
+                                rounded-xl
+                                border border-amber-200/20
+                                bg-white/10
+                                px-3 py-2
+                                backdrop-blur-md
+                              "
+                            >
                               <span className="text-xs font-medium text-indigo-100">
                                 3D Winning Payout
                               </span>
@@ -513,7 +742,9 @@ export default function HeroSection() {
                         </div>
                       )}
 
-                      {/* Buttons */}
+                      {/* ==================================================
+                          BUTTONS
+                      ================================================== */}
 
                       <div className="mt-6 flex flex-wrap gap-3">
                         <Link
@@ -576,7 +807,9 @@ export default function HeroSection() {
                         </Link>
                       </div>
 
-                      {/* Bottom information */}
+                      {/* ==================================================
+                          BOTTOM INFORMATION
+                      ================================================== */}
 
                       <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-xs text-indigo-100">
                         <span className="flex items-center gap-1.5">
@@ -611,7 +844,241 @@ export default function HeroSection() {
                         lg:block
                       "
                     >
-                      {renderVisual()}
+                      {/*
+                       * Render based on the slide being mapped.
+                       * Temporarily use the mapped slide rather than
+                       * currentSlide so every slide renders correctly
+                       * while it is inside the slider.
+                       */}
+                      {item.type === "2D" && (
+                        <div className="relative flex h-full min-h-[220px] items-center justify-center">
+                          <div className="absolute h-52 w-52 rounded-full bg-white/10 blur-2xl" />
+
+                          <div className="relative text-center">
+                            <p className="text-xs font-semibold tracking-[0.35em] text-indigo-100">
+                              TODAY&apos;S
+                            </p>
+
+                            <p
+                              className="
+                                mt-1
+                                text-[100px]
+                                font-black
+                                leading-none
+                                tracking-tighter
+                                text-white
+                                drop-shadow-2xl
+                                sm:text-[125px]
+                              "
+                            >
+                              2D
+                            </p>
+
+                            <div
+                              className="
+                                mx-auto mt-2
+                                flex w-fit items-center gap-2
+                                rounded-full
+                                border border-white/20
+                                bg-white/10
+                                px-4 py-1.5
+                                backdrop-blur-md
+                              "
+                            >
+                              <span className="h-2 w-2 rounded-full bg-emerald-300" />
+
+                              <span className="text-xs font-semibold text-white">
+                                AM &amp; PM
+                              </span>
+                            </div>
+
+                            <div
+                              className="
+                                mx-auto mt-4
+                                flex w-fit
+                                items-baseline gap-1
+                                rounded-2xl
+                                border border-amber-200/30
+                                bg-amber-300/10
+                                px-5 py-2
+                                shadow-lg
+                                backdrop-blur-md
+                              "
+                            >
+                              <span className="text-xs font-semibold uppercase tracking-wider text-amber-100">
+                                Win
+                              </span>
+
+                              <span className="text-3xl font-black leading-none text-amber-200">
+                                7×
+                              </span>
+                            </div>
+                          </div>
+
+                          <div
+                            className="
+                              absolute bottom-5 right-2
+                              rounded-xl
+                              border border-white/20
+                              bg-white/10
+                              px-4 py-3
+                              shadow-xl
+                              backdrop-blur-md
+                              sm:right-8
+                            "
+                          >
+                            <p className="text-[10px] uppercase tracking-wide text-indigo-100">
+                              Results
+                            </p>
+
+                            <p className="mt-0.5 text-sm font-bold text-white">
+                              Updated Daily
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {item.type === "3D" && (
+                        <div className="relative flex h-full min-h-[220px] items-center justify-center">
+                          <div className="absolute h-56 w-56 rounded-full bg-violet-300/10 blur-3xl" />
+
+                          <div className="relative text-center">
+                            <p className="text-xs font-semibold tracking-[0.35em] text-violet-100">
+                              LUCKY
+                            </p>
+
+                            <div className="mt-2 flex items-center justify-center gap-2">
+                              <span className="text-[78px] font-black leading-none text-white drop-shadow-2xl sm:text-[100px]">
+                                3
+                              </span>
+
+                              <span className="text-[78px] font-black leading-none text-amber-200 drop-shadow-2xl sm:text-[100px]">
+                                D
+                              </span>
+                            </div>
+
+                            <div
+                              className="
+                                mx-auto mt-3
+                                flex w-fit items-center gap-2
+                                rounded-full
+                                border border-white/20
+                                bg-white/10
+                                px-4 py-1.5
+                                backdrop-blur-md
+                              "
+                            >
+                              <CalendarDays
+                                className="h-3.5 w-3.5 text-amber-200"
+                                strokeWidth={2}
+                              />
+
+                              <span className="text-xs font-semibold text-white">
+                                Scheduled Draw
+                              </span>
+                            </div>
+
+                            <div
+                              className="
+                                mx-auto mt-4
+                                flex w-fit
+                                items-baseline gap-1
+                                rounded-2xl
+                                border border-amber-200/30
+                                bg-amber-300/10
+                                px-5 py-2
+                                shadow-lg
+                                backdrop-blur-md
+                              "
+                            >
+                              <span className="text-xs font-semibold uppercase tracking-wider text-amber-100">
+                                Win
+                              </span>
+
+                              <span className="text-3xl font-black leading-none text-amber-200">
+                                500×
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="absolute right-3 top-6 h-8 w-8 rounded-full border border-white/20" />
+
+                          <div className="absolute bottom-8 left-5 h-5 w-5 rounded-full bg-amber-200/20" />
+                        </div>
+                      )}
+
+                      {item.type === "RESULT" && (
+                        <div className="relative flex h-full min-h-[220px] items-center justify-center">
+                          <div className="absolute h-60 w-60 rounded-full bg-amber-300/10 blur-3xl" />
+
+                          <div className="relative text-center">
+                            <div
+                              className="
+                                mx-auto
+                                flex h-20 w-20
+                                items-center justify-center
+                                rounded-3xl
+                                border border-white/20
+                                bg-white/10
+                                shadow-2xl
+                                backdrop-blur-md
+                              "
+                            >
+                              <Trophy
+                                className="h-10 w-10 text-amber-200"
+                                strokeWidth={2}
+                              />
+                            </div>
+
+                            <p className="mt-4 text-4xl font-black tracking-tight text-white sm:text-5xl">
+                              2D <span className="text-amber-200">&amp;</span>{" "}
+                              3D
+                            </p>
+
+                            <p className="mt-1 text-xs font-medium uppercase tracking-[0.25em] text-indigo-100">
+                              Lottery Results
+                            </p>
+
+                            <div className="mt-4 flex items-center justify-center gap-2">
+                              <div
+                                className="
+                                  rounded-xl
+                                  border border-white/15
+                                  bg-white/10
+                                  px-3 py-1.5
+                                  backdrop-blur-md
+                                "
+                              >
+                                <span className="text-xs font-semibold text-indigo-100">
+                                  2D
+                                </span>
+
+                                <span className="ml-1 text-lg font-black text-amber-200">
+                                  7×
+                                </span>
+                              </div>
+
+                              <div
+                                className="
+                                  rounded-xl
+                                  border border-white/15
+                                  bg-white/10
+                                  px-3 py-1.5
+                                  backdrop-blur-md
+                                "
+                              >
+                                <span className="text-xs font-semibold text-indigo-100">
+                                  3D
+                                </span>
+
+                                <span className="ml-1 text-lg font-black text-amber-200">
+                                  500×
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -620,16 +1087,98 @@ export default function HeroSection() {
           </div>
 
           {/* ==================================================
-              PROGRESS INDICATOR
+              PREVIOUS BUTTON
           ================================================== */}
 
-          <div className="absolute bottom-4 right-6 z-20 flex items-center gap-1.5 sm:right-8">
+          <button
+            type="button"
+            aria-label="Previous slide"
+            onClick={previousSlide}
+            onMouseEnter={() => setPaused(true)}
+            onMouseLeave={() => setPaused(false)}
+            className="
+              absolute
+              left-3
+              top-1/2
+              z-30
+              hidden
+              -translate-y-1/2
+              items-center
+              justify-center
+              rounded-full
+              border
+              border-white/20
+              bg-black/15
+              p-2
+              text-white
+              shadow-lg
+              backdrop-blur-md
+              transition
+              hover:bg-white/20
+              sm:flex
+            "
+          >
+            <ChevronLeft className="h-4 w-4" strokeWidth={2.2} />
+          </button>
+
+          {/* ==================================================
+              NEXT BUTTON
+          ================================================== */}
+
+          <button
+            type="button"
+            aria-label="Next slide"
+            onClick={nextSlide}
+            onMouseEnter={() => setPaused(true)}
+            onMouseLeave={() => setPaused(false)}
+            className="
+              absolute
+              right-3
+              top-1/2
+              z-30
+              hidden
+              -translate-y-1/2
+              items-center
+              justify-center
+              rounded-full
+              border
+              border-white/20
+              bg-black/15
+              p-2
+              text-white
+              shadow-lg
+              backdrop-blur-md
+              transition
+              hover:bg-white/20
+              sm:flex
+            "
+          >
+            <ChevronRight className="h-4 w-4" strokeWidth={2.2} />
+          </button>
+
+          {/* ==================================================
+              SLIDE INDICATORS
+          ================================================== */}
+
+          <div
+            className="
+              absolute
+              bottom-4
+              right-6
+              z-30
+              flex
+              items-center
+              gap-1.5
+              sm:right-8
+            "
+          >
             {slides.map((item, index) => (
               <button
                 key={item.id}
                 type="button"
                 aria-label={`Show slide ${index + 1}`}
-                onClick={() => setCurrentSlide(index)}
+                aria-current={currentSlide === index ? "true" : undefined}
+                onClick={() => goToSlide(index)}
                 className={`
                   h-1.5
                   rounded-full
@@ -651,6 +1200,31 @@ export default function HeroSection() {
 
           <div className="pointer-events-none absolute right-3 top-3 opacity-10 lg:hidden">
             <Trophy className="h-28 w-28 text-white" />
+          </div>
+
+          {/* ==================================================
+              MOBILE SWIPE HINT
+          ================================================== */}
+
+          <div
+            className="
+              pointer-events-none
+              absolute
+              bottom-4
+              left-5
+              z-20
+              hidden
+              items-center
+              gap-1.5
+              text-[9px]
+              font-medium
+              text-white/40
+              sm:hidden
+            "
+          >
+            <ChevronLeft className="h-3 w-3" />
+            Swipe
+            <ChevronRight className="h-3 w-3" />
           </div>
         </div>
       </div>
