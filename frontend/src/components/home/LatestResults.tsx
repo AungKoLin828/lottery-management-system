@@ -21,18 +21,18 @@ export default function LatestResults() {
   const latest3DResult = latest3DResults[0];
 
   return (
-    <section className="w-full bg-slate-50w-full bg-purple-50/40 py-8">
+    <section className="w-full bg-slate-50 py-8 sm:py-10">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         {/* ==================================================
-            HEADER
+            SECTION HEADER
         ================================================== */}
 
-        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-6 flex items-end justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <div className="h-7 w-1 rounded-full bg-gradient-to-b from-purple-700 to-violet-500" />
+              <span className="h-6 w-1 rounded-full bg-purple-600" />
 
-              <h2 className="text-xl font-bold text-slate-900">
+              <h2 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
                 Latest Results
               </h2>
             </div>
@@ -44,10 +44,10 @@ export default function LatestResults() {
 
           <Link
             to="/results-history"
-            className="inline-flex w-fit items-center rounded-lg px-3 py-2 text-sm font-semibold text-purple-700 transition hover:bg-purple-50 hover:text-purple-800"
+            className="group inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-purple-200 hover:bg-purple-50 hover:text-purple-700 sm:px-4 sm:text-sm"
           >
             View All
-            <span className="ml-1 transition-transform duration-200 group-hover:translate-x-0.5">
+            <span className="text-base leading-none transition-transform duration-200 group-hover:translate-x-0.5">
               →
             </span>
           </Link>
@@ -68,92 +68,106 @@ export default function LatestResults() {
             return (
               <div
                 key={`2d-${item.id}`}
-                className={`group overflow-hidden rounded-2xl border bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
-                  isMorning
-                    ? "border-indigo-100 hover:border-indigo-200"
-                    : "border-violet-100 hover:border-violet-200"
-                }`}
+                className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
               >
                 {/* ==================================================
-                    CARD HEADER
+                    TOP ACCENT
                 ================================================== */}
 
                 <div
-                  className={`px-4 py-3 ${
-                    isMorning
-                      ? "border-b border-indigo-100 bg-gradient-to-r from-indigo-50 to-blue-50"
-                      : "border-b border-violet-100 bg-gradient-to-r from-violet-50 to-purple-50"
+                  className={`h-1 ${
+                    isMorning ? "bg-indigo-500" : "bg-purple-500"
                   }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      {/* Session Badge */}
+                />
 
-                      <span
-                        className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                {/* ==================================================
+                    CARD CONTENT
+                ================================================== */}
+
+                <div className="p-4">
+                  {/* Header */}
+
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      {/* Session */}
+
+                      <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-extrabold ${
                           isMorning
-                            ? "bg-indigo-600 text-white"
-                            : "bg-violet-600 text-white"
+                            ? "bg-indigo-50 text-indigo-600"
+                            : "bg-purple-50 text-purple-600"
                         }`}
                       >
-                        2D {item.session}
-                      </span>
+                        2D
+                      </div>
 
-                      {/* Date */}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold text-slate-900">
+                            {isMorning ? "Morning Draw" : "Evening Draw"}
+                          </h3>
 
-                      <p className="mt-1.5 text-xs text-slate-400">
-                        {item.date}
-                      </p>
+                          <span
+                            className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold ${
+                              isMorning
+                                ? "bg-indigo-100 text-indigo-700"
+                                : "bg-purple-100 text-purple-700"
+                            }`}
+                          >
+                            {item.session}
+                          </span>
+                        </div>
 
-                      {/* Draw Name */}
-
-                      <h3 className="mt-0.5 text-sm font-bold text-slate-800">
-                        {isMorning ? "Morning Draw" : "Evening Draw"}
-                      </h3>
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          {item.date}
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Published */}
+                    {/* Status */}
 
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-600 ring-1 ring-emerald-100">
+                    <span className="shrink-0 text-[10px] font-semibold text-emerald-600">
                       ● Published
                     </span>
                   </div>
-                </div>
 
-                {/* ==================================================
-                    WINNING NUMBER
-                ================================================== */}
+                  {/* Divider */}
 
-                <div className="p-5 text-center">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                    Winning Number
-                  </p>
+                  <div className="my-4 border-t border-slate-100" />
 
-                  <div
-                    className={`mx-auto mt-2 flex h-16 w-16 items-center justify-center rounded-full shadow-sm transition-transform duration-200 group-hover:scale-105 ${
-                      isMorning
-                        ? "bg-indigo-50 ring-4 ring-indigo-100"
-                        : "bg-violet-50 ring-4 ring-violet-100"
-                    }`}
-                  >
-                    <p
-                      className={`text-3xl font-extrabold tracking-wider ${
+                  {/* Winning Number */}
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                        Winning Number
+                      </p>
+
+                      <p
+                        className={`mt-1 text-xs font-medium ${
+                          isMorning ? "text-indigo-500" : "text-purple-500"
+                        }`}
+                      >
+                        2D Lottery Result
+                      </p>
+                    </div>
+
+                    <div
+                      className={`flex h-14 min-w-[72px] items-center justify-center rounded-lg border px-3 transition-transform duration-200 group-hover:scale-105 ${
                         isMorning
-                          ? "text-indigo-600"
-                          : "text-violet-600"
+                          ? "border-indigo-100 bg-indigo-50"
+                          : "border-purple-100 bg-purple-50"
                       }`}
                     >
-                      {item.result}
-                    </p>
+                      <span
+                        className={`text-3xl font-black leading-none tracking-widest ${
+                          isMorning ? "text-indigo-600" : "text-purple-600"
+                        }`}
+                      >
+                        {item.result}
+                      </span>
+                    </div>
                   </div>
-
-                  {/* Small accent */}
-
-                  <div
-                    className={`mx-auto mt-3 h-1 w-8 rounded-full ${
-                      isMorning ? "bg-indigo-200" : "bg-violet-200"
-                    }`}
-                  />
                 </div>
               </div>
             );
@@ -164,66 +178,80 @@ export default function LatestResults() {
           ================================================== */}
 
           {latest3DResult && (
-            <div className="group overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-violet-200 hover:shadow-lg">
-              {/* ==================================================
-                  CARD HEADER
-              ================================================== */}
+            <div className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+              {/* Top Accent */}
 
-              <div className="border-b border-violet-100 bg-gradient-to-r from-violet-50 to-purple-50 px-4 py-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    {/* 3D Badge */}
+              <div className="h-1 bg-gradient-to-r from-purple-600 to-indigo-600" />
 
-                    <span className="inline-flex rounded-md bg-gradient-to-r from-violet-600 to-purple-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+              <div className="p-4">
+                {/* Header */}
+
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    {/* 3D Icon */}
+
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-purple-600 text-xs font-extrabold text-white shadow-sm">
                       3D
-                    </span>
+                    </div>
 
-                    {/* Date */}
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-bold text-slate-900">
+                        3D Draw
+                      </h3>
 
-                    <p className="mt-1.5 text-xs text-slate-400">
-                      {latest3DResult.date}
-                    </p>
-
-                    {/* Draw Name */}
-
-                    <h3 className="mt-0.5 text-sm font-bold text-slate-800">
-                      3D Draw
-                    </h3>
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        {latest3DResult.date}
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Published */}
+                  {/* Status */}
 
-                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-600 ring-1 ring-emerald-100">
+                  <span className="shrink-0 text-[10px] font-semibold text-emerald-600">
                     ● Published
                   </span>
                 </div>
-              </div>
 
-              {/* ==================================================
-                  WINNING NUMBER
-              ================================================== */}
+                {/* Divider */}
 
-              <div className="p-5 text-center">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                  Winning Number
-                </p>
+                <div className="my-4 border-t border-slate-100" />
 
-                <div className="mx-auto mt-2 flex h-16 w-20 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600 shadow-md shadow-purple-200/60 ring-4 ring-violet-100 transition-transform duration-200 group-hover:scale-105">
-                  <p className="text-3xl font-extrabold tracking-widest text-white">
-                    {latest3DResult.result}
-                  </p>
+                {/* Winning Number */}
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Winning Number
+                    </p>
+
+                    <p className="mt-1 text-xs font-medium text-purple-500">
+                      3D Lottery Result
+                    </p>
+                  </div>
+
+                  <div className="flex h-14 min-w-[86px] items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-indigo-600 px-3 shadow-sm transition-transform duration-200 group-hover:scale-105">
+                    <span className="text-3xl font-black leading-none tracking-widest text-white">
+                      {latest3DResult.result}
+                    </span>
+                  </div>
                 </div>
-
-                <p className="mt-3 text-[10px] text-slate-400">
-                  One winning number per 3D draw
-                </p>
-
-                {/* Small accent */}
-
-                <div className="mx-auto mt-3 h-1 w-8 rounded-full bg-gradient-to-r from-violet-300 to-purple-300" />
               </div>
             </div>
           )}
+        </div>
+
+        {/* ==================================================
+            MOBILE VIEW ALL
+        ================================================== */}
+
+        <div className="mt-5 flex justify-center sm:hidden">
+          <Link
+            to="/results-history"
+            className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-purple-600 transition hover:bg-purple-50"
+          >
+            View All Results
+            <span>→</span>
+          </Link>
         </div>
       </div>
     </section>
