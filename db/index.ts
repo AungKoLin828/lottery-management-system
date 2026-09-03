@@ -20,6 +20,7 @@ import * as publicHolidays from "./schema/publicHolidays";
 import * as numberRestrictions from "./schema/numberRestrictions";
 import * as drawSettings from "./schema/drawSettings";
 import * as lotteryNumberSettings from "./schema/lotteryNumberSettings";
+import * as announcements from "./schema/announcements";
 
 import * as relations from "./relations";
 
@@ -73,6 +74,7 @@ export const db = drizzle(pool, {
     ...ticketItems,
     ...settings,
     ...auditLogs,
+    ...announcements,
 
     /* ========================================================
        NEW LOTTERY SETTINGS SCHEMAS
@@ -118,5 +120,6 @@ export { publicHolidays };
 export { numberRestrictions };
 export { drawSettings };
 export { lotteryNumberSettings };
+export { announcements };
 
 export { relations };
