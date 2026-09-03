@@ -419,15 +419,7 @@ export default function PublicLayout() {
           <Link
             to="/"
             onClick={closeAllMenus}
-            className="
-    header-logo
-    group
-    flex
-    min-w-0
-    shrink-0
-    items-center
-    gap-2.5
-  "
+            className="header-logo group flex min-w-0 shrink-0 items-center gap-2.5"
             aria-label="LotteryPlay Home"
           >
             {/* New image logo */}
