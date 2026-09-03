@@ -8,8 +8,6 @@ const Weekly2DResults = lazy(() => import("@/components/home/Weekly2DResults"));
 
 const ThreeDResults = lazy(() => import("@/components/home/ThreeDResults"));
 
-const LuckyNumbers = lazy(() => import("@/components/home/LuckyNumbers"));
-
 const LotteryInformation = lazy(
   () => import("@/components/home/LotteryInformation"),
 );
@@ -39,10 +37,6 @@ export default function Home() {
 
       <Suspense fallback={<SectionLoader />}>
         <ThreeDResults />
-      </Suspense>
-
-      <Suspense fallback={<SectionLoader />}>
-        <LuckyNumbers />
       </Suspense>
 
       <Suspense fallback={<SectionLoader />}>
