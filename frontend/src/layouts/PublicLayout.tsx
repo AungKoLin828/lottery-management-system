@@ -434,7 +434,15 @@ export default function PublicLayout() {
             <img
               src="/logo.png"
               alt="Logo"
-              className="block h-9 w-auto max-w-[120px] object-contain transition-transform duration-200 group-hover:scale-105"
+              className="block
+                        h-7
+                        w-7
+                        shrink-0
+                        rounded-lg
+                        object-contain
+                        transition-transform
+                        duration-200
+                        group-hover:scale-105"
             />
 
             {/* Existing text */}
