@@ -10,17 +10,16 @@ import {
   Sparkles,
   Ticket,
   MoreHorizontal,
-  Menu,
-  X,
   LogIn,
   UserPlus,
+  Menu,
+  X,
   Download,
-  Smartphone,
-  Apple,
-  CheckCircle2,
 } from "lucide-react";
 
 import { useEffect, useRef, useState } from "react";
+
+import PWAInstallButton from "@/components/PWAInstallButton";
 
 /* ============================================================
    PUBLIC PLAY NAVIGATION
@@ -46,42 +45,31 @@ const playNavigation = [
 ============================================================ */
 
 /**
- * Returns true only when the application is actually running
- * in an installed / standalone PWA environment.
+ * Returns true ONLY when the application is actually running
+ * as an installed / standalone PWA.
  *
- * Normal browser:
+ * Normal mobile browser:
  *   false
  *
- * Installed PWA:
+ * Installed Android / Chrome PWA:
  *   true
  *
- * iOS Home Screen:
+ * iOS Add to Home Screen:
  *   true
  *
- * Android / Chrome standalone:
- *   true
- *
- * Fullscreen:
- *   true
- *
- * Minimal UI:
- *   true
+ * IMPORTANT:
+ * fullscreen and minimal-ui are intentionally NOT treated
+ * as installed PWA modes.
  */
 function isRunningAsPWA(): boolean {
   if (typeof window === "undefined") {
     return false;
   }
 
-  /* ==========================================================
-     STANDARD STANDALONE
-  ========================================================== */
-
+  /* Android / Chrome / Edge / modern browsers */
   const standalone = window.matchMedia("(display-mode: standalone)").matches;
 
-  /* ==========================================================
-     IOS SAFARI HOME SCREEN
-  ========================================================== */
-
+  /* iOS Safari Add to Home Screen */
   const iosStandalone =
     "standalone" in window.navigator &&
     Boolean(
@@ -92,40 +80,33 @@ function isRunningAsPWA(): boolean {
       ).standalone,
     );
 
-  /* ==========================================================
-     FULLSCREEN
-  ========================================================== */
-
-  const fullscreen = window.matchMedia("(display-mode: fullscreen)").matches;
-
-  /* ==========================================================
-     MINIMAL UI
-  ========================================================== */
-
-  const minimalUi = window.matchMedia("(display-mode: minimal-ui)").matches;
-
-  return standalone || iosStandalone || fullscreen || minimalUi;
+  return standalone || iosStandalone;
 }
 
 /* ============================================================
-   MOBILE IOS DETECTION
+   MEDIA QUERY LISTENER HELPER
 ============================================================ */
 
-function isIOSDevice(): boolean {
-  if (typeof window === "undefined") {
-    return false;
+function subscribeToMediaQuery(
+  mediaQuery: MediaQueryList,
+  listener: () => void,
+): () => void {
+  if (typeof mediaQuery.addEventListener === "function") {
+    mediaQuery.addEventListener("change", listener);
+
+    return () => {
+      mediaQuery.removeEventListener("change", listener);
+    };
   }
 
-  const userAgent = window.navigator.userAgent || "";
+  /*
+   * Older Safari fallback
+   */
+  mediaQuery.addListener(listener);
 
-  const platform = window.navigator.platform || "";
-
-  const maxTouchPoints = window.navigator.maxTouchPoints || 0;
-
-  return (
-    /iPad|iPhone|iPod/i.test(userAgent) ||
-    (platform === "MacIntel" && maxTouchPoints > 1)
-  );
+  return () => {
+    mediaQuery.removeListener(listener);
+  };
 }
 
 /* ============================================================
@@ -138,29 +119,20 @@ export default function PublicLayout() {
   /* ============================================================
      PWA STATE
 
-     Normal browser:
-       false
-       -> No PWA bottom navigation
-       -> Mobile hamburger/sidebar displayed
+     false:
+       Normal browser
+       - Mobile hamburger/sidebar
+       - No bottom navigation
 
-     Installed PWA:
-       true
-       -> PWA mobile bottom navigation displayed
-       -> Mobile hamburger/sidebar hidden
+     true:
+       Installed / standalone PWA
+       - No hamburger/sidebar
+       - PWA bottom navigation
   ============================================================ */
 
-  const [isInstalledPWA, setIsInstalledPWA] = useState(false);
-
-  /* ============================================================
-     PWA INSTALL STATE
-  ============================================================ */
-
-  const [deferredInstallPrompt, setDeferredInstallPrompt] =
-    useState<BeforeInstallPromptEvent | null>(null);
-
-  const [showInstallMenu, setShowInstallMenu] = useState(false);
-
-  const [isInstalling, setIsInstalling] = useState(false);
+  const [isInstalledPWA, setIsInstalledPWA] = useState<boolean>(() =>
+    isRunningAsPWA(),
+  );
 
   /* ============================================================
      MOBILE / PWA MENU STATE
@@ -170,7 +142,12 @@ export default function PublicLayout() {
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
   /* ============================================================
-     MOBILE BROWSER SIDEBAR STATE
+     MOBILE BROWSER SIDEBAR
+
+     Only available in normal mobile browser.
+
+     Installed PWA:
+       sidebar hidden
   ============================================================ */
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -188,115 +165,109 @@ export default function PublicLayout() {
   const playMenuRef = useRef<HTMLDivElement>(null);
 
   /* ============================================================
-     IOS
-  ============================================================ */
-
-  const iosDevice = isIOSDevice();
-
-  /* ============================================================
-     PWA INSTALL EVENT
+     DETECT PWA / STANDALONE MODE
   ============================================================ */
 
   useEffect(() => {
-    /**
-     * Chrome / Edge / Android install prompt.
-     *
-     * The browser fires this event when the application
-     * satisfies the PWA installation requirements.
-     */
-    const handleBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault();
+    const updatePWAState = () => {
+      const runningAsPWA = isRunningAsPWA();
 
-      setDeferredInstallPrompt(event as BeforeInstallPromptEvent);
+      setIsInstalledPWA(runningAsPWA);
+
+      /*
+       * If the app changes into PWA mode, close browser-only
+       * mobile navigation.
+       */
+      if (runningAsPWA) {
+        setMobileSidebarOpen(false);
+      }
     };
 
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    /*
+     * Initial detection.
+     */
+    updatePWAState();
 
-    /**
-     * Fires after successful PWA installation.
+    /*
+     * Standard standalone media query.
+     */
+    const standaloneMedia = window.matchMedia("(display-mode: standalone)");
+
+    const handleDisplayModeChange = () => {
+      updatePWAState();
+    };
+
+    const unsubscribeMediaQuery = subscribeToMediaQuery(
+      standaloneMedia,
+      handleDisplayModeChange,
+    );
+
+    /*
+     * Visibility change.
+     *
+     * Useful when:
+     * - user launches installed PWA
+     * - returns from Home Screen
+     * - switches applications
+     */
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        updatePWAState();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    /*
+     * Focus.
+     */
+    window.addEventListener("focus", updatePWAState);
+
+    /*
+     * pageshow.
+     */
+    window.addEventListener("pageshow", updatePWAState);
+
+    /*
+     * appinstalled:
+     *
+     * IMPORTANT:
+     * Do NOT force the interface into PWA mode here.
+     *
+     * The current browser tab may still be running in normal
+     * browser mode after installation.
+     *
+     * We only change the layout when the browser actually
+     * reports standalone mode.
      */
     const handleAppInstalled = () => {
-      setDeferredInstallPrompt(null);
-      setIsInstalling(false);
-      setShowInstallMenu(false);
-
-      setIsInstalledPWA(true);
+      updatePWAState();
     };
 
     window.addEventListener("appinstalled", handleAppInstalled);
 
     return () => {
-      window.removeEventListener(
-        "beforeinstallprompt",
-        handleBeforeInstallPrompt,
-      );
+      unsubscribeMediaQuery();
+
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+
+      window.removeEventListener("focus", updatePWAState);
+
+      window.removeEventListener("pageshow", updatePWAState);
 
       window.removeEventListener("appinstalled", handleAppInstalled);
     };
   }, []);
 
   /* ============================================================
-     DETECT PWA
+     CLOSE SIDEBAR WHEN PWA MODE BECOMES ACTIVE
   ============================================================ */
 
   useEffect(() => {
-    const checkPWAInstalled = () => {
-      setIsInstalledPWA(isRunningAsPWA());
-    };
-
-    /* Initial detection */
-    checkPWAInstalled();
-
-    /* ==========================================================
-       DISPLAY MODE MEDIA QUERIES
-    ========================================================== */
-
-    const standaloneMedia = window.matchMedia("(display-mode: standalone)");
-
-    const fullscreenMedia = window.matchMedia("(display-mode: fullscreen)");
-
-    const minimalUiMedia = window.matchMedia("(display-mode: minimal-ui)");
-
-    const handleDisplayModeChange = () => {
-      checkPWAInstalled();
-    };
-
-    standaloneMedia.addEventListener("change", handleDisplayModeChange);
-
-    fullscreenMedia.addEventListener("change", handleDisplayModeChange);
-
-    minimalUiMedia.addEventListener("change", handleDisplayModeChange);
-
-    /* ==========================================================
-       VISIBILITY CHANGE
-    ========================================================== */
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        checkPWAInstalled();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    /* ==========================================================
-       WINDOW FOCUS
-    ========================================================== */
-
-    window.addEventListener("focus", checkPWAInstalled);
-
-    return () => {
-      standaloneMedia.removeEventListener("change", handleDisplayModeChange);
-
-      fullscreenMedia.removeEventListener("change", handleDisplayModeChange);
-
-      minimalUiMedia.removeEventListener("change", handleDisplayModeChange);
-
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-
-      window.removeEventListener("focus", checkPWAInstalled);
-    };
-  }, []);
+    if (isInstalledPWA) {
+      setMobileSidebarOpen(false);
+    }
+  }, [isInstalledPWA]);
 
   /* ============================================================
      ACTIVE ROUTES
@@ -328,65 +299,17 @@ export default function PublicLayout() {
   const closeAllMenus = () => {
     setMobilePlayOpen(false);
     setMobileMoreOpen(false);
-    setMobileSidebarOpen(false);
     setDesktopPlayOpen(false);
-    setShowInstallMenu(false);
-  };
-
-  /* ============================================================
-     OPEN INSTALL MENU
-  ============================================================ */
-
-  const openInstallMenu = () => {
-    setShowInstallMenu(true);
-
-    setMobilePlayOpen(false);
-    setMobileMoreOpen(false);
     setMobileSidebarOpen(false);
-    setDesktopPlayOpen(false);
   };
 
   /* ============================================================
-     CLOSE INSTALL MENU
-  ============================================================ */
-
-  const closeInstallMenu = () => {
-    setShowInstallMenu(false);
-  };
-
-  /* ============================================================
-     NATIVE PWA INSTALL
-  ============================================================ */
-
-  const installPWA = async () => {
-    if (!deferredInstallPrompt) {
-      return;
-    }
-
-    try {
-      setIsInstalling(true);
-
-      await deferredInstallPrompt.prompt();
-
-      const choiceResult = await deferredInstallPrompt.userChoice;
-
-      if (choiceResult.outcome === "accepted") {
-        setDeferredInstallPrompt(null);
-      }
-    } catch (error) {
-      console.error("PWA installation error:", error);
-    } finally {
-      setIsInstalling(false);
-    }
-  };
-
-  /* ============================================================
-     MOBILE BROWSER SIDEBAR
+     MOBILE SIDEBAR
   ============================================================ */
 
   const toggleMobileSidebar = () => {
     /*
-     * Never open the sidebar in an installed PWA.
+     * Never allow the sidebar in installed PWA mode.
      */
     if (isInstalledPWA) {
       return;
@@ -397,25 +320,10 @@ export default function PublicLayout() {
     setMobilePlayOpen(false);
     setMobileMoreOpen(false);
     setDesktopPlayOpen(false);
-    setShowInstallMenu(false);
   };
 
   /* ============================================================
-     MOBILE BROWSER SIDEBAR NAVIGATION
-  ============================================================ */
-
-  const handleMobileSidebarNavigation = () => {
-    setMobileSidebarOpen(false);
-    closeAllMenus();
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  };
-
-  /* ============================================================
-     MOBILE / PWA NAVIGATION
+     MOBILE NAVIGATION
   ============================================================ */
 
   const handleMobileNavigation = () => {
@@ -433,7 +341,6 @@ export default function PublicLayout() {
 
   useEffect(() => {
     closeAllMenus();
-    setMobileSidebarOpen(false);
 
     window.scrollTo({
       top: 0,
@@ -447,7 +354,7 @@ export default function PublicLayout() {
 
   const toggleMobilePlay = () => {
     /*
-     * Never open this menu in a normal browser.
+     * Play popup is only for installed PWA.
      */
     if (!isInstalledPWA) {
       return;
@@ -456,9 +363,8 @@ export default function PublicLayout() {
     setMobilePlayOpen((current) => !current);
 
     setMobileMoreOpen(false);
-    setMobileSidebarOpen(false);
     setDesktopPlayOpen(false);
-    setShowInstallMenu(false);
+    setMobileSidebarOpen(false);
   };
 
   /* ============================================================
@@ -467,7 +373,7 @@ export default function PublicLayout() {
 
   const toggleMobileMore = () => {
     /*
-     * Never open this menu in a normal browser.
+     * More popup is only for installed PWA.
      */
     if (!isInstalledPWA) {
       return;
@@ -476,9 +382,8 @@ export default function PublicLayout() {
     setMobileMoreOpen((current) => !current);
 
     setMobilePlayOpen(false);
-    setMobileSidebarOpen(false);
     setDesktopPlayOpen(false);
-    setShowInstallMenu(false);
+    setMobileSidebarOpen(false);
   };
 
   /* ============================================================
@@ -491,7 +396,6 @@ export default function PublicLayout() {
     setMobilePlayOpen(false);
     setMobileMoreOpen(false);
     setMobileSidebarOpen(false);
-    setShowInstallMenu(false);
   };
 
   /* ============================================================
@@ -528,7 +432,45 @@ export default function PublicLayout() {
   }, []);
 
   /* ============================================================
-     DESKTOP NAV CLASS
+     ESCAPE KEY
+  ============================================================ */
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      closeAllMenus();
+    };
+
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  /* ============================================================
+     PREVENT BODY SCROLL WHEN MOBILE SIDEBAR IS OPEN
+  ============================================================ */
+
+  useEffect(() => {
+    if (!mobileSidebarOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileSidebarOpen]);
+
+  /* ============================================================
+     NAV CLASS
   ============================================================ */
 
   const navClass = (active: boolean) =>
@@ -560,7 +502,7 @@ export default function PublicLayout() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       {/* ======================================================
-          HEADER SAFE AREA
+          HEADER
       ======================================================= */}
 
       <header className="pwa-header-safe sticky top-0 z-50 border-b border-slate-700/80 bg-slate-900/95 backdrop-blur-xl">
@@ -593,7 +535,7 @@ export default function PublicLayout() {
           >
             <img
               src="/logo.png"
-              alt="Logo"
+              alt="LotteryPlay Logo"
               className="
                 block
                 h-7
@@ -639,9 +581,7 @@ export default function PublicLayout() {
               )}
             </Link>
 
-            {/* =================================================
-                PLAY
-            ================================================= */}
+            {/* PLAY */}
 
             <div ref={playMenuRef} className="relative">
               <button
@@ -766,31 +706,13 @@ export default function PublicLayout() {
                 <span className="absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/80" />
               )}
             </Link>
-
-            {/* =================================================
-                INSTALL APP
-            ================================================= */}
-
-            {!isInstalledPWA && (
-              <button
-                type="button"
-                onClick={openInstallMenu}
-                className={navClass(showInstallMenu)}
-              >
-                <Download size={17} />
-
-                <span>Install App</span>
-              </button>
-            )}
           </nav>
 
           {/* ==================================================
               DESKTOP AUTH
-          ================================================== */}
+          =================================================== */}
 
           <div className="hidden shrink-0 items-center gap-2 lg:flex">
-            {/* LOGIN */}
-
             <Link
               to="/login"
               onClick={closeAllMenus}
@@ -802,8 +724,6 @@ export default function PublicLayout() {
             >
               Login
             </Link>
-
-            {/* REGISTER */}
 
             <Link
               to="/register"
@@ -819,16 +739,44 @@ export default function PublicLayout() {
 
           {/* ==================================================
               MOBILE HEADER
-          ================================================== */}
+              
+              NORMAL MOBILE BROWSER:
+                Hamburger displayed
 
-          <div className="flex shrink-0 items-center lg:hidden">
+              INSTALLED PWA:
+                Hamburger hidden
+                Bottom navigation used
+          =================================================== */}
+
+          <div className="flex min-w-0 shrink-0 items-center gap-2 lg:hidden">
             {!isInstalledPWA && (
               <button
                 type="button"
                 onClick={toggleMobileSidebar}
-                aria-label={mobileSidebarOpen ? "Close menu" : "Open menu"}
+                aria-label={
+                  mobileSidebarOpen
+                    ? "Close navigation menu"
+                    : "Open navigation menu"
+                }
                 aria-expanded={mobileSidebarOpen}
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-300 transition-all duration-200 hover:bg-slate-700 hover:text-white active:scale-95"
+                className="
+                  flex
+                  h-10
+                  w-10
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-xl
+                  border
+                  border-slate-700
+                  bg-slate-800
+                  text-slate-300
+                  transition-all
+                  duration-200
+                  hover:bg-slate-700
+                  hover:text-white
+                  active:scale-95
+                "
               >
                 {mobileSidebarOpen ? (
                   <X className="h-5 w-5" />
@@ -837,290 +785,24 @@ export default function PublicLayout() {
                 )}
               </button>
             )}
+
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-300">
+              <Ticket className="h-[18px] w-[18px]" />
+            </div>
           </div>
         </div>
       </header>
 
       {/* ======================================================
-          INSTALL APP MENU / GUIDE
-      ======================================================= */}
+          MOBILE BROWSER SIDEBAR
 
-      {!isInstalledPWA && showInstallMenu && (
-        <>
-          {/* BACKDROP */}
+          ONLY NORMAL MOBILE BROWSER
 
-          <button
-            type="button"
-            aria-label="Close installation guide"
-            onClick={closeInstallMenu}
-            className="fixed inset-0 z-[150] bg-slate-950/60 backdrop-blur-[2px]"
-          />
+          Installed PWA:
+            - Never rendered
 
-          {/* INSTALL MENU */}
-
-          <div
-            className="
-                fixed
-                inset-x-4
-                top-1/2
-                z-[160]
-                max-h-[85vh]
-                -translate-y-1/2
-                overflow-y-auto
-                rounded-2xl
-                border
-                border-slate-700
-                bg-slate-900
-                shadow-2xl
-                shadow-slate-950/70
-                sm:left-1/2
-                sm:right-auto
-                sm:w-[440px]
-                sm:-translate-x-1/2
-              "
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="install-app-title"
-          >
-            {/* HEADER */}
-
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-700 bg-slate-900/98 px-4 py-4 backdrop-blur-xl">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white">
-                  <Download className="h-5 w-5" />
-                </div>
-
-                <div>
-                  <h2
-                    id="install-app-title"
-                    className="text-base font-bold text-white"
-                  >
-                    Install LotteryPlay
-                  </h2>
-
-                  <p className="text-xs text-slate-400">
-                    Install the app on your device
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={closeInstallMenu}
-                aria-label="Close installation guide"
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-400 transition-colors hover:bg-slate-700 hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="space-y-4 p-4">
-              {/* =================================================
-                    ANDROID
-                ================================================= */}
-
-              <div className="rounded-2xl border border-slate-700 bg-slate-800/70 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-400">
-                    <Smartphone className="h-5 w-5" />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-white">Android</h3>
-
-                    <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Recommended: Google Chrome
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  {/* NATIVE INSTALL */}
-
-                  {deferredInstallPrompt ? (
-                    <button
-                      type="button"
-                      onClick={installPWA}
-                      disabled={isInstalling}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3 text-sm font-bold text-white shadow-md shadow-indigo-900/30 transition-all hover:from-indigo-500 hover:to-violet-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <Download className="h-4 w-4" />
-
-                      {isInstalling ? "Installing..." : "Install App"}
-                    </button>
-                  ) : (
-                    <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-3">
-                      <p className="text-xs font-semibold text-slate-300">
-                        If the Install button is not shown:
-                      </p>
-
-                      <ol className="mt-2 space-y-2 text-xs leading-5 text-slate-400">
-                        <li>
-                          <span className="font-semibold text-slate-300">
-                            1.
-                          </span>{" "}
-                          Open this website in Chrome.
-                        </li>
-
-                        <li>
-                          <span className="font-semibold text-slate-300">
-                            2.
-                          </span>{" "}
-                          Tap the{" "}
-                          <span className="font-semibold text-white">⋮</span>{" "}
-                          menu.
-                        </li>
-
-                        <li>
-                          <span className="font-semibold text-slate-300">
-                            3.
-                          </span>{" "}
-                          Select{" "}
-                          <span className="font-semibold text-indigo-300">
-                            Install app
-                          </span>{" "}
-                          or{" "}
-                          <span className="font-semibold text-indigo-300">
-                            Add to Home screen
-                          </span>
-                          .
-                        </li>
-
-                        <li>
-                          <span className="font-semibold text-slate-300">
-                            4.
-                          </span>{" "}
-                          Confirm the installation.
-                        </li>
-                      </ol>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* =================================================
-                    IOS
-                ================================================= */}
-
-              <div className="rounded-2xl border border-slate-700 bg-slate-800/70 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-700 text-slate-200">
-                    <Apple className="h-5 w-5" />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-white">iPhone / iPad</h3>
-
-                    <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Add LotteryPlay to your Home Screen
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/70 p-3">
-                  <ol className="space-y-3 text-xs leading-5 text-slate-400">
-                    <li className="flex gap-2">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-[10px] font-bold text-indigo-300">
-                        1
-                      </span>
-
-                      <span>
-                        Open LotteryPlay in{" "}
-                        <span className="font-semibold text-white">Safari</span>
-                        .
-                      </span>
-                    </li>
-
-                    <li className="flex gap-2">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-[10px] font-bold text-indigo-300">
-                        2
-                      </span>
-
-                      <span>
-                        Tap the{" "}
-                        <span className="font-semibold text-white">Share</span>{" "}
-                        button in Safari.
-                      </span>
-                    </li>
-
-                    <li className="flex gap-2">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-[10px] font-bold text-indigo-300">
-                        3
-                      </span>
-
-                      <span>
-                        Scroll down and select{" "}
-                        <span className="font-semibold text-white">
-                          Add to Home Screen
-                        </span>
-                        .
-                      </span>
-                    </li>
-
-                    <li className="flex gap-2">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-[10px] font-bold text-indigo-300">
-                        4
-                      </span>
-
-                      <span>
-                        Tap{" "}
-                        <span className="font-semibold text-white">Add</span> to
-                        confirm.
-                      </span>
-                    </li>
-                  </ol>
-                </div>
-
-                {iosDevice && (
-                  <div className="mt-3 flex gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/10 p-3">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-indigo-400" />
-
-                    <p className="text-xs leading-5 text-indigo-200">
-                      You appear to be using an Apple device. For the best PWA
-                      installation experience, use Safari.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* =================================================
-                    WHAT HAPPENS AFTER INSTALL
-                ================================================= */}
-
-              <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-4">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  After installation
-                </p>
-
-                <div className="mt-3 space-y-2 text-xs leading-5 text-slate-400">
-                  <p>
-                    <span className="font-semibold text-slate-300">
-                      Android:
-                    </span>{" "}
-                    LotteryPlay opens as an installed app without normal browser
-                    controls.
-                  </p>
-
-                  <p>
-                    <span className="font-semibold text-slate-300">
-                      iPhone / iPad:
-                    </span>{" "}
-                    open LotteryPlay from your Home Screen after adding it.
-                  </p>
-
-                  <p>
-                    The mobile bottom navigation will then automatically be used
-                    inside the installed PWA.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ======================================================
-          MOBILE BROWSER HAMBURGER SIDEBAR
+          Desktop:
+            - Hidden
       ======================================================= */}
 
       {!isInstalledPWA && mobileSidebarOpen && (
@@ -1129,251 +811,264 @@ export default function PublicLayout() {
 
           <button
             type="button"
-            aria-label="Close mobile menu"
+            aria-label="Close navigation menu"
             onClick={() => setMobileSidebarOpen(false)}
-            className="fixed inset-0 z-[90] bg-slate-950/60 backdrop-blur-[2px] lg:hidden"
+            className="
+                fixed
+                inset-0
+                z-[90]
+                bg-slate-950/60
+                backdrop-blur-[2px]
+                lg:hidden
+              "
           />
 
           {/* SIDEBAR */}
 
           <aside
-            className="fixed inset-y-0 left-0 z-[100] flex w-[min(84vw,320px)] flex-col border-r border-slate-700 bg-slate-900 shadow-2xl shadow-slate-950/60 lg:hidden"
-            aria-label="Mobile navigation"
+            className="
+                fixed
+                inset-y-0
+                left-0
+                z-[100]
+                flex
+                w-[min(84vw,320px)]
+                flex-col
+                border-r
+                border-slate-700
+                bg-slate-900
+                shadow-2xl
+                shadow-slate-950/60
+                lg:hidden
+              "
+            aria-label="Public navigation"
           >
             {/* SIDEBAR HEADER */}
 
-            <div className="pwa-header-safe flex min-h-[64px] shrink-0 items-center justify-between border-b border-slate-700/80 px-4 sm:min-h-[72px] sm:px-6">
-              <Link
-                to="/"
-                onClick={handleMobileSidebarNavigation}
-                className="flex min-w-0 items-center gap-2.5"
-                aria-label="LotteryPlay Home"
-              >
-                <img
-                  src="/logo.png"
-                  alt="Logo"
-                  className="block h-7 w-7 shrink-0 rounded-lg object-contain"
-                />
+            <div className="pwa-header-safe border-b border-slate-700">
+              <div className="flex h-[64px] items-center justify-between px-4 sm:h-[72px]">
+                <Link
+                  to="/"
+                  onClick={closeAllMenus}
+                  className="flex items-center gap-2.5"
+                >
+                  <img
+                    src="/logo.png"
+                    alt="LotteryPlay Logo"
+                    className="h-8 w-8 rounded-lg object-contain"
+                  />
 
-                <div className="flex min-w-0 items-center">
-                  <span className="text-lg font-extrabold tracking-tight text-white">
-                    AB
-                  </span>
+                  <div className="flex items-center">
+                    <span className="text-lg font-extrabold text-white">
+                      AB
+                    </span>
 
-                  <span className="text-lg font-extrabold tracking-tight text-indigo-400">
-                    CD
-                  </span>
-                </div>
-              </Link>
+                    <span className="text-lg font-extrabold text-indigo-400">
+                      CD
+                    </span>
+                  </div>
+                </Link>
 
-              <button
-                type="button"
-                onClick={() => setMobileSidebarOpen(false)}
-                aria-label="Close menu"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileSidebarOpen(false)}
+                  aria-label="Close navigation menu"
+                  className="
+                      flex
+                      h-9
+                      w-9
+                      items-center
+                      justify-center
+                      rounded-xl
+                      border
+                      border-slate-700
+                      bg-slate-800
+                      text-slate-300
+                      transition
+                      hover:bg-slate-700
+                      hover:text-white
+                    "
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             {/* SIDEBAR CONTENT */}
 
-            <div className="flex-1 overflow-y-auto px-3 py-4">
-              <div className="space-y-1">
-                {/* HOME */}
+            <div className="flex-1 overflow-y-auto p-3">
+              {/* HOME */}
 
-                <Link
-                  to="/"
-                  onClick={handleMobileSidebarNavigation}
-                  className={`flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
-                    isActive("/")
-                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
-                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
+              <Link
+                to="/"
+                onClick={handleMobileNavigation}
+                className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
+                  isActive("/")
+                    ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                }`}
+              >
+                <span
+                  className={`flex h-9 w-9 items-center justify-center rounded-lg ${
+                    isActive("/") ? "bg-white/10" : "bg-slate-800"
                   }`}
                 >
-                  <Home className="h-5 w-5 shrink-0" />
+                  <Home className="h-5 w-5" />
+                </span>
 
-                  <span>Home</span>
-                </Link>
+                <span>Home</span>
+              </Link>
 
-                {/* PLAY */}
+              {/* PLAY SECTION */}
 
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMobilePlayOpen((current) => !current);
+              <div className="mt-2">
+                <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Play
+                </p>
 
-                      setMobileMoreOpen(false);
-                    }}
-                    aria-haspopup="menu"
-                    aria-expanded={mobilePlayOpen}
-                    className={`flex min-h-12 w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm font-semibold transition-all ${
-                      isPlayActive || mobilePlayOpen
-                        ? "bg-indigo-500/15 text-indigo-300"
-                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                    }`}
-                  >
-                    <span className="flex items-center gap-3">
-                      <Dice5 className="h-5 w-5 shrink-0" />
+                {playNavigation.map((item, index) => {
+                  const Icon = item.icon;
+                  const is2D = index === 0;
 
-                      <span>Play</span>
-                    </span>
-
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform duration-200 ${
-                        mobilePlayOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-
-                  {mobilePlayOpen && (
-                    <div className="mt-1 space-y-1 pl-3">
-                      {playNavigation.map((item, index) => {
-                        const Icon = item.icon;
-
-                        const is2D = index === 0;
-
-                        return (
-                          <button
-                            key={item.path}
-                            type="button"
-                            onClick={() => handlePlay(item.path)}
-                            className={playItemClass(
-                              location.pathname === item.path,
-                              is2D,
-                            )}
-                          >
-                            <div
-                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                                is2D
-                                  ? "bg-indigo-500/15 text-indigo-400"
-                                  : "bg-violet-500/15 text-violet-400"
-                              }`}
-                            >
-                              <Icon className="h-4 w-4" />
-                            </div>
-
-                            <div className="min-w-0">
-                              <p className="text-sm font-bold text-white">
-                                {item.name}
-                              </p>
-
-                              <p className="mt-0.5 text-xs text-slate-400">
-                                {item.description}
-                              </p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* RESULTS HISTORY */}
-
-                <Link
-                  to="/results-history"
-                  onClick={handleMobileSidebarNavigation}
-                  className={`flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
-                    isActive("/results-history")
-                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
-                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                  }`}
-                >
-                  <BarChart3 className="h-5 w-5 shrink-0" />
-
-                  <span>Results History</span>
-                </Link>
-
-                {/* ABOUT */}
-
-                <Link
-                  to="/about"
-                  onClick={handleMobileSidebarNavigation}
-                  className={`flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
-                    isActive("/about")
-                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
-                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                  }`}
-                >
-                  <Info className="h-5 w-5 shrink-0" />
-
-                  <span>About</span>
-                </Link>
-
-                {/* =================================================
-                      INSTALL APP
-                  ================================================= */}
-
-                {!isInstalledPWA && (
-                  <div className="pt-1">
-                    <button
-                      type="button"
-                      onClick={openInstallMenu}
-                      className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-300 transition-all hover:bg-slate-800 hover:text-white"
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={handleMobileNavigation}
+                      className={playItemClass(
+                        location.pathname === item.path,
+                        is2D,
+                      )}
                     >
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400">
-                        <Download className="h-5 w-5" />
-                      </span>
+                      <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                          is2D
+                            ? "bg-indigo-500/15 text-indigo-400"
+                            : "bg-violet-500/15 text-violet-400"
+                        }`}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </div>
 
-                      <span>Install App</span>
-                    </button>
-                  </div>
-                )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-white">
+                          {item.name}
+                        </p>
+
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          {item.description}
+                        </p>
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
 
-              {/* AUTH */}
+              {/* RESULTS */}
 
-              <div className="mt-6 border-t border-slate-800 pt-4">
-                <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <Link
+                to="/results-history"
+                onClick={handleMobileNavigation}
+                className={`mt-2 flex min-h-11 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
+                  isActive("/results-history")
+                    ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                }`}
+              >
+                <span
+                  className={`flex h-9 w-9 items-center justify-center rounded-lg ${
+                    isActive("/results-history")
+                      ? "bg-white/10"
+                      : "bg-slate-800"
+                  }`}
+                >
+                  <BarChart3 className="h-5 w-5" />
+                </span>
+
+                <span>Results History</span>
+              </Link>
+
+              {/* ABOUT */}
+
+              <Link
+                to="/about"
+                onClick={handleMobileNavigation}
+                className={`mt-1 flex min-h-11 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
+                  isActive("/about")
+                    ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                }`}
+              >
+                <span
+                  className={`flex h-9 w-9 items-center justify-center rounded-lg ${
+                    isActive("/about") ? "bg-white/10" : "bg-slate-800"
+                  }`}
+                >
+                  <Info className="h-5 w-5" />
+                </span>
+
+                <span>About</span>
+              </Link>
+
+              {/* ACCOUNT */}
+
+              <div className="mt-4 border-t border-slate-800 pt-3">
+                <p className="px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   Account
                 </p>
 
-                <div className="space-y-1">
-                  {/* LOGIN */}
+                {/* LOGIN */}
 
-                  <Link
-                    to="/login"
-                    onClick={handleMobileSidebarNavigation}
-                    className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all ${
-                      isActive("/login")
-                        ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
-                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                    }`}
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
-                      <LogIn size={17} />
-                    </span>
+                <Link
+                  to="/login"
+                  onClick={handleMobileNavigation}
+                  className={`mt-1 flex min-h-11 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
+                    isActive("/login")
+                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                  }`}
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800">
+                    <LogIn className="h-5 w-5" />
+                  </span>
 
-                    <span>Login</span>
-                  </Link>
+                  <span>Login</span>
+                </Link>
 
-                  {/* REGISTER */}
+                {/* REGISTER */}
 
-                  <Link
-                    to="/register"
-                    onClick={handleMobileSidebarNavigation}
-                    className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all ${
-                      isActive("/register")
-                        ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
-                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                    }`}
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
-                      <UserPlus size={17} />
-                    </span>
+                <Link
+                  to="/register"
+                  onClick={handleMobileNavigation}
+                  className={`mt-1 flex min-h-11 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
+                    isActive("/register")
+                      ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                  }`}
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800">
+                    <UserPlus className="h-5 w-5" />
+                  </span>
 
-                    <span>Register</span>
-                  </Link>
-                </div>
+                  <span>Register</span>
+                </Link>
+
+                {/* INSTALL */}
+
+                {!isInstalledPWA && (
+                  <div className="mt-1">
+                    <PWAInstallButton />
+                  </div>
+                )}
               </div>
             </div>
 
             {/* SIDEBAR FOOTER */}
 
-            <div className="shrink-0 border-t border-slate-800 px-4 py-4 text-center text-[11px] text-slate-500">
-              LotteryPlay
+            <div className="border-t border-slate-800 px-4 py-4">
+              <p className="text-center text-[10px] text-slate-500">
+                LotteryPlay
+              </p>
             </div>
           </aside>
         </>
@@ -1381,6 +1076,8 @@ export default function PublicLayout() {
 
       {/* ======================================================
           MOBILE / PWA PLAY POPUP
+
+          ONLY INSTALLED PWA
       ======================================================= */}
 
       {isInstalledPWA && mobilePlayOpen && (
@@ -1399,14 +1096,13 @@ export default function PublicLayout() {
             <div className="grid grid-cols-2 gap-2">
               {playNavigation.map((item, index) => {
                 const Icon = item.icon;
-
                 const is2D = index === 0;
 
                 return (
-                  <button
+                  <Link
                     key={item.path}
-                    type="button"
-                    onClick={() => handlePlay(item.path)}
+                    to={item.path}
+                    onClick={handleMobileNavigation}
                     className={`flex flex-col items-center justify-center rounded-xl border px-3 py-4 text-center transition-all ${
                       location.pathname === item.path
                         ? is2D
@@ -1430,7 +1126,7 @@ export default function PublicLayout() {
                     <span className="mt-0.5 text-[9px] text-slate-500">
                       {item.description}
                     </span>
-                  </button>
+                  </Link>
                 );
               })}
             </div>
@@ -1440,6 +1136,8 @@ export default function PublicLayout() {
 
       {/* ======================================================
           MOBILE / PWA MORE POPUP
+
+          ONLY INSTALLED PWA
       ======================================================= */}
 
       {isInstalledPWA && mobileMoreOpen && (
@@ -1498,6 +1196,15 @@ export default function PublicLayout() {
 
       {/* ======================================================
           MOBILE / PWA BOTTOM NAVIGATION
+
+          Normal mobile browser:
+            NOT rendered
+
+          Installed PWA:
+            Rendered
+
+          Desktop:
+            Hidden
       ======================================================= */}
 
       {isInstalledPWA && (
@@ -1827,19 +1534,20 @@ export default function PublicLayout() {
           </div>
         </div>
       </footer>
+
+      {/* ======================================================
+          PWA INSTALL BUTTON
+
+          Normal browser only.
+
+          Installed PWA:
+            PWAInstallButton remains mounted if its own
+            component handles installed state, but the
+            component should not display an install action
+            once the app is already installed.
+      ======================================================= */}
+
+      {!isInstalledPWA && <PWAInstallButton />}
     </div>
   );
-}
-
-/* ============================================================
-   BEFORE INSTALL PROMPT TYPE
-============================================================ */
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt(): Promise<void>;
-
-  userChoice: Promise<{
-    outcome: "accepted" | "dismissed";
-    platform: string;
-  }>;
 }
