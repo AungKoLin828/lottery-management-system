@@ -14,7 +14,6 @@ import {
   UserPlus,
   Menu,
   X,
-  Download,
 } from "lucide-react";
 
 import { useEffect, useRef, useState } from "react";
