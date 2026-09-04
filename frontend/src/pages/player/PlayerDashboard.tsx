@@ -109,22 +109,6 @@ function formatDate(date: string): string {
   });
 }
 
-function getInitials(name: string): string {
-  const value = name.trim();
-
-  if (!value) {
-    return "P";
-  }
-
-  const parts = value.split(/\s+/);
-
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase();
-  }
-
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-}
-
 function maskPlayerName(name: string): string {
   if (!name) {
     return "Player";
@@ -222,6 +206,7 @@ function ResultCard({
       {featured && (
         <>
           <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-emerald-400/10 blur-2xl" />
+
           <div className="absolute -bottom-12 -left-12 h-28 w-28 rounded-full bg-cyan-400/10 blur-2xl" />
         </>
       )}
@@ -339,7 +324,7 @@ function QuickPlayCard({
       to={href}
       className="group relative overflow-hidden rounded-[28px] border border-white/10 bg-[#101923] p-5 text-white shadow-[0_18px_50px_rgba(2,8,23,0.16)] transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-[0_24px_60px_rgba(2,8,23,0.25)] sm:p-6"
     >
-      {/* Decorative circles */}
+      {/* Decorative background */}
       <div
         className={[
           "absolute -right-12 -top-12 h-40 w-40 rounded-full blur-[1px]",
@@ -347,14 +332,9 @@ function QuickPlayCard({
         ].join(" ")}
       />
 
-      <div
-        className={[
-          "absolute -bottom-16 -left-12 h-36 w-36 rounded-full",
-          "border border-white/[0.04]",
-        ].join(" ")}
-      />
+      <div className="absolute -bottom-16 -left-12 h-36 w-36 rounded-full border border-white/[0.04]" />
 
-      <div className="absolute right-5 top-5 flex gap-1.5 opacity-50">
+      <div className="absolute right-5 top-5 flex gap-1.5 opacity-30">
         <span className="h-1.5 w-1.5 rounded-full bg-white" />
         <span className="h-1.5 w-1.5 rounded-full bg-white/60" />
         <span className="h-1.5 w-1.5 rounded-full bg-white/30" />
@@ -403,13 +383,7 @@ function QuickPlayCard({
             </p>
           </div>
 
-          <div
-            className={[
-              "flex h-11 w-11 items-center justify-center rounded-full",
-              "border border-white/10 bg-white/5",
-              "transition-transform duration-300 group-hover:translate-x-1",
-            ].join(" ")}
-          >
+          <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 transition-transform duration-300 group-hover:translate-x-1">
             <ArrowRight size={18} />
           </div>
         </div>
@@ -493,7 +467,7 @@ function WinnerRow({ winner, rank }: { winner: Winner; rank: number }) {
 }
 
 /* ============================================================
-   LOADING
+   LOADING SKELETON
 ============================================================ */
 
 function DashboardSkeleton() {
@@ -504,6 +478,7 @@ function DashboardSkeleton() {
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="h-56 rounded-[28px] bg-slate-200" />
+
           <div className="h-56 rounded-[28px] bg-slate-200" />
         </div>
 
@@ -543,8 +518,11 @@ function EmptyResults() {
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
+
   const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState("");
+
   const [refreshing, setRefreshing] = useState(false);
 
   /* ==========================================================
@@ -604,6 +582,10 @@ export default function Dashboard() {
         throw new Error("Dashboard statistics are unavailable");
       }
 
+      /* --------------------------------------------------------
+         NORMALIZE LATEST RESULTS
+      -------------------------------------------------------- */
+
       let normalizedLatestResults: LatestDraw[] = [];
 
       if (
@@ -628,6 +610,10 @@ export default function Dashboard() {
           }));
       }
 
+      /* --------------------------------------------------------
+         BACKWARD COMPATIBILITY
+      -------------------------------------------------------- */
+
       if (normalizedLatestResults.length === 0 && result.latestDraw) {
         normalizedLatestResults = [
           {
@@ -641,6 +627,10 @@ export default function Dashboard() {
         ];
       }
 
+      /* --------------------------------------------------------
+         NORMALIZE WINNERS
+      -------------------------------------------------------- */
+
       const normalizedWinners: Winner[] = Array.isArray(result.winners)
         ? result.winners
             .filter((winner) => winner && typeof winner.id === "string")
@@ -651,6 +641,10 @@ export default function Dashboard() {
               date: winner.date ?? "",
             }))
         : [];
+
+      /* --------------------------------------------------------
+         FINAL NORMALIZED DATA
+      -------------------------------------------------------- */
 
       const normalizedData: DashboardData = {
         user: {
@@ -665,8 +659,11 @@ export default function Dashboard() {
 
         stats: {
           walletBalance: Number(result.stats.walletBalance ?? 0),
+
           totalTickets: Number(result.stats.totalTickets ?? 0),
+
           totalDeposit: Number(result.stats.totalDeposit ?? 0),
+
           totalWithdraw: Number(result.stats.totalWithdraw ?? 0),
         },
 
@@ -704,6 +701,7 @@ export default function Dashboard() {
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
+
       await loadDashboard();
     } finally {
       setRefreshing(false);
@@ -759,7 +757,7 @@ export default function Dashboard() {
   }, [data]);
 
   /* ==========================================================
-     LATEST FEATURED RESULT
+     FEATURED RESULT
   ========================================================== */
 
   const featuredResult = useMemo(() => {
@@ -811,9 +809,13 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={handleRefresh}
-                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-slate-800"
+                disabled={refreshing}
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <RefreshCw size={14} />
+                <RefreshCw
+                  size={14}
+                  className={refreshing ? "animate-spin" : undefined}
+                />
                 Try Again
               </button>
             </div>
@@ -824,7 +826,7 @@ export default function Dashboard() {
   }
 
   /* ==========================================================
-     MAIN
+     MAIN DASHBOARD
   ========================================================== */
 
   return (
@@ -835,9 +837,11 @@ export default function Dashboard() {
         ==================================================== */}
 
         <section className="relative overflow-hidden rounded-[30px] bg-[#0b151d] shadow-[0_18px_50px_rgba(15,23,42,0.16)]">
-          {/* Background decoration */}
+          {/* Decorative circles */}
           <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full border border-emerald-300/10" />
+
           <div className="absolute -right-5 -top-10 h-40 w-40 rounded-full border border-emerald-300/[0.07]" />
+
           <div className="absolute -bottom-24 left-1/3 h-52 w-52 rounded-full bg-emerald-400/[0.04] blur-2xl" />
 
           <div className="absolute right-[18%] top-8 hidden gap-2 opacity-30 sm:flex">
@@ -851,6 +855,7 @@ export default function Dashboard() {
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/10 bg-emerald-300/[0.06] px-3 py-1.5">
                 <span className="relative flex h-2 w-2">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-60" />
+
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300" />
                 </span>
 
@@ -888,7 +893,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Featured latest number */}
+            {/* Featured result */}
             <div className="relative shrink-0">
               {featuredResult ? (
                 <div className="flex items-center gap-4 rounded-[24px] border border-white/10 bg-white/[0.04] p-4 sm:p-5">
@@ -962,7 +967,7 @@ export default function Dashboard() {
         </section>
 
         {/* ====================================================
-            RESULTS BOARD
+            LATEST RESULTS
         ==================================================== */}
 
         <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
@@ -1018,7 +1023,7 @@ export default function Dashboard() {
               <EmptyResults />
             ) : (
               <div className="grid gap-3 md:grid-cols-3">
-                {latestResults.slice(0, 3).map((draw, index) => (
+                {latestResults.slice(0, 3).map((draw) => (
                   <ResultCard
                     key={draw.id}
                     draw={draw}
@@ -1043,7 +1048,7 @@ export default function Dashboard() {
         </section>
 
         {/* ====================================================
-            WINNERS
+            LATEST WINNERS
         ==================================================== */}
 
         <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
