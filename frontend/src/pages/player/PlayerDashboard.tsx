@@ -3,19 +3,13 @@ import {
   CalendarDays,
   ChevronRight,
   Clock3,
-  Crown,
   Dice5,
-  Gamepad2,
-  Medal,
-  RefreshCw,
   Sparkles,
   Trophy,
-  Zap,
+  UserRound,
 } from "lucide-react";
-
-import { useCallback, useEffect, useMemo, useState } from "react";
-
 import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 /* ============================================================
    TYPES
@@ -79,316 +73,150 @@ type DashboardResponse = {
    HELPERS
 ============================================================ */
 
-function formatMoney(value: number | string | null | undefined): string {
-  const amount = Number(value ?? 0);
+const formatMoney = (value: number) => {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+  }).format(value);
+};
 
-  if (!Number.isFinite(amount)) {
-    return "0";
+const formatDate = (value: string) => {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
   }
 
-  return amount.toLocaleString("en-US", {
-    maximumFractionDigits: 2,
-  });
-}
-
-function formatDate(date: string): string {
-  if (!date) {
-    return "—";
-  }
-
-  const parsed = new Date(date);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return date;
-  }
-
-  return parsed.toLocaleDateString("en-US", {
+  return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
-  });
-}
+  }).format(date);
+};
 
-function maskPlayerName(name: string): string {
-  if (!name) {
-    return "Player";
+const formatTime = (value: string) => {
+  if (!value) return "—";
+
+  /*
+   * Handles:
+   * 10:30
+   * 10:30:00
+   * 2026-09-04T10:30:00
+   */
+  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(value)) {
+    const parts = value.split(":");
+
+    const hours = Number(parts[0]);
+    const minutes = Number(parts[1]);
+
+    if (!Number.isNaN(hours) && !Number.isNaN(minutes)) {
+      const suffix = hours >= 12 ? "PM" : "AM";
+      const displayHour = hours % 12 || 12;
+
+      return `${displayHour}:${String(minutes).padStart(2, "0")} ${suffix}`;
+    }
   }
 
-  const trimmed = name.trim();
+  const date = new Date(value);
 
-  if (trimmed.length <= 2) {
-    return `${trimmed[0] ?? "P"}***`;
+  if (Number.isNaN(date.getTime())) {
+    return value;
   }
 
-  if (trimmed.length <= 5) {
-    return `${trimmed.slice(0, 2)}***`;
-  }
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+};
 
-  return `${trimmed.slice(0, 3)}***`;
-}
+const getSessionLabel = (draw: LatestDraw) => {
+  if (draw.type === "3D") return "3D";
+  return draw.session ? `2D ${draw.session}` : "2D";
+};
 
-function normalizeNumber(value: string, type: "2D" | "3D"): string {
-  const length = type === "2D" ? 2 : 3;
-
-  return String(value ?? "")
-    .replace(/\D/g, "")
-    .padStart(length, "0")
-    .slice(-length);
-}
-
-function getResultLabel(draw: LatestDraw): string {
-  if (draw.type === "3D") {
-    return "3D";
-  }
-
-  return draw.session === "AM" ? "2D AM" : "2D PM";
-}
-
-/* ============================================================
-   NUMBER BALL
-============================================================ */
-
-function NumberBall({
-  value,
-  size = "normal",
-}: {
-  value: string;
-  size?: "small" | "normal" | "large";
-}) {
-  const sizeClass =
-    size === "small"
-      ? "h-8 w-8 text-[11px]"
-      : size === "large"
-        ? "h-20 w-20 text-2xl sm:h-24 sm:w-24 sm:text-3xl"
-        : "h-14 w-14 text-lg";
-
-  return (
-    <div
-      className={[
-        "relative flex shrink-0 items-center justify-center rounded-full",
-        "border border-white/15 bg-white/[0.08]",
-        "font-black tracking-tight text-white",
-        "shadow-[0_10px_30px_rgba(0,0,0,0.25)]",
-        "before:absolute before:inset-[5px] before:rounded-full",
-        "before:border before:border-white/[0.08]",
-        sizeClass,
-      ].join(" ")}
-    >
-      <span className="relative z-10">{value}</span>
-    </div>
-  );
-}
+const getWinnerSessionLabel = (winner: Winner) => {
+  if (winner.type === "3D") return "3D";
+  return winner.session ? `2D ${winner.session}` : "2D";
+};
 
 /* ============================================================
    RESULT CARD
 ============================================================ */
 
-function ResultCard({
-  draw,
-  featured = false,
-}: {
-  draw: LatestDraw;
-  featured?: boolean;
-}) {
-  const number = normalizeNumber(draw.number, draw.type);
-  const label = getResultLabel(draw);
+function ResultCard({ draw }: { draw: LatestDraw }) {
+  const is3D = draw.type === "3D";
+  const isAM = draw.session === "AM";
 
   return (
-    <div
-      className={[
-        "group relative overflow-hidden rounded-[24px] border",
-        "transition-all duration-300",
-        featured
-          ? "border-emerald-400/30 bg-[#10251f]"
-          : "border-slate-200 bg-white hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-xl",
-      ].join(" ")}
-    >
-      {featured && (
-        <>
-          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-emerald-400/10 blur-2xl" />
-
-          <div className="absolute -bottom-12 -left-12 h-28 w-28 rounded-full bg-cyan-400/10 blur-2xl" />
-        </>
-      )}
-
-      <div className="relative p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <span
-                className={[
-                  "rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]",
-                  featured
-                    ? "bg-emerald-400/15 text-emerald-300"
-                    : "bg-slate-900 text-white",
-                ].join(" ")}
-              >
-                {draw.type}
-              </span>
-
-              {draw.session && (
-                <span
-                  className={[
-                    "rounded-full px-2.5 py-1 text-[10px] font-bold",
-                    featured
-                      ? "bg-white/10 text-white/70"
-                      : "bg-slate-100 text-slate-500",
-                  ].join(" ")}
-                >
-                  {draw.session}
-                </span>
-              )}
-            </div>
-
-            <p
-              className={[
-                "mt-2 text-xs font-medium",
-                featured ? "text-white/50" : "text-slate-400",
-              ].join(" ")}
-            >
-              {label}
-            </p>
-          </div>
-
-          {featured && (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-400/10 text-emerald-300">
-              <Sparkles size={15} />
-            </div>
-          )}
-        </div>
-
-        <div className="mt-5 flex items-center justify-center">
+    <div className="group rounded-2xl border border-slate-200 bg-white p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
           <div
             className={[
-              "relative flex items-center justify-center rounded-2xl px-6 py-4",
-              featured ? "bg-black/20" : "bg-slate-50",
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+              is3D
+                ? "bg-blue-50 text-blue-600"
+                : isAM
+                  ? "bg-emerald-50 text-emerald-600"
+                  : "bg-orange-50 text-orange-600",
             ].join(" ")}
           >
+            <Dice5 className="h-5 w-5" />
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              {getSessionLabel(draw)}
+            </p>
+
+            <p className="mt-0.5 text-xs text-slate-500">Latest result</p>
+          </div>
+        </div>
+
+        <span
+          className={[
+            "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+            is3D
+              ? "bg-blue-50 text-blue-600"
+              : isAM
+                ? "bg-emerald-50 text-emerald-600"
+                : "bg-orange-50 text-orange-600",
+          ].join(" ")}
+        >
+          {draw.type}
+        </span>
+      </div>
+
+      <div className="mt-5 flex items-end justify-between gap-3">
+        <div>
+          <p className="text-xs text-slate-400">Winning Number</p>
+
+          <div className="mt-2 flex h-14 items-center rounded-xl bg-slate-50 px-5">
             <span
               className={[
-                "font-black tracking-[0.16em]",
-                featured
-                  ? "text-3xl text-white sm:text-4xl"
-                  : "text-3xl text-slate-900",
+                "font-mono font-bold tracking-[0.18em] text-slate-900",
+                is3D ? "text-2xl" : "text-3xl",
               ].join(" ")}
             >
-              {number}
+              {draw.number}
             </span>
           </div>
         </div>
 
-        <div
-          className={[
-            "mt-4 flex items-center justify-between text-[11px]",
-            featured ? "text-white/40" : "text-slate-400",
-          ].join(" ")}
-        >
-          <span className="inline-flex items-center gap-1.5">
-            <CalendarDays size={12} />
-            {formatDate(draw.date)}
-          </span>
+        <div className="pb-1 text-right">
+          <div className="flex items-center justify-end gap-1 text-xs text-slate-500">
+            <Clock3 className="h-3.5 w-3.5" />
+            <span>{formatTime(draw.time)}</span>
+          </div>
 
-          <span className="inline-flex items-center gap-1.5">
-            <Clock3 size={12} />
-            {draw.time || "—"}
-          </span>
+          <div className="mt-1 flex items-center justify-end gap-1 text-xs text-slate-400">
+            <CalendarDays className="h-3.5 w-3.5" />
+            <span>{formatDate(draw.date)}</span>
+          </div>
         </div>
       </div>
     </div>
-  );
-}
-
-/* ============================================================
-   QUICK PLAY CARD
-============================================================ */
-
-function QuickPlayCard({
-  type,
-  title,
-  subtitle,
-  example,
-  href,
-  icon,
-}: {
-  type: "2D" | "3D";
-  title: string;
-  subtitle: string;
-  example: string;
-  href: string;
-  icon: React.ReactNode;
-}) {
-  const is2D = type === "2D";
-
-  return (
-    <Link
-      to={href}
-      className="group relative overflow-hidden rounded-[28px] border border-white/10 bg-[#101923] p-5 text-white shadow-[0_18px_50px_rgba(2,8,23,0.16)] transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-[0_24px_60px_rgba(2,8,23,0.25)] sm:p-6"
-    >
-      {/* Decorative background */}
-      <div
-        className={[
-          "absolute -right-12 -top-12 h-40 w-40 rounded-full blur-[1px]",
-          is2D ? "bg-emerald-400/10" : "bg-indigo-400/10",
-        ].join(" ")}
-      />
-
-      <div className="absolute -bottom-16 -left-12 h-36 w-36 rounded-full border border-white/[0.04]" />
-
-      <div className="absolute right-5 top-5 flex gap-1.5 opacity-30">
-        <span className="h-1.5 w-1.5 rounded-full bg-white" />
-        <span className="h-1.5 w-1.5 rounded-full bg-white/60" />
-        <span className="h-1.5 w-1.5 rounded-full bg-white/30" />
-      </div>
-
-      <div className="relative z-10">
-        <div className="flex items-start justify-between">
-          <div
-            className={[
-              "flex h-12 w-12 items-center justify-center rounded-2xl",
-              is2D
-                ? "bg-emerald-400/10 text-emerald-300"
-                : "bg-indigo-400/10 text-indigo-300",
-            ].join(" ")}
-          >
-            {icon}
-          </div>
-
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white/50">
-            Play now
-          </span>
-        </div>
-
-        <div className="mt-6">
-          <div className="flex items-end gap-3">
-            <h3 className="text-2xl font-black tracking-tight">{title}</h3>
-
-            <span className="mb-0.5 text-xs font-semibold text-white/35">
-              {subtitle}
-            </span>
-          </div>
-
-          <p className="mt-2 max-w-[260px] text-sm leading-6 text-white/50">
-            Pick your lucky number and place your {type} bet.
-          </p>
-        </div>
-
-        <div className="mt-6 flex items-end justify-between">
-          <div>
-            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/30">
-              Lucky format
-            </p>
-
-            <p className="mt-1 text-2xl font-black tracking-[0.22em] text-white/80">
-              {example}
-            </p>
-          </div>
-
-          <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 transition-transform duration-300 group-hover:translate-x-1">
-            <ArrowRight size={18} />
-          </div>
-        </div>
-      </div>
-    </Link>
   );
 }
 
@@ -397,68 +225,41 @@ function QuickPlayCard({
 ============================================================ */
 
 function WinnerRow({ winner, rank }: { winner: Winner; rank: number }) {
-  const number = normalizeNumber(winner.number, winner.type);
-
-  const rankIcon =
-    rank === 1 ? (
-      <Crown size={15} />
-    ) : rank === 2 ? (
-      <Medal size={15} />
-    ) : (
-      <Trophy size={15} />
-    );
-
   return (
-    <div
-      className={[
-        "group flex items-center gap-3 rounded-2xl border p-3 transition-all",
-        rank === 1
-          ? "border-amber-200 bg-amber-50/70"
-          : "border-slate-100 bg-slate-50/60 hover:bg-white hover:shadow-md",
-      ].join(" ")}
-    >
-      <div
-        className={[
-          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-          rank === 1
-            ? "bg-amber-100 text-amber-600"
-            : "bg-white text-slate-400 shadow-sm",
-        ].join(" ")}
-      >
-        {rankIcon}
+    <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-3 transition-colors hover:bg-slate-100/70">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold text-slate-600 shadow-sm">
+        {rank}
       </div>
 
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-bold text-slate-800">
-            {maskPlayerName(winner.player)}
-          </p>
-
-          <span className="hidden rounded-full bg-slate-200/70 px-2 py-0.5 text-[9px] font-bold text-slate-500 sm:inline-flex">
-            #{rank}
-          </span>
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
+          <UserRound className="h-5 w-5" />
         </div>
 
-        <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-400">
-          <span className="font-semibold">
-            {winner.type}
-            {winner.session ? ` ${winner.session}` : ""}
-          </span>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-slate-900">
+            {winner.player || "Player"}
+          </p>
 
-          <span>•</span>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+            <span>{getWinnerSessionLabel(winner)}</span>
 
-          <span>{formatDate(winner.date)}</span>
+            {winner.date && (
+              <>
+                <span className="text-slate-300">•</span>
+                <span>{formatDate(winner.date)}</span>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="shrink-0 text-right">
-        <div className="inline-flex items-center rounded-lg bg-slate-900 px-2.5 py-1.5">
-          <span className="text-xs font-black tracking-widest text-white">
-            {number}
-          </span>
+        <div className="inline-flex rounded-lg bg-white px-2.5 py-1 font-mono text-sm font-bold tracking-wider text-slate-900 shadow-sm">
+          {winner.number}
         </div>
 
-        <p className="mt-1 text-[10px] font-black text-emerald-600">
+        <p className="mt-1 text-xs font-semibold text-emerald-600">
           +{formatMoney(winner.prize)}
         </p>
       </div>
@@ -467,67 +268,68 @@ function WinnerRow({ winner, rank }: { winner: Winner; rank: number }) {
 }
 
 /* ============================================================
-   LOADING SKELETON
-============================================================ */
-
-function DashboardSkeleton() {
-  return (
-    <div className="min-h-full bg-[#f5f7f8] px-4 py-5 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl animate-pulse space-y-5">
-        <div className="h-40 rounded-[28px] bg-slate-200" />
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="h-56 rounded-[28px] bg-slate-200" />
-
-          <div className="h-56 rounded-[28px] bg-slate-200" />
-        </div>
-
-        <div className="h-80 rounded-[28px] bg-slate-200" />
-
-        <div className="h-64 rounded-[28px] bg-slate-200" />
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================
-   EMPTY RESULTS
+   EMPTY RESULT
 ============================================================ */
 
 function EmptyResults() {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-300 shadow-sm">
-        <Dice5 size={22} />
+    <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-6 text-center">
+      <div>
+        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
+          <Trophy className="h-5 w-5" />
+        </div>
+
+        <p className="mt-3 text-sm font-semibold text-slate-700">
+          No results available
+        </p>
+
+        <p className="mt-1 text-xs text-slate-400">
+          Latest lottery results will appear here.
+        </p>
       </div>
-
-      <p className="mt-3 text-sm font-bold text-slate-600">
-        No results available yet
-      </p>
-
-      <p className="mt-1 text-xs text-slate-400">
-        Latest winning numbers will appear here.
-      </p>
     </div>
   );
 }
 
 /* ============================================================
-   DASHBOARD
+   SKELETON
 ============================================================ */
 
-export default function Dashboard() {
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="h-28 animate-pulse rounded-2xl bg-slate-100" />
+        <div className="h-28 animate-pulse rounded-2xl bg-slate-100" />
+      </div>
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-5">
+        <div className="mb-5 h-6 w-40 animate-pulse rounded bg-slate-100" />
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="h-44 animate-pulse rounded-2xl bg-slate-100" />
+          <div className="h-44 animate-pulse rounded-2xl bg-slate-100" />
+          <div className="h-44 animate-pulse rounded-2xl bg-slate-100" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   MAIN DASHBOARD
+============================================================ */
+
+export default function PlayerDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
-
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState("");
 
-  const [refreshing, setRefreshing] = useState(false);
-
-  /* ==========================================================
+  /* ============================================================
      LOAD DASHBOARD
-  ========================================================== */
+  ============================================================ */
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -582,9 +384,9 @@ export default function Dashboard() {
         throw new Error("Dashboard statistics are unavailable");
       }
 
-      /* --------------------------------------------------------
+      /* ========================================================
          NORMALIZE LATEST RESULTS
-      -------------------------------------------------------- */
+      ======================================================== */
 
       let normalizedLatestResults: LatestDraw[] = [];
 
@@ -610,9 +412,9 @@ export default function Dashboard() {
           }));
       }
 
-      /* --------------------------------------------------------
-         BACKWARD COMPATIBILITY
-      -------------------------------------------------------- */
+      /* ========================================================
+         FALLBACK TO latestDraw
+      ======================================================== */
 
       if (normalizedLatestResults.length === 0 && result.latestDraw) {
         normalizedLatestResults = [
@@ -627,9 +429,9 @@ export default function Dashboard() {
         ];
       }
 
-      /* --------------------------------------------------------
+      /* ========================================================
          NORMALIZE WINNERS
-      -------------------------------------------------------- */
+      ======================================================== */
 
       const normalizedWinners: Winner[] = Array.isArray(result.winners)
         ? result.winners
@@ -642,9 +444,9 @@ export default function Dashboard() {
             }))
         : [];
 
-      /* --------------------------------------------------------
-         FINAL NORMALIZED DATA
-      -------------------------------------------------------- */
+      /* ========================================================
+         NORMALIZED DATA
+      ======================================================== */
 
       const normalizedData: DashboardData = {
         user: {
@@ -659,11 +461,8 @@ export default function Dashboard() {
 
         stats: {
           walletBalance: Number(result.stats.walletBalance ?? 0),
-
           totalTickets: Number(result.stats.totalTickets ?? 0),
-
           totalDeposit: Number(result.stats.totalDeposit ?? 0),
-
           totalWithdraw: Number(result.stats.totalWithdraw ?? 0),
         },
 
@@ -686,43 +485,32 @@ export default function Dashboard() {
     }
   }, []);
 
-  /* ==========================================================
+  /* ============================================================
      INITIAL LOAD
-  ========================================================== */
+  ============================================================ */
 
   useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
 
-  /* ==========================================================
-     REFRESH
-  ========================================================== */
-
-  const handleRefresh = async () => {
-    try {
-      setRefreshing(true);
-
-      await loadDashboard();
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  /* ==========================================================
+  /* ============================================================
      DISPLAY NAME
-  ========================================================== */
+  ============================================================ */
 
   const displayName = useMemo(() => {
-    if (!data?.user) {
-      return "Player";
-    }
+    if (!data?.user) return "Player";
 
     return data.user.fullName?.trim() || data.user.username || "Player";
   }, [data]);
 
-  /* ==========================================================
+  /* ============================================================
      LATEST RESULTS
-  ========================================================== */
+     
+     Always display:
+       1. 2D AM
+       2. 2D PM
+       3. 3D
+  ============================================================ */
 
   const latestResults = useMemo(() => {
     const results = data?.latestResults ?? [];
@@ -748,415 +536,294 @@ export default function Dashboard() {
     });
   }, [data]);
 
-  /* ==========================================================
+  /* ============================================================
      LATEST WINNERS
-  ========================================================== */
+  ============================================================ */
 
   const latestWinners = useMemo(() => {
     return (data?.winners ?? []).slice(0, 3);
   }, [data]);
 
-  /* ==========================================================
-     FEATURED RESULT
-  ========================================================== */
-
-  const featuredResult = useMemo(() => {
-    if (latestResults.length === 0) {
-      return null;
-    }
-
-    return latestResults[latestResults.length - 1];
-  }, [latestResults]);
-
-  /* ==========================================================
+  /* ============================================================
      LOADING
-  ========================================================== */
+  ============================================================ */
 
-  if (loading && !data) {
-    return <DashboardSkeleton />;
+  if (loading) {
+    return (
+      <div className="min-h-full bg-slate-50/60 px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <DashboardSkeleton />
+        </div>
+      </div>
+    );
   }
 
-  /* ==========================================================
+  /* ============================================================
      ERROR
-  ========================================================== */
+  ============================================================ */
 
-  if (error && !data) {
+  if (error || !data) {
     return (
-      <div className="min-h-full bg-[#f5f7f8] px-4 py-5 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="overflow-hidden rounded-[28px] border border-red-100 bg-white shadow-sm">
-            <div className="border-b border-red-100 bg-red-50 px-5 py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-red-500">
-                  <RefreshCw size={18} />
-                </div>
-
-                <div>
-                  <p className="text-sm font-black text-red-700">
-                    Unable to load dashboard
-                  </p>
-
-                  <p className="mt-0.5 text-xs text-red-500">
-                    Something went wrong while loading your dashboard.
-                  </p>
-                </div>
-              </div>
+      <div className="min-h-full bg-slate-50/60 px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto flex min-h-[60vh] max-w-lg items-center justify-center">
+          <div className="w-full rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-500">
+              <Sparkles className="h-6 w-6" />
             </div>
 
-            <div className="px-5 py-5">
-              <p className="text-sm text-slate-500">{error}</p>
+            <h2 className="mt-4 text-lg font-bold text-slate-900">
+              Unable to load dashboard
+            </h2>
 
-              <button
-                type="button"
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <RefreshCw
-                  size={14}
-                  className={refreshing ? "animate-spin" : undefined}
-                />
-                Try Again
-              </button>
-            </div>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              {error || "Something went wrong while loading your dashboard."}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => void loadDashboard()}
+              className="mt-5 inline-flex items-center justify-center rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              Try Again
+            </button>
           </div>
         </div>
       </div>
     );
   }
 
-  /* ==========================================================
-     MAIN DASHBOARD
-  ========================================================== */
+  /* ============================================================
+     DASHBOARD
+  ============================================================ */
 
   return (
-    <div className="min-h-full bg-[#f5f7f8] px-3 py-4 sm:px-5 sm:py-5 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-5">
-        {/* ====================================================
-            WELCOME HERO
-        ==================================================== */}
+    <div className="min-h-full bg-slate-50/60 px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        {/* ======================================================
+            WELCOME
+        ====================================================== */}
 
-        <section className="relative overflow-hidden rounded-[30px] bg-[#0b151d] shadow-[0_18px_50px_rgba(15,23,42,0.16)]">
-          {/* Decorative circles */}
-          <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full border border-emerald-300/10" />
+        <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white px-5 py-6 shadow-sm sm:px-7 sm:py-7">
+          {/* Decorative background shapes */}
+          <div className="pointer-events-none absolute -right-10 -top-16 h-40 w-40 rounded-full bg-emerald-100/60 blur-3xl" />
 
-          <div className="absolute -right-5 -top-10 h-40 w-40 rounded-full border border-emerald-300/[0.07]" />
+          <div className="pointer-events-none absolute -bottom-20 left-1/3 h-40 w-40 rounded-full bg-blue-100/50 blur-3xl" />
 
-          <div className="absolute -bottom-24 left-1/3 h-52 w-52 rounded-full bg-emerald-400/[0.04] blur-2xl" />
-
-          <div className="absolute right-[18%] top-8 hidden gap-2 opacity-30 sm:flex">
-            <span className="h-2 w-2 rounded-full bg-emerald-300" />
-            <span className="h-2 w-2 rounded-full bg-white" />
-            <span className="h-2 w-2 rounded-full bg-emerald-300" />
-          </div>
-
-          <div className="relative flex flex-col gap-7 p-5 sm:p-7 lg:flex-row lg:items-center lg:justify-between lg:px-8 lg:py-7">
+          <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/10 bg-emerald-300/[0.06] px-3 py-1.5">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-60" />
-
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300" />
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Player
                 </span>
 
-                <span className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300">
-                  Player Lobby
-                </span>
+                {data.user.isVerified && (
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-600">
+                    Verified
+                  </span>
+                )}
               </div>
 
-              <h1 className="mt-4 text-2xl font-black tracking-tight text-white sm:text-3xl">
-                Welcome back,{" "}
-                <span className="text-emerald-300">{displayName}</span>
+              <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                Welcome back, {displayName}
               </h1>
 
-              <p className="mt-2 max-w-xl text-sm leading-6 text-white/45">
-                Ready to try your luck? Choose a game, pick your numbers, and
-                play your way.
+              <p className="mt-1.5 max-w-xl text-sm leading-6 text-slate-500">
+                Ready to play? Choose your game and check the latest winning
+                numbers.
               </p>
-
-              <div className="mt-5 flex flex-wrap gap-2">
-                <Link
-                  to="/player/play-2d"
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2.5 text-xs font-black text-[#07130f] transition hover:bg-emerald-300"
-                >
-                  <Zap size={14} />
-                  Play 2D
-                </Link>
-
-                <Link
-                  to="/player/play-3d"
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/10"
-                >
-                  <Dice5 size={14} />
-                  Play 3D
-                </Link>
-              </div>
             </div>
 
-            {/* Featured result */}
-            <div className="relative shrink-0">
-              {featuredResult ? (
-                <div className="flex items-center gap-4 rounded-[24px] border border-white/10 bg-white/[0.04] p-4 sm:p-5">
-                  <div className="text-right">
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/30">
-                      Latest draw
-                    </p>
-
-                    <p className="mt-1 text-sm font-bold text-white/70">
-                      {getResultLabel(featuredResult)}
-                    </p>
-                  </div>
-
-                  <NumberBall
-                    value={normalizeNumber(
-                      featuredResult.number,
-                      featuredResult.type,
-                    )}
-                    size="large"
-                  />
-                </div>
-              ) : (
-                <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/10 bg-white/[0.04]">
-                  <Dice5 size={30} className="text-white/20" />
-                </div>
-              )}
-            </div>
+            <Link
+              to="/player/results-history"
+              className="group inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:self-center"
+            >
+              Results History
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
           </div>
         </section>
 
-        {/* ====================================================
+        {/* ======================================================
             QUICK PLAY
-        ==================================================== */}
+        ====================================================== */}
 
         <section>
-          <div className="mb-3 flex items-end justify-between px-1">
+          <div className="mb-3 flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-2">
-                <Gamepad2 size={16} className="text-emerald-600" />
+              <h2 className="text-base font-bold text-slate-900">Quick Play</h2>
 
-                <h2 className="text-lg font-black tracking-tight text-slate-900">
-                  Quick Play
-                </h2>
-              </div>
-
-              <p className="mt-0.5 text-xs text-slate-400">
-                Pick a game and start your lucky run
+              <p className="mt-0.5 text-xs text-slate-500">
+                Choose a lottery game to start
               </p>
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <QuickPlayCard
-              type="2D"
-              title="2D"
-              subtitle="Two Digits"
-              example="00 — 99"
-              href="/player/play-2d"
-              icon={<Dice5 size={22} />}
-            />
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* 2D */}
+            <Link
+              to="/player/play-2d"
+              className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md"
+            >
+              <div className="absolute inset-x-0 top-0 h-1 bg-emerald-500" />
 
-            <QuickPlayCard
-              type="3D"
-              title="3D"
-              subtitle="Three Digits"
-              example="000 — 999"
-              href="/player/play-3d"
-              icon={<Sparkles size={22} />}
-            />
-          </div>
-        </section>
-
-        {/* ====================================================
-            LATEST RESULTS
-        ==================================================== */}
-
-        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900 text-emerald-300">
-                    <Trophy size={15} />
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                    <Dice5 className="h-6 w-6" />
                   </div>
 
-                  <h2 className="text-base font-black tracking-tight text-slate-900 sm:text-lg">
-                    Latest Results
-                  </h2>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      Play 2D
+                    </h3>
 
-                  <span className="hidden rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-emerald-600 sm:inline-flex">
-                    Live Board
-                  </span>
+                    <p className="mt-1 text-xs text-slate-500">
+                      AM &amp; PM sessions
+                    </p>
+                  </div>
                 </div>
 
-                <p className="mt-1 text-xs text-slate-400">
-                  Check the latest winning numbers
-                </p>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50 text-slate-400 transition group-hover:bg-emerald-50 group-hover:text-emerald-600">
+                  <ChevronRight className="h-5 w-5" />
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  aria-label="Refresh dashboard"
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <RefreshCw
-                    size={14}
-                    className={refreshing ? "animate-spin" : undefined}
-                  />
-                </button>
+              <div className="mt-4 flex items-center gap-2">
+                <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-600">
+                  00 — 99
+                </span>
 
-                <Link
-                  to="/player/results-history"
-                  className="hidden items-center gap-1 text-xs font-bold text-slate-500 transition hover:text-slate-900 sm:flex"
-                >
-                  View all
-                  <ChevronRight size={14} />
-                </Link>
+                <span className="text-xs text-slate-400">
+                  Two-digit lottery
+                </span>
               </div>
-            </div>
-          </div>
+            </Link>
 
-          <div className="p-4 sm:p-5">
-            {latestResults.length === 0 ? (
-              <EmptyResults />
-            ) : (
-              <div className="grid gap-3 md:grid-cols-3">
-                {latestResults.slice(0, 3).map((draw) => (
-                  <ResultCard
-                    key={draw.id}
-                    draw={draw}
-                    featured={Boolean(
-                      featuredResult && draw.id === featuredResult.id,
-                    )}
-                  />
-                ))}
+            {/* 3D */}
+            <Link
+              to="/player/play-3d"
+              className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+            >
+              <div className="absolute inset-x-0 top-0 h-1 bg-blue-500" />
+
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                    <Dice5 className="h-6 w-6" />
+                  </div>
+
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      Play 3D
+                    </h3>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      Three-digit lottery
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50 text-slate-400 transition group-hover:bg-blue-50 group-hover:text-blue-600">
+                  <ChevronRight className="h-5 w-5" />
+                </div>
               </div>
-            )}
 
-            <div className="mt-4 sm:hidden">
-              <Link
-                to="/player/results-history"
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-3 text-xs font-bold text-slate-600 transition hover:bg-slate-100"
-              >
-                View complete results
-                <ArrowRight size={14} />
-              </Link>
-            </div>
+              <div className="mt-4 flex items-center gap-2">
+                <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-600">
+                  000 — 999
+                </span>
+
+                <span className="text-xs text-slate-400">
+                  Three-digit lottery
+                </span>
+              </div>
+            </Link>
           </div>
         </section>
 
-        {/* ====================================================
-            LATEST WINNERS
-        ==================================================== */}
+        {/* ======================================================
+            LATEST RESULTS
+        ====================================================== */}
 
-        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-5">
+        <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                Latest Results
+              </h2>
+
+              <p className="mt-0.5 text-xs text-slate-500">
+                Most recent winning numbers
+              </p>
+            </div>
+
+            <Link
+              to="/player/results-history"
+              className="group inline-flex items-center gap-1 text-xs font-semibold text-slate-500 transition hover:text-slate-900"
+            >
+              View all
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+
+          {latestResults.length > 0 ? (
+            <div className="grid gap-4 lg:grid-cols-3">
+              {latestResults.map((draw) => (
+                <ResultCard key={draw.id} draw={draw} />
+              ))}
+            </div>
+          ) : (
+            <EmptyResults />
+          )}
+        </section>
+
+        {/* ======================================================
+            LATEST WINNERS
+        ====================================================== */}
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="mb-5 flex items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50 text-amber-500">
-                  <Crown size={15} />
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                  <Trophy className="h-4 w-4" />
                 </div>
 
-                <h2 className="text-base font-black tracking-tight text-slate-900 sm:text-lg">
+                <h2 className="text-base font-bold text-slate-900">
                   Latest Winners
                 </h2>
               </div>
 
-              <p className="mt-1 text-xs text-slate-400">
-                Players who hit the lucky numbers
+              <p className="mt-1 text-xs text-slate-500">
+                Recent winning players
               </p>
-            </div>
-
-            <div className="hidden items-center gap-1 rounded-full bg-amber-50 px-3 py-1.5 text-[10px] font-black text-amber-600 sm:flex">
-              <Sparkles size={12} />
-              Top 3
             </div>
           </div>
 
-          <div className="p-4 sm:p-5">
-            {latestWinners.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-300 shadow-sm">
-                  <Trophy size={22} />
+          {latestWinners.length > 0 ? (
+            <div className="space-y-2.5">
+              {latestWinners.map((winner, index) => (
+                <WinnerRow key={winner.id} winner={winner} rank={index + 1} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex min-h-[150px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-6 text-center">
+              <div>
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
+                  <Trophy className="h-5 w-5" />
                 </div>
 
-                <p className="mt-3 text-sm font-bold text-slate-600">
+                <p className="mt-3 text-sm font-semibold text-slate-700">
                   No winners yet
                 </p>
 
                 <p className="mt-1 text-xs text-slate-400">
-                  Winners will appear here after results are published.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {latestWinners.map((winner, index) => (
-                  <WinnerRow key={winner.id} winner={winner} rank={index + 1} />
-                ))}
-              </div>
-            )}
-
-            <div className="mt-4 flex items-center justify-center rounded-xl bg-slate-50 px-4 py-3">
-              <p className="text-[11px] font-medium text-slate-400">
-                Your lucky number could be next.
-              </p>
-
-              <Link
-                to="/player/play-2d"
-                className="ml-2 inline-flex items-center gap-1 text-[11px] font-black text-emerald-600 hover:text-emerald-700"
-              >
-                Play now
-                <ArrowRight size={12} />
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* ====================================================
-            BOTTOM CTA
-        ==================================================== */}
-
-        <section className="relative overflow-hidden rounded-[24px] bg-[#101923] px-5 py-5 sm:px-6">
-          <div className="absolute right-0 top-0 h-full w-1/3 bg-emerald-400/[0.03]" />
-
-          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300">
-                <Zap size={18} />
-              </div>
-
-              <div>
-                <p className="text-sm font-black text-white">Feeling lucky?</p>
-
-                <p className="mt-0.5 text-xs text-white/35">
-                  Choose your numbers and make your next play.
+                  Winning players will appear here.
                 </p>
               </div>
             </div>
-
-            <div className="flex gap-2">
-              <Link
-                to="/player/play-2d"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-2.5 text-xs font-black text-[#07130f] transition hover:bg-emerald-300"
-              >
-                2D
-                <ArrowRight size={13} />
-              </Link>
-
-              <Link
-                to="/player/play-3d"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/10"
-              >
-                3D
-                <ArrowRight size={13} />
-              </Link>
-            </div>
-          </div>
+          )}
         </section>
-
-        <div className="h-2" />
       </div>
     </div>
   );
