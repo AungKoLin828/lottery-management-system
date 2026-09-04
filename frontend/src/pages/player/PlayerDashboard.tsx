@@ -1,8 +1,12 @@
 import {
   ArrowRight,
   CalendarDays,
+  ChevronRight,
   Clock3,
   Crown,
+  Dice5,
+  Gamepad2,
+  Medal,
   RefreshCw,
   Sparkles,
   Trophy,
@@ -61,22 +65,13 @@ type DashboardData = {
   winners: Winner[];
 };
 
-/* ============================================================
-   API RESPONSE
-============================================================ */
-
 type DashboardResponse = {
   success: boolean;
   message?: string;
-
   user?: DashboardUser;
-
   stats?: DashboardStats;
-
   latestResults?: LatestDraw[];
-
   latestDraw?: LatestDraw | null;
-
   winners?: Winner[];
 };
 
@@ -96,40 +91,461 @@ function formatMoney(value: number | string | null | undefined): string {
   });
 }
 
-/* ============================================================
-   RESULT STYLE
-============================================================ */
-
-function getResultTheme(type: "2D" | "3D") {
-  if (type === "3D") {
-    return {
-      card: "border-blue-200/80 bg-gradient-to-br from-blue-50 via-white to-indigo-50/70",
-      badge: "bg-blue-100 text-blue-700 ring-blue-200",
-      number: "bg-white text-blue-700 ring-blue-200 shadow-blue-100/70",
-      accent: "bg-blue-500",
-      glow: "bg-blue-200/30",
-    };
+function formatDate(date: string): string {
+  if (!date) {
+    return "—";
   }
 
-  return {
-    card: "border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-teal-50/70",
-    badge: "bg-emerald-100 text-emerald-700 ring-emerald-200",
-    number: "bg-white text-emerald-700 ring-emerald-200 shadow-emerald-100/70",
-    accent: "bg-emerald-500",
-    glow: "bg-emerald-200/30",
-  };
+  const parsed = new Date(date);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return date;
+  }
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function getInitials(name: string): string {
+  const value = name.trim();
+
+  if (!value) {
+    return "P";
+  }
+
+  const parts = value.split(/\s+/);
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+function maskPlayerName(name: string): string {
+  if (!name) {
+    return "Player";
+  }
+
+  const trimmed = name.trim();
+
+  if (trimmed.length <= 2) {
+    return `${trimmed[0] ?? "P"}***`;
+  }
+
+  if (trimmed.length <= 5) {
+    return `${trimmed.slice(0, 2)}***`;
+  }
+
+  return `${trimmed.slice(0, 3)}***`;
+}
+
+function normalizeNumber(value: string, type: "2D" | "3D"): string {
+  const length = type === "2D" ? 2 : 3;
+
+  return String(value ?? "")
+    .replace(/\D/g, "")
+    .padStart(length, "0")
+    .slice(-length);
+}
+
+function getResultLabel(draw: LatestDraw): string {
+  if (draw.type === "3D") {
+    return "3D";
+  }
+
+  return draw.session === "AM" ? "2D AM" : "2D PM";
 }
 
 /* ============================================================
-   PAGE
+   NUMBER BALL
+============================================================ */
+
+function NumberBall({
+  value,
+  size = "normal",
+}: {
+  value: string;
+  size?: "small" | "normal" | "large";
+}) {
+  const sizeClass =
+    size === "small"
+      ? "h-8 w-8 text-[11px]"
+      : size === "large"
+        ? "h-20 w-20 text-2xl sm:h-24 sm:w-24 sm:text-3xl"
+        : "h-14 w-14 text-lg";
+
+  return (
+    <div
+      className={[
+        "relative flex shrink-0 items-center justify-center rounded-full",
+        "border border-white/15 bg-white/[0.08]",
+        "font-black tracking-tight text-white",
+        "shadow-[0_10px_30px_rgba(0,0,0,0.25)]",
+        "before:absolute before:inset-[5px] before:rounded-full",
+        "before:border before:border-white/[0.08]",
+        sizeClass,
+      ].join(" ")}
+    >
+      <span className="relative z-10">{value}</span>
+    </div>
+  );
+}
+
+/* ============================================================
+   RESULT CARD
+============================================================ */
+
+function ResultCard({
+  draw,
+  featured = false,
+}: {
+  draw: LatestDraw;
+  featured?: boolean;
+}) {
+  const number = normalizeNumber(draw.number, draw.type);
+  const label = getResultLabel(draw);
+
+  return (
+    <div
+      className={[
+        "group relative overflow-hidden rounded-[24px] border",
+        "transition-all duration-300",
+        featured
+          ? "border-emerald-400/30 bg-[#10251f]"
+          : "border-slate-200 bg-white hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-xl",
+      ].join(" ")}
+    >
+      {featured && (
+        <>
+          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-emerald-400/10 blur-2xl" />
+          <div className="absolute -bottom-12 -left-12 h-28 w-28 rounded-full bg-cyan-400/10 blur-2xl" />
+        </>
+      )}
+
+      <div className="relative p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span
+                className={[
+                  "rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]",
+                  featured
+                    ? "bg-emerald-400/15 text-emerald-300"
+                    : "bg-slate-900 text-white",
+                ].join(" ")}
+              >
+                {draw.type}
+              </span>
+
+              {draw.session && (
+                <span
+                  className={[
+                    "rounded-full px-2.5 py-1 text-[10px] font-bold",
+                    featured
+                      ? "bg-white/10 text-white/70"
+                      : "bg-slate-100 text-slate-500",
+                  ].join(" ")}
+                >
+                  {draw.session}
+                </span>
+              )}
+            </div>
+
+            <p
+              className={[
+                "mt-2 text-xs font-medium",
+                featured ? "text-white/50" : "text-slate-400",
+              ].join(" ")}
+            >
+              {label}
+            </p>
+          </div>
+
+          {featured && (
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-400/10 text-emerald-300">
+              <Sparkles size={15} />
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5 flex items-center justify-center">
+          <div
+            className={[
+              "relative flex items-center justify-center rounded-2xl px-6 py-4",
+              featured ? "bg-black/20" : "bg-slate-50",
+            ].join(" ")}
+          >
+            <span
+              className={[
+                "font-black tracking-[0.16em]",
+                featured
+                  ? "text-3xl text-white sm:text-4xl"
+                  : "text-3xl text-slate-900",
+              ].join(" ")}
+            >
+              {number}
+            </span>
+          </div>
+        </div>
+
+        <div
+          className={[
+            "mt-4 flex items-center justify-between text-[11px]",
+            featured ? "text-white/40" : "text-slate-400",
+          ].join(" ")}
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <CalendarDays size={12} />
+            {formatDate(draw.date)}
+          </span>
+
+          <span className="inline-flex items-center gap-1.5">
+            <Clock3 size={12} />
+            {draw.time || "—"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   QUICK PLAY CARD
+============================================================ */
+
+function QuickPlayCard({
+  type,
+  title,
+  subtitle,
+  example,
+  href,
+  icon,
+}: {
+  type: "2D" | "3D";
+  title: string;
+  subtitle: string;
+  example: string;
+  href: string;
+  icon: React.ReactNode;
+}) {
+  const is2D = type === "2D";
+
+  return (
+    <Link
+      to={href}
+      className="group relative overflow-hidden rounded-[28px] border border-white/10 bg-[#101923] p-5 text-white shadow-[0_18px_50px_rgba(2,8,23,0.16)] transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-[0_24px_60px_rgba(2,8,23,0.25)] sm:p-6"
+    >
+      {/* Decorative circles */}
+      <div
+        className={[
+          "absolute -right-12 -top-12 h-40 w-40 rounded-full blur-[1px]",
+          is2D ? "bg-emerald-400/10" : "bg-indigo-400/10",
+        ].join(" ")}
+      />
+
+      <div
+        className={[
+          "absolute -bottom-16 -left-12 h-36 w-36 rounded-full",
+          "border border-white/[0.04]",
+        ].join(" ")}
+      />
+
+      <div className="absolute right-5 top-5 flex gap-1.5 opacity-50">
+        <span className="h-1.5 w-1.5 rounded-full bg-white" />
+        <span className="h-1.5 w-1.5 rounded-full bg-white/60" />
+        <span className="h-1.5 w-1.5 rounded-full bg-white/30" />
+      </div>
+
+      <div className="relative z-10">
+        <div className="flex items-start justify-between">
+          <div
+            className={[
+              "flex h-12 w-12 items-center justify-center rounded-2xl",
+              is2D
+                ? "bg-emerald-400/10 text-emerald-300"
+                : "bg-indigo-400/10 text-indigo-300",
+            ].join(" ")}
+          >
+            {icon}
+          </div>
+
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white/50">
+            Play now
+          </span>
+        </div>
+
+        <div className="mt-6">
+          <div className="flex items-end gap-3">
+            <h3 className="text-2xl font-black tracking-tight">{title}</h3>
+
+            <span className="mb-0.5 text-xs font-semibold text-white/35">
+              {subtitle}
+            </span>
+          </div>
+
+          <p className="mt-2 max-w-[260px] text-sm leading-6 text-white/50">
+            Pick your lucky number and place your {type} bet.
+          </p>
+        </div>
+
+        <div className="mt-6 flex items-end justify-between">
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/30">
+              Lucky format
+            </p>
+
+            <p className="mt-1 text-2xl font-black tracking-[0.22em] text-white/80">
+              {example}
+            </p>
+          </div>
+
+          <div
+            className={[
+              "flex h-11 w-11 items-center justify-center rounded-full",
+              "border border-white/10 bg-white/5",
+              "transition-transform duration-300 group-hover:translate-x-1",
+            ].join(" ")}
+          >
+            <ArrowRight size={18} />
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+/* ============================================================
+   WINNER ROW
+============================================================ */
+
+function WinnerRow({ winner, rank }: { winner: Winner; rank: number }) {
+  const number = normalizeNumber(winner.number, winner.type);
+
+  const rankIcon =
+    rank === 1 ? (
+      <Crown size={15} />
+    ) : rank === 2 ? (
+      <Medal size={15} />
+    ) : (
+      <Trophy size={15} />
+    );
+
+  return (
+    <div
+      className={[
+        "group flex items-center gap-3 rounded-2xl border p-3 transition-all",
+        rank === 1
+          ? "border-amber-200 bg-amber-50/70"
+          : "border-slate-100 bg-slate-50/60 hover:bg-white hover:shadow-md",
+      ].join(" ")}
+    >
+      <div
+        className={[
+          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+          rank === 1
+            ? "bg-amber-100 text-amber-600"
+            : "bg-white text-slate-400 shadow-sm",
+        ].join(" ")}
+      >
+        {rankIcon}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="truncate text-sm font-bold text-slate-800">
+            {maskPlayerName(winner.player)}
+          </p>
+
+          <span className="hidden rounded-full bg-slate-200/70 px-2 py-0.5 text-[9px] font-bold text-slate-500 sm:inline-flex">
+            #{rank}
+          </span>
+        </div>
+
+        <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-400">
+          <span className="font-semibold">
+            {winner.type}
+            {winner.session ? ` ${winner.session}` : ""}
+          </span>
+
+          <span>•</span>
+
+          <span>{formatDate(winner.date)}</span>
+        </div>
+      </div>
+
+      <div className="shrink-0 text-right">
+        <div className="inline-flex items-center rounded-lg bg-slate-900 px-2.5 py-1.5">
+          <span className="text-xs font-black tracking-widest text-white">
+            {number}
+          </span>
+        </div>
+
+        <p className="mt-1 text-[10px] font-black text-emerald-600">
+          +{formatMoney(winner.prize)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   LOADING
+============================================================ */
+
+function DashboardSkeleton() {
+  return (
+    <div className="min-h-full bg-[#f5f7f8] px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl animate-pulse space-y-5">
+        <div className="h-40 rounded-[28px] bg-slate-200" />
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="h-56 rounded-[28px] bg-slate-200" />
+          <div className="h-56 rounded-[28px] bg-slate-200" />
+        </div>
+
+        <div className="h-80 rounded-[28px] bg-slate-200" />
+
+        <div className="h-64 rounded-[28px] bg-slate-200" />
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   EMPTY RESULTS
+============================================================ */
+
+function EmptyResults() {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-300 shadow-sm">
+        <Dice5 size={22} />
+      </div>
+
+      <p className="mt-3 text-sm font-bold text-slate-600">
+        No results available yet
+      </p>
+
+      <p className="mt-1 text-xs text-slate-400">
+        Latest winning numbers will appear here.
+      </p>
+    </div>
+  );
+}
+
+/* ============================================================
+   DASHBOARD
 ============================================================ */
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
-
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   /* ==========================================================
      LOAD DASHBOARD
@@ -142,19 +558,12 @@ export default function Dashboard() {
 
       const response = await fetch("/api/player/dashboard", {
         method: "GET",
-
         credentials: "include",
-
         headers: {
           Accept: "application/json",
         },
-
         cache: "no-store",
       });
-
-      /* ======================================================
-         CONTENT TYPE
-      ====================================================== */
 
       const contentType = response.headers.get("content-type") || "";
 
@@ -175,25 +584,13 @@ export default function Dashboard() {
         throw new Error("Dashboard API returned an invalid response");
       }
 
-      /* ======================================================
-         PARSE JSON
-      ====================================================== */
-
       const result = (await response.json()) as DashboardResponse;
 
       console.log("Dashboard API response:", result);
 
-      /* ======================================================
-         API ERROR
-      ====================================================== */
-
       if (!response.ok || !result.success) {
         throw new Error(result.message || "Failed to load dashboard");
       }
-
-      /* ======================================================
-         VALIDATE USER
-      ====================================================== */
 
       if (!result.user) {
         console.error("Dashboard response does not contain user:", result);
@@ -201,19 +598,11 @@ export default function Dashboard() {
         throw new Error("Dashboard user data is unavailable");
       }
 
-      /* ======================================================
-         VALIDATE STATS
-      ====================================================== */
-
       if (!result.stats) {
         console.error("Dashboard response does not contain stats:", result);
 
         throw new Error("Dashboard statistics are unavailable");
       }
-
-      /* ======================================================
-         NORMALIZE LATEST RESULTS
-      ====================================================== */
 
       let normalizedLatestResults: LatestDraw[] = [];
 
@@ -239,10 +628,6 @@ export default function Dashboard() {
           }));
       }
 
-      /* ======================================================
-         BACKWARD COMPATIBILITY
-      ====================================================== */
-
       if (normalizedLatestResults.length === 0 && result.latestDraw) {
         normalizedLatestResults = [
           {
@@ -256,10 +641,6 @@ export default function Dashboard() {
         ];
       }
 
-      /* ======================================================
-         NORMALIZE WINNERS
-      ====================================================== */
-
       const normalizedWinners: Winner[] = Array.isArray(result.winners)
         ? result.winners
             .filter((winner) => winner && typeof winner.id === "string")
@@ -270,10 +651,6 @@ export default function Dashboard() {
               date: winner.date ?? "",
             }))
         : [];
-
-      /* ======================================================
-         NORMALIZE DATA
-      ====================================================== */
 
       const normalizedData: DashboardData = {
         user: {
@@ -288,11 +665,8 @@ export default function Dashboard() {
 
         stats: {
           walletBalance: Number(result.stats.walletBalance ?? 0),
-
           totalTickets: Number(result.stats.totalTickets ?? 0),
-
           totalDeposit: Number(result.stats.totalDeposit ?? 0),
-
           totalWithdraw: Number(result.stats.totalWithdraw ?? 0),
         },
 
@@ -322,6 +696,19 @@ export default function Dashboard() {
   useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
+
+  /* ==========================================================
+     REFRESH
+  ========================================================== */
+
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await loadDashboard();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   /* ==========================================================
      DISPLAY NAME
@@ -372,93 +759,64 @@ export default function Dashboard() {
   }, [data]);
 
   /* ==========================================================
+     LATEST FEATURED RESULT
+  ========================================================== */
+
+  const featuredResult = useMemo(() => {
+    if (latestResults.length === 0) {
+      return null;
+    }
+
+    return latestResults[latestResults.length - 1];
+  }, [latestResults]);
+
+  /* ==========================================================
      LOADING
   ========================================================== */
 
-  if (loading) {
-    return (
-      <div className="space-y-5 pb-6">
-        {/* HERO */}
-
-        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-          <div className="animate-pulse">
-            <div className="h-6 w-24 rounded-full bg-slate-200" />
-
-            <div className="mt-5 h-8 w-80 max-w-full rounded-xl bg-slate-200" />
-
-            <div className="mt-3 h-4 w-[28rem] max-w-full rounded bg-slate-100" />
-
-            <div className="mt-6 h-10 w-32 rounded-xl bg-slate-100" />
-          </div>
-        </div>
-
-        {/* QUICK PLAY */}
-
-        <section>
-          <div className="mb-3 h-5 w-28 animate-pulse rounded bg-slate-200" />
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="h-40 animate-pulse rounded-3xl bg-slate-200" />
-            <div className="h-40 animate-pulse rounded-3xl bg-slate-200" />
-          </div>
-        </section>
-
-        {/* RESULTS */}
-
-        <div className="h-80 animate-pulse rounded-3xl bg-slate-200" />
-
-        {/* WINNERS */}
-
-        <div className="h-72 animate-pulse rounded-3xl bg-slate-200" />
-      </div>
-    );
+  if (loading && !data) {
+    return <DashboardSkeleton />;
   }
 
   /* ==========================================================
      ERROR
   ========================================================== */
 
-  if (error) {
+  if (error && !data) {
     return (
-      <div className="space-y-5 pb-6">
-        <div>
-          <div className="flex items-center gap-1.5 text-[10px] font-bold">
-            <span className="text-slate-400">Player</span>
+      <div className="min-h-full bg-[#f5f7f8] px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="overflow-hidden rounded-[28px] border border-red-100 bg-white shadow-sm">
+            <div className="border-b border-red-100 bg-red-50 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-red-500">
+                  <RefreshCw size={18} />
+                </div>
 
-            <span className="text-emerald-400">/</span>
+                <div>
+                  <p className="text-sm font-black text-red-700">
+                    Unable to load dashboard
+                  </p>
 
-            <span className="text-emerald-600">Dashboard</span>
-          </div>
-
-          <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-            Player Dashboard
-          </h1>
-        </div>
-
-        <div className="relative overflow-hidden rounded-3xl border border-red-200 bg-gradient-to-br from-red-50 to-white p-5 shadow-sm sm:p-6">
-          <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="inline-flex rounded-full bg-red-100 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-red-600">
-                Something went wrong
+                  <p className="mt-0.5 text-xs text-red-500">
+                    Something went wrong while loading your dashboard.
+                  </p>
+                </div>
               </div>
-
-              <p className="mt-3 text-sm font-extrabold text-slate-900">
-                Unable to load your dashboard
-              </p>
-
-              <p className="mt-1 max-w-xl text-xs leading-5 text-slate-500">
-                {error}
-              </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => void loadDashboard()}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.98]"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              Try Again
-            </button>
+            <div className="px-5 py-5">
+              <p className="text-sm text-slate-500">{error}</p>
+
+              <button
+                type="button"
+                onClick={handleRefresh}
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-slate-800"
+              >
+                <RefreshCw size={14} />
+                Try Again
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -466,609 +824,335 @@ export default function Dashboard() {
   }
 
   /* ==========================================================
-     PAGE
+     MAIN
   ========================================================== */
 
   return (
-    <div className="space-y-6 pb-8">
-      {/* ======================================================
-          WELCOME HERO
-      ======================================================= */}
+    <div className="min-h-full bg-[#f5f7f8] px-3 py-4 sm:px-5 sm:py-5 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-5">
+        {/* ====================================================
+            WELCOME HERO
+        ==================================================== */}
 
-      <section className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_12px_40px_-24px_rgba(15,23,42,0.35)]">
-        {/* Decorative shapes */}
+        <section className="relative overflow-hidden rounded-[30px] bg-[#0b151d] shadow-[0_18px_50px_rgba(15,23,42,0.16)]">
+          {/* Background decoration */}
+          <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full border border-emerald-300/10" />
+          <div className="absolute -right-5 -top-10 h-40 w-40 rounded-full border border-emerald-300/[0.07]" />
+          <div className="absolute -bottom-24 left-1/3 h-52 w-52 rounded-full bg-emerald-400/[0.04] blur-2xl" />
 
-        <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-emerald-100/50 blur-3xl" />
+          <div className="absolute right-[18%] top-8 hidden gap-2 opacity-30 sm:flex">
+            <span className="h-2 w-2 rounded-full bg-emerald-300" />
+            <span className="h-2 w-2 rounded-full bg-white" />
+            <span className="h-2 w-2 rounded-full bg-emerald-300" />
+          </div>
 
-        <div className="pointer-events-none absolute -bottom-32 left-1/3 h-64 w-64 rounded-full bg-blue-100/30 blur-3xl" />
-
-        <div className="pointer-events-none absolute right-12 top-8 hidden h-28 w-28 rounded-full border border-emerald-100 sm:block" />
-
-        <div className="pointer-events-none absolute right-20 top-16 hidden h-14 w-14 rounded-full border border-emerald-100 sm:block" />
-
-        <div className="relative px-5 py-6 sm:px-7 sm:py-7">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            {/* Welcome */}
-
+          <div className="relative flex flex-col gap-7 p-5 sm:p-7 lg:flex-row lg:items-center lg:justify-between lg:px-8 lg:py-7">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[9px] font-black tracking-[0.14em] text-emerald-600">
-                <Sparkles className="h-3 w-3" />
-                LOTTERY PLAYER
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/10 bg-emerald-300/[0.06] px-3 py-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300" />
+                </span>
+
+                <span className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300">
+                  Player Lobby
+                </span>
               </div>
 
-              <h1 className="mt-4 max-w-2xl text-[26px] font-black leading-tight tracking-[-0.03em] text-slate-900 sm:text-3xl">
+              <h1 className="mt-4 text-2xl font-black tracking-tight text-white sm:text-3xl">
                 Welcome back,{" "}
-                <span className="text-emerald-600">{displayName}</span>
+                <span className="text-emerald-300">{displayName}</span>
               </h1>
 
-              <p className="mt-2 max-w-xl text-xs leading-5 text-slate-500 sm:text-sm">
-                Your numbers, results and winning moments — all in one place.
-                Choose a game and see what’s happening today.
+              <p className="mt-2 max-w-xl text-sm leading-6 text-white/45">
+                Ready to try your luck? Choose a game, pick your numbers, and
+                play your way.
               </p>
 
-              <div className="mt-5 flex flex-wrap gap-2.5">
+              <div className="mt-5 flex flex-wrap gap-2">
                 <Link
                   to="/player/play-2d"
-                  className="group inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-[10px] font-extrabold text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.98] sm:text-xs"
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2.5 text-xs font-black text-[#07130f] transition hover:bg-emerald-300"
                 >
-                  <Zap className="h-3.5 w-3.5 text-emerald-400" />
-                  Quick Play
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                  <Zap size={14} />
+                  Play 2D
                 </Link>
 
                 <Link
-                  to="/player/results-history"
-                  className="group inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[10px] font-extrabold text-slate-600 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600 sm:text-xs"
+                  to="/player/play-3d"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/10"
                 >
-                  View Results
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                  <Dice5 size={14} />
+                  Play 3D
                 </Link>
               </div>
             </div>
 
-            {/* Decorative number panel */}
+            {/* Featured latest number */}
+            <div className="relative shrink-0">
+              {featuredResult ? (
+                <div className="flex items-center gap-4 rounded-[24px] border border-white/10 bg-white/[0.04] p-4 sm:p-5">
+                  <div className="text-right">
+                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/30">
+                      Latest draw
+                    </p>
 
-            <div className="hidden shrink-0 lg:block">
-              <div className="relative flex h-36 w-52 items-center justify-center overflow-hidden rounded-3xl border border-slate-100 bg-slate-50/80">
-                <div className="absolute -right-5 -top-5 h-20 w-20 rounded-full bg-emerald-100/60" />
-
-                <div className="absolute -bottom-8 -left-4 h-24 w-24 rounded-full bg-blue-100/50" />
-
-                <div className="relative flex items-end gap-2">
-                  <div className="flex h-16 w-14 items-center justify-center rounded-2xl bg-white text-3xl font-black text-emerald-600 shadow-sm ring-1 ring-slate-200">
-                    2
+                    <p className="mt-1 text-sm font-bold text-white/70">
+                      {getResultLabel(featuredResult)}
+                    </p>
                   </div>
 
-                  <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-white text-2xl font-black text-slate-400 shadow-sm ring-1 ring-slate-200">
-                    0
-                  </div>
-
-                  <div className="flex h-16 w-14 items-center justify-center rounded-2xl bg-white text-3xl font-black text-blue-600 shadow-sm ring-1 ring-slate-200">
-                    8
-                  </div>
+                  <NumberBall
+                    value={normalizeNumber(
+                      featuredResult.number,
+                      featuredResult.type,
+                    )}
+                    size="large"
+                  />
                 </div>
-              </div>
+              ) : (
+                <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/10 bg-white/[0.04]">
+                  <Dice5 size={30} className="text-white/20" />
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ======================================================
-          QUICK PLAY
-      ======================================================= */}
+        {/* ====================================================
+            QUICK PLAY
+        ==================================================== */}
 
-      <section>
-        <div className="mb-3.5 flex items-end justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-black tracking-tight text-slate-900 sm:text-lg">
-                Quick Play
-              </h2>
+        <section>
+          <div className="mb-3 flex items-end justify-between px-1">
+            <div>
+              <div className="flex items-center gap-2">
+                <Gamepad2 size={16} className="text-emerald-600" />
 
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-slate-400">
-                Games
-              </span>
+                <h2 className="text-lg font-black tracking-tight text-slate-900">
+                  Quick Play
+                </h2>
+              </div>
+
+              <p className="mt-0.5 text-xs text-slate-400">
+                Pick a game and start your lucky run
+              </p>
             </div>
-
-            <p className="mt-0.5 text-[10px] text-slate-400 sm:text-xs">
-              Pick a game and start your next play
-            </p>
           </div>
-        </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          {/* ==================================================
-              2D CARD
-          ================================================== */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <QuickPlayCard
+              type="2D"
+              title="2D"
+              subtitle="Two Digits"
+              example="00 — 99"
+              href="/player/play-2d"
+              icon={<Dice5 size={22} />}
+            />
 
-          <Link
-            to="/player/play-2d"
-            className="group relative overflow-hidden rounded-3xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-white shadow-[0_10px_30px_-20px_rgba(16,185,129,0.55)] transition duration-300 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-[0_18px_40px_-20px_rgba(16,185,129,0.4)]"
-          >
-            {/* Background number */}
+            <QuickPlayCard
+              type="3D"
+              title="3D"
+              subtitle="Three Digits"
+              example="000 — 999"
+              href="/player/play-3d"
+              icon={<Sparkles size={22} />}
+            />
+          </div>
+        </section>
 
-            <div className="pointer-events-none absolute -right-3 -top-8 select-none text-[150px] font-black leading-none text-emerald-500/[0.055] transition duration-500 group-hover:scale-110">
-              2D
-            </div>
+        {/* ====================================================
+            RESULTS BOARD
+        ==================================================== */}
 
-            {/* Accent */}
-
-            <div className="absolute inset-x-0 top-0 h-1 bg-emerald-500" />
-
-            <div className="relative flex min-h-[158px] items-center gap-4 p-5 sm:p-6">
-              {/* Game icon */}
-
-              <div className="relative shrink-0">
-                <div className="absolute inset-0 rounded-2xl bg-emerald-400/20 blur-md" />
-
-                <div className="relative flex h-[68px] w-[68px] items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-200/70">
-                  <span className="text-xl font-black tracking-tight">2D</span>
-                </div>
-              </div>
-
-              {/* Content */}
-
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-lg font-black tracking-tight text-slate-900">
-                    Play 2D
-                  </h3>
-
-                  <span className="rounded-full bg-white px-2 py-1 text-[8px] font-black uppercase tracking-wider text-emerald-600 ring-1 ring-emerald-100">
-                    AM / PM
-                  </span>
-                </div>
-
-                <p className="mt-1.5 max-w-xs text-[10px] leading-4 text-slate-500 sm:text-xs">
-                  Choose your lucky two-digit number and play for the AM or PM
-                  draw.
-                </p>
-
-                <div className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-black text-emerald-600">
-                  Start playing
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
-                </div>
-              </div>
-            </div>
-          </Link>
-
-          {/* ==================================================
-              3D CARD
-          ================================================== */}
-
-          <Link
-            to="/player/play-3d"
-            className="group relative overflow-hidden rounded-3xl border border-blue-200/80 bg-gradient-to-br from-blue-50 via-white to-white shadow-[0_10px_30px_-20px_rgba(59,130,246,0.55)] transition duration-300 hover:-translate-y-1 hover:border-blue-300 hover:shadow-[0_18px_40px_-20px_rgba(59,130,246,0.4)]"
-          >
-            {/* Background number */}
-
-            <div className="pointer-events-none absolute -right-5 -top-8 select-none text-[150px] font-black leading-none text-blue-500/[0.055] transition duration-500 group-hover:scale-110">
-              3D
-            </div>
-
-            {/* Accent */}
-
-            <div className="absolute inset-x-0 top-0 h-1 bg-blue-500" />
-
-            <div className="relative flex min-h-[158px] items-center gap-4 p-5 sm:p-6">
-              {/* Game icon */}
-
-              <div className="relative shrink-0">
-                <div className="absolute inset-0 rounded-2xl bg-blue-400/20 blur-md" />
-
-                <div className="relative flex h-[68px] w-[68px] items-center justify-center rounded-2xl bg-blue-500 text-white shadow-lg shadow-blue-200/70">
-                  <span className="text-xl font-black tracking-tight">3D</span>
-                </div>
-              </div>
-
-              {/* Content */}
-
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-lg font-black tracking-tight text-slate-900">
-                    Play 3D
-                  </h3>
-
-                  <span className="rounded-full bg-white px-2 py-1 text-[8px] font-black uppercase tracking-wider text-blue-600 ring-1 ring-blue-100">
-                    3 DIGITS
-                  </span>
-                </div>
-
-                <p className="mt-1.5 max-w-xs text-[10px] leading-4 text-slate-500 sm:text-xs">
-                  Pick your three-digit number and try your luck in the 3D draw.
-                </p>
-
-                <div className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-black text-blue-600">
-                  Start playing
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
-                </div>
-              </div>
-            </div>
-          </Link>
-        </div>
-      </section>
-
-      {/* ======================================================
-          LATEST RESULTS
-      ======================================================= */}
-
-      <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_12px_40px_-28px_rgba(15,23,42,0.35)]">
-        {/* Header */}
-
-        <div className="relative border-b border-slate-100 px-4 py-4 sm:px-6 sm:py-5">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
-                <Trophy className="h-[18px] w-[18px]" />
-
-                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-white" />
-              </div>
-
+        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
+            <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-black text-slate-900 sm:text-base">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900 text-emerald-300">
+                    <Trophy size={15} />
+                  </div>
+
+                  <h2 className="text-base font-black tracking-tight text-slate-900 sm:text-lg">
                     Latest Results
                   </h2>
 
-                  <span className="hidden rounded-full bg-emerald-50 px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-emerald-600 sm:inline-flex">
+                  <span className="hidden rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-emerald-600 sm:inline-flex">
                     Live Board
                   </span>
                 </div>
 
-                <p className="mt-0.5 text-[9px] text-slate-400 sm:text-[10px]">
-                  The latest published winning numbers
+                <p className="mt-1 text-xs text-slate-400">
+                  Check the latest winning numbers
                 </p>
               </div>
-            </div>
 
-            <Link
-              to="/player/results-history"
-              className="group inline-flex shrink-0 items-center gap-1 rounded-xl px-2.5 py-2 text-[9px] font-black text-emerald-600 transition hover:bg-emerald-50 sm:text-[10px]"
-            >
-              View all
-              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-          </div>
-        </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  aria-label="Refresh dashboard"
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <RefreshCw
+                    size={14}
+                    className={refreshing ? "animate-spin" : undefined}
+                  />
+                </button>
 
-        {/* Result Content */}
-
-        {latestResults.length > 0 ? (
-          <div className="p-3 sm:p-5">
-            <div className="grid gap-3 md:grid-cols-3">
-              {latestResults.slice(0, 3).map((result) => {
-                const theme = getResultTheme(result.type);
-
-                return (
-                  <div
-                    key={result.id}
-                    className={`group relative overflow-hidden rounded-2xl border ${theme.card} p-4 transition duration-300 hover:-translate-y-0.5 hover:shadow-lg`}
-                  >
-                    {/* Decorative glow */}
-
-                    <div
-                      className={`pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full ${theme.glow} blur-2xl`}
-                    />
-
-                    <div className="relative">
-                      {/* Top */}
-
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={`rounded-lg px-2 py-1 text-[9px] font-black ring-1 ${theme.badge}`}
-                          >
-                            {result.type}
-                          </span>
-
-                          {result.session && (
-                            <span
-                              className={`rounded-lg px-2 py-1 text-[9px] font-black ${
-                                result.session === "AM"
-                                  ? "bg-amber-50 text-amber-600 ring-1 ring-amber-100"
-                                  : "bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100"
-                              }`}
-                            >
-                              {result.session}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="text-right">
-                          {result.date && (
-                            <p className="text-[8px] font-semibold text-slate-400">
-                              {result.date}
-                            </p>
-                          )}
-
-                          {result.time && (
-                            <p className="mt-0.5 flex items-center justify-end gap-1 text-[8px] font-bold text-slate-500">
-                              <Clock3 className="h-2.5 w-2.5" />
-                              {result.time}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Label */}
-
-                      <div className="mt-5">
-                        <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">
-                          Winning Number
-                        </p>
-
-                        {/* Number */}
-
-                        <div className="mt-2 flex items-center justify-between gap-3">
-                          <div
-                            className={`inline-flex min-w-[86px] items-center justify-center rounded-xl px-4 py-2.5 text-2xl font-black tracking-[0.18em] ring-1 shadow-sm ${theme.number}`}
-                          >
-                            {result.number}
-                          </div>
-
-                          <div
-                            className={`flex h-9 w-9 items-center justify-center rounded-xl bg-white/80 text-slate-300 ring-1 ring-white transition group-hover:text-slate-400`}
-                          >
-                            <ArrowRight className="h-4 w-4" />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Bottom */}
-
-                      <div className="mt-4 flex items-center gap-1.5 text-[8px] font-semibold text-slate-400">
-                        <CalendarDays className="h-3 w-3" />
-                        Latest published result
-                      </div>
-                    </div>
-
-                    {/* Bottom accent */}
-
-                    <div
-                      className={`absolute inset-x-4 bottom-0 h-0.5 origin-center scale-x-0 ${theme.accent} transition duration-300 group-hover:scale-x-100`}
-                    />
-                  </div>
-                );
-              })}
+                <Link
+                  to="/player/results-history"
+                  className="hidden items-center gap-1 text-xs font-bold text-slate-500 transition hover:text-slate-900 sm:flex"
+                >
+                  View all
+                  <ChevronRight size={14} />
+                </Link>
+              </div>
             </div>
           </div>
-        ) : (
-          <div className="px-5 py-14 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-50 text-slate-300 ring-1 ring-slate-100">
-              <Trophy className="h-6 w-6" />
+
+          <div className="p-4 sm:p-5">
+            {latestResults.length === 0 ? (
+              <EmptyResults />
+            ) : (
+              <div className="grid gap-3 md:grid-cols-3">
+                {latestResults.slice(0, 3).map((draw, index) => (
+                  <ResultCard
+                    key={draw.id}
+                    draw={draw}
+                    featured={Boolean(
+                      featuredResult && draw.id === featuredResult.id,
+                    )}
+                  />
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4 sm:hidden">
+              <Link
+                to="/player/results-history"
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-3 text-xs font-bold text-slate-600 transition hover:bg-slate-100"
+              >
+                View complete results
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* ====================================================
+            WINNERS
+        ==================================================== */}
+
+        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-5">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50 text-amber-500">
+                  <Crown size={15} />
+                </div>
+
+                <h2 className="text-base font-black tracking-tight text-slate-900 sm:text-lg">
+                  Latest Winners
+                </h2>
+              </div>
+
+              <p className="mt-1 text-xs text-slate-400">
+                Players who hit the lucky numbers
+              </p>
             </div>
 
-            <p className="mt-4 text-sm font-black text-slate-700">
-              No published results yet
-            </p>
-
-            <p className="mx-auto mt-1 max-w-sm text-[10px] leading-5 text-slate-400">
-              Results will appear here as soon as the lottery draw has been
-              published.
-            </p>
-          </div>
-        )}
-
-        {/* Footer */}
-
-        {latestResults.length > 0 && (
-          <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 sm:px-6">
-            <div className="flex min-w-0 items-center gap-1.5 text-[8px] font-medium text-slate-400 sm:text-[9px]">
-              <CalendarDays className="h-3 w-3 shrink-0" />
-
-              <span className="truncate">Latest available lottery results</span>
+            <div className="hidden items-center gap-1 rounded-full bg-amber-50 px-3 py-1.5 text-[10px] font-black text-amber-600 sm:flex">
+              <Sparkles size={12} />
+              Top 3
             </div>
-
-            <Link
-              to="/player/results-history"
-              className="shrink-0 text-[9px] font-black text-slate-500 transition hover:text-emerald-600"
-            >
-              Results History →
-            </Link>
           </div>
-        )}
-      </section>
 
-      {/* ======================================================
-          LATEST WINNERS
-      ======================================================= */}
+          <div className="p-4 sm:p-5">
+            {latestWinners.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-300 shadow-sm">
+                  <Trophy size={22} />
+                </div>
 
-      <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_12px_40px_-28px_rgba(15,23,42,0.35)]">
-        {/* Header */}
+                <p className="mt-3 text-sm font-bold text-slate-600">
+                  No winners yet
+                </p>
 
-        <div className="relative border-b border-slate-100 px-4 py-4 sm:px-6 sm:py-5">
-          <div className="flex items-center justify-between gap-4">
+                <p className="mt-1 text-xs text-slate-400">
+                  Winners will appear here after results are published.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {latestWinners.map((winner, index) => (
+                  <WinnerRow key={winner.id} winner={winner} rank={index + 1} />
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4 flex items-center justify-center rounded-xl bg-slate-50 px-4 py-3">
+              <p className="text-[11px] font-medium text-slate-400">
+                Your lucky number could be next.
+              </p>
+
+              <Link
+                to="/player/play-2d"
+                className="ml-2 inline-flex items-center gap-1 text-[11px] font-black text-emerald-600 hover:text-emerald-700"
+              >
+                Play now
+                <ArrowRight size={12} />
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* ====================================================
+            BOTTOM CTA
+        ==================================================== */}
+
+        <section className="relative overflow-hidden rounded-[24px] bg-[#101923] px-5 py-5 sm:px-6">
+          <div className="absolute right-0 top-0 h-full w-1/3 bg-emerald-400/[0.03]" />
+
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-500 ring-1 ring-amber-100">
-                <Crown className="h-[18px] w-[18px]" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300">
+                <Zap size={18} />
               </div>
 
               <div>
-                <h2 className="text-sm font-black text-slate-900 sm:text-base">
-                  Latest Winners
-                </h2>
+                <p className="text-sm font-black text-white">Feeling lucky?</p>
 
-                <p className="mt-0.5 text-[9px] text-slate-400 sm:text-[10px]">
-                  Recent winning tickets
+                <p className="mt-0.5 text-xs text-white/35">
+                  Choose your numbers and make your next play.
                 </p>
               </div>
             </div>
 
-            <Link
-              to="/player/results-history"
-              className="group inline-flex shrink-0 items-center gap-1 rounded-xl px-2.5 py-2 text-[9px] font-black text-emerald-600 transition hover:bg-emerald-50 sm:text-[10px]"
-            >
-              View all
-              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-          </div>
-        </div>
+            <div className="flex gap-2">
+              <Link
+                to="/player/play-2d"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-2.5 text-xs font-black text-[#07130f] transition hover:bg-emerald-300"
+              >
+                2D
+                <ArrowRight size={13} />
+              </Link>
 
-        {/* Winners */}
-
-        {latestWinners.length > 0 ? (
-          <div className="p-3 sm:p-5">
-            {/* Winner podium */}
-
-            <div className="grid gap-3 md:grid-cols-3">
-              {latestWinners.map((winner, index) => {
-                const rankStyles =
-                  index === 0
-                    ? {
-                        wrapper:
-                          "border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50/50",
-                        rank: "bg-amber-400 text-white shadow-amber-200",
-                        icon: "text-amber-500",
-                        prize: "text-amber-600",
-                      }
-                    : index === 1
-                      ? {
-                          wrapper:
-                            "border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-50",
-                          rank: "bg-slate-400 text-white shadow-slate-200",
-                          icon: "text-slate-400",
-                          prize: "text-slate-600",
-                        }
-                      : {
-                          wrapper:
-                            "border-orange-200 bg-gradient-to-br from-orange-50 via-white to-amber-50/40",
-                          rank: "bg-orange-400 text-white shadow-orange-200",
-                          icon: "text-orange-500",
-                          prize: "text-orange-600",
-                        };
-
-                return (
-                  <div
-                    key={winner.id}
-                    className={`group relative overflow-hidden rounded-2xl border p-4 transition duration-300 hover:-translate-y-0.5 hover:shadow-lg ${rankStyles.wrapper}`}
-                  >
-                    {/* Decorative crown */}
-
-                    {index === 0 && (
-                      <Crown
-                        className={`absolute -right-1 -top-1 h-16 w-16 rotate-12 opacity-[0.07] ${rankStyles.icon}`}
-                      />
-                    )}
-
-                    <div className="relative">
-                      {/* Rank / player */}
-
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-black shadow-md ${rankStyles.rank}`}
-                        >
-                          #{index + 1}
-                        </div>
-
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-black text-slate-900">
-                            {winner.player}
-                          </p>
-
-                          <div className="mt-1 flex items-center gap-1.5">
-                            <span
-                              className={`text-[9px] font-black ${
-                                winner.type === "2D"
-                                  ? "text-emerald-600"
-                                  : "text-blue-600"
-                              }`}
-                            >
-                              {winner.type}
-                            </span>
-
-                            {winner.session && (
-                              <>
-                                <span className="text-slate-300">•</span>
-
-                                <span className="text-[8px] font-semibold text-slate-400">
-                                  {winner.session}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Number */}
-
-                      <div className="mt-4 flex items-end justify-between gap-3">
-                        <div>
-                          <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">
-                            Winning Number
-                          </p>
-
-                          <span
-                            className={`mt-1.5 inline-flex rounded-xl bg-white px-3 py-2 text-sm font-black tracking-[0.16em] shadow-sm ring-1 ${
-                              winner.type === "2D"
-                                ? "text-emerald-600 ring-emerald-100"
-                                : "text-blue-600 ring-blue-100"
-                            }`}
-                          >
-                            {winner.number}
-                          </span>
-                        </div>
-
-                        <div className="text-right">
-                          <p
-                            className={`text-sm font-black ${rankStyles.prize}`}
-                          >
-                            +{formatMoney(winner.prize)}
-                          </p>
-
-                          <p className="mt-0.5 text-[8px] font-bold uppercase tracking-wider text-slate-400">
-                            MMK
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Date */}
-
-                      {winner.date && (
-                        <div className="mt-3 flex items-center gap-1.5 text-[8px] font-semibold text-slate-400">
-                          <CalendarDays className="h-3 w-3" />
-
-                          {winner.date}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              <Link
+                to="/player/play-3d"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/10"
+              >
+                3D
+                <ArrowRight size={13} />
+              </Link>
             </div>
           </div>
-        ) : (
-          <div className="px-5 py-14 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-300 ring-1 ring-amber-100">
-              <Trophy className="h-6 w-6" />
-            </div>
+        </section>
 
-            <p className="mt-4 text-sm font-black text-slate-700">
-              No winners yet
-            </p>
-
-            <p className="mx-auto mt-1 max-w-sm text-[10px] leading-5 text-slate-400">
-              Winning tickets will appear here after a result is processed.
-            </p>
-          </div>
-        )}
-
-        {/* Footer */}
-
-        {latestWinners.length > 0 && (
-          <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 sm:px-6">
-            <p className="text-[8px] font-medium text-slate-400 sm:text-[9px]">
-              Showing the 3 latest winners
-            </p>
-
-            <Link
-              to="/player/results-history"
-              className="text-[9px] font-black text-slate-500 transition hover:text-emerald-600 sm:text-[10px]"
-            >
-              View all results →
-            </Link>
-          </div>
-        )}
-      </section>
+        <div className="h-2" />
+      </div>
     </div>
   );
 }
