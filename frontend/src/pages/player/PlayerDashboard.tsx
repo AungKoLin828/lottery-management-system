@@ -1,13 +1,9 @@
 import {
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  Ticket,
-  Trophy,
-  WalletCards,
   ArrowRight,
   CalendarDays,
   Clock3,
   RefreshCw,
+  Trophy,
 } from "lucide-react";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -56,33 +52,55 @@ type DashboardUser = {
 
 type DashboardData = {
   user: DashboardUser;
+
+  /*
+   * Existing statistics are still loaded because
+   * the backend already returns them.
+   *
+   * They are intentionally NOT displayed on this dashboard.
+   */
   stats: DashboardStats;
+
+  /*
+   * New dashboard result list.
+   *
+   * Expected:
+   * 2D AM
+   * 2D PM
+   * 3D
+   */
+  latestResults: LatestDraw[];
+
+  /*
+   * Kept for backward compatibility with the
+   * current backend response.
+   */
   latestDraw: LatestDraw | null;
+
   winners: Winner[];
 };
 
 /* ============================================================
    API RESPONSE
-
-   Backend currently returns:
-
-   {
-     success: true,
-     user: {...},
-     stats: {...},
-     latestDraw: null,
-     winners: []
-   }
 ============================================================ */
 
 type DashboardResponse = {
   success: boolean;
+
   message?: string;
 
   user?: DashboardUser;
 
   stats?: DashboardStats;
 
+  /*
+   * New field recommended for the dashboard.
+   */
+  latestResults?: LatestDraw[];
+
+  /*
+   * Existing field.
+   */
   latestDraw?: LatestDraw | null;
 
   winners?: Winner[];
@@ -196,6 +214,81 @@ export default function Dashboard() {
       }
 
       /* ======================================================
+         NORMALIZE LATEST RESULTS
+      ====================================================== */
+
+      let normalizedLatestResults: LatestDraw[] = [];
+
+      /*
+       * Preferred:
+       *
+       * result.latestResults
+       *
+       * This should contain:
+       * 2D AM
+       * 2D PM
+       * 3D
+       */
+      if (
+        Array.isArray(result.latestResults) &&
+        result.latestResults.length > 0
+      ) {
+        normalizedLatestResults = result.latestResults
+          .filter(
+            (draw): draw is LatestDraw =>
+              Boolean(draw) &&
+              typeof draw.id === "string" &&
+              (draw.type === "2D" || draw.type === "3D") &&
+              typeof draw.number === "string",
+          )
+          .map((draw) => ({
+            id: draw.id,
+            type: draw.type,
+            number: draw.number,
+            session: draw.session ?? null,
+            date: draw.date ?? "",
+            time: draw.time ?? "",
+          }));
+      }
+
+      /*
+       * Backward compatibility:
+       *
+       * If the backend has not yet been changed and only
+       * returns latestDraw, use that as a single result.
+       */
+      if (normalizedLatestResults.length === 0 && result.latestDraw) {
+        normalizedLatestResults = [
+          {
+            id: result.latestDraw.id,
+            type: result.latestDraw.type,
+            number: result.latestDraw.number,
+            session: result.latestDraw.session ?? null,
+            date: result.latestDraw.date ?? "",
+            time: result.latestDraw.time ?? "",
+          },
+        ];
+      }
+
+      /* ======================================================
+         NORMALIZE WINNERS
+      ====================================================== */
+
+      const normalizedWinners: Winner[] = Array.isArray(result.winners)
+        ? result.winners
+            .filter((winner) => winner && typeof winner.id === "string")
+            .map((winner) => ({
+              ...winner,
+
+              prize: Number(winner.prize ?? 0),
+
+              session: winner.session ?? null,
+
+              date: winner.date ?? "",
+            }))
+        : [];
+
+      /* ======================================================
          NORMALIZE DATA
       ====================================================== */
 
@@ -226,15 +319,11 @@ export default function Dashboard() {
           totalWithdraw: Number(result.stats.totalWithdraw ?? 0),
         },
 
+        latestResults: normalizedLatestResults,
+
         latestDraw: result.latestDraw ?? null,
 
-        winners: Array.isArray(result.winners)
-          ? result.winners.map((winner) => ({
-              ...winner,
-
-              prize: Number(winner.prize ?? 0),
-            }))
-          : [],
+        winners: normalizedWinners,
       };
 
       /* ======================================================
@@ -261,84 +350,70 @@ export default function Dashboard() {
     void loadDashboard();
   }, [loadDashboard]);
 
-  /* ============================================================
-     STATISTICS
-  ============================================================ */
+  /* ==========================================================
+     USER DISPLAY NAME
+  ========================================================== */
 
-  const stats = useMemo(() => {
-    const values = data?.stats ?? {
-      walletBalance: 0,
-      totalTickets: 0,
-      totalDeposit: 0,
-      totalWithdraw: 0,
-    };
+  const displayName = useMemo(() => {
+    if (!data?.user) {
+      return "Player";
+    }
 
-    return [
-      {
-        title: "Wallet Balance",
-
-        value: formatMoney(values.walletBalance),
-
-        unit: "MMK",
-
-        icon: WalletCards,
-
-        iconBg: "bg-emerald-100",
-
-        iconColor: "text-emerald-600",
-      },
-
-      {
-        title: "Total Tickets",
-
-        value: Number(values.totalTickets || 0).toLocaleString("en-US"),
-
-        unit: "Tickets",
-
-        icon: Ticket,
-
-        iconBg: "bg-indigo-100",
-
-        iconColor: "text-indigo-600",
-      },
-
-      {
-        title: "Total Deposit",
-
-        value: formatMoney(values.totalDeposit),
-
-        unit: "MMK",
-
-        icon: ArrowDownToLine,
-
-        iconBg: "bg-blue-100",
-
-        iconColor: "text-blue-600",
-      },
-
-      {
-        title: "Total Withdraw",
-
-        value: formatMoney(values.totalWithdraw),
-
-        unit: "MMK",
-
-        icon: ArrowUpFromLine,
-
-        iconBg: "bg-amber-100",
-
-        iconColor: "text-amber-600",
-      },
-    ];
+    return data.user.fullName?.trim() || data.user.username || "Player";
   }, [data]);
 
-  /* ============================================================
+  /* ==========================================================
+     LATEST RESULTS
+  ========================================================== */
+
+  const latestResults = useMemo(() => {
+    const results = data?.latestResults ?? [];
+
+    /*
+     * Keep the dashboard ordering:
+     *
+     * 2D AM
+     * 2D PM
+     * 3D
+     */
+    return [...results].sort((a, b) => {
+      const order = (draw: LatestDraw) => {
+        if (draw.type === "2D" && draw.session === "AM") {
+          return 1;
+        }
+
+        if (draw.type === "2D" && draw.session === "PM") {
+          return 2;
+        }
+
+        if (draw.type === "3D") {
+          return 3;
+        }
+
+        return 99;
+      };
+
+      return order(a) - order(b);
+    });
+  }, [data]);
+
+  /* ==========================================================
+     LATEST WINNERS
+  ========================================================== */
+
+  const latestWinners = useMemo(() => {
+    return (data?.winners ?? []).slice(0, 3);
+  }, [data]);
+
+  /* ==========================================================
      LOADING
-  ============================================================ */
+  ========================================================== */
 
   if (loading) {
     return (
       <div className="space-y-5 pb-6">
+        {/* HEADER */}
+
         <div>
           <div className="h-3 w-28 animate-pulse rounded bg-slate-200" />
 
@@ -347,35 +422,42 @@ export default function Dashboard() {
           <div className="mt-2 h-4 w-80 max-w-full animate-pulse rounded bg-slate-100" />
         </div>
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div
-              key={index}
-              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
-            >
-              <div className="h-9 w-9 animate-pulse rounded-xl bg-slate-100" />
+        {/* QUICK PLAY */}
 
-              <div className="mt-4 h-3 w-24 animate-pulse rounded bg-slate-100" />
+        <div>
+          <div className="mb-3">
+            <div className="h-4 w-24 animate-pulse rounded bg-slate-200" />
 
-              <div className="mt-2 h-6 w-32 animate-pulse rounded bg-slate-200" />
-            </div>
-          ))}
+            <div className="mt-2 h-3 w-44 animate-pulse rounded bg-slate-100" />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="h-44 animate-pulse rounded-2xl bg-slate-200" />
+
+            <div className="h-44 animate-pulse rounded-2xl bg-slate-200" />
+          </div>
         </div>
 
-        <div className="h-40 animate-pulse rounded-2xl bg-slate-200" />
+        {/* LATEST RESULTS */}
+
+        <div className="h-56 animate-pulse rounded-2xl bg-slate-200" />
+
+        {/* WINNERS */}
 
         <div className="h-72 animate-pulse rounded-2xl bg-slate-200" />
       </div>
     );
   }
 
-  /* ============================================================
+  /* ==========================================================
      ERROR
-  ============================================================ */
+  ========================================================== */
 
   if (error) {
     return (
       <div className="space-y-5 pb-6">
+        {/* HEADER */}
+
         <div>
           <div className="flex items-center gap-1 text-xs font-semibold">
             <span className="text-slate-400">Player</span>
@@ -390,9 +472,11 @@ export default function Dashboard() {
           </h1>
 
           <p className="mt-1.5 text-xs text-slate-500 sm:text-sm">
-            Manage your lottery play, tickets and wallet.
+            Here’s the latest lottery information for you.
           </p>
         </div>
+
+        {/* ERROR */}
 
         <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -418,17 +502,9 @@ export default function Dashboard() {
     );
   }
 
-  /* ============================================================
-     DATA
-  ============================================================ */
-
-  const latestDraw = data?.latestDraw ?? null;
-
-  const winners = data?.winners ?? [];
-
-  /* ============================================================
+  /* ==========================================================
      PAGE
-  ============================================================ */
+  ========================================================== */
 
   return (
     <div className="space-y-5 pb-6">
@@ -446,72 +522,29 @@ export default function Dashboard() {
         </div>
 
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-          Player Dashboard
+          Welcome back, {displayName}
         </h1>
 
         <p className="mt-1.5 text-xs text-slate-500 sm:text-sm">
-          Manage your lottery play, tickets and wallet.
+          Here’s the latest lottery information for you.
         </p>
-      </div>
-
-      {/* ======================================================
-          STATISTICS
-      ======================================================= */}
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {stats.map((item) => {
-          const Icon = item.icon;
-
-          return (
-            <div
-              key={item.title}
-              className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:p-5"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div
-                  className={`flex h-9 w-9 items-center justify-center rounded-xl ${item.iconBg} ${item.iconColor}`}
-                >
-                  <Icon className="h-4 w-4" />
-                </div>
-
-                <ArrowRight className="h-3.5 w-3.5 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-emerald-400" />
-              </div>
-
-              <p className="mt-4 truncate text-[10px] font-semibold text-slate-400 sm:text-xs">
-                {item.title}
-              </p>
-
-              <div className="mt-1 flex min-w-0 items-baseline gap-1.5">
-                <p className="truncate text-lg font-extrabold tracking-tight text-slate-900 sm:text-xl">
-                  {item.value}
-                </p>
-
-                <span className="shrink-0 text-[9px] font-bold text-slate-400 sm:text-[10px]">
-                  {item.unit}
-                </span>
-              </div>
-            </div>
-          );
-        })}
       </div>
 
       {/* ======================================================
           QUICK PLAY
       ======================================================= */}
 
-      <div>
+      <section>
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-bold text-slate-900">Play Lottery</h2>
+            <h2 className="text-sm font-bold text-slate-900 sm:text-base">
+              Quick Play
+            </h2>
 
-            <p className="mt-0.5 text-[10px] text-slate-400">
-              Choose your lottery game
+            <p className="mt-0.5 text-[10px] text-slate-400 sm:text-xs">
+              Choose a lottery game to start playing
             </p>
           </div>
-
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[9px] font-semibold text-slate-500">
-            Quick Play
-          </span>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -523,35 +556,35 @@ export default function Dashboard() {
             to="/player/play-2d"
             className="group relative overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-green-50 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md sm:p-5"
           >
-            <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-emerald-100/60 transition group-hover:scale-110" />
+            <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-emerald-100/60 transition duration-300 group-hover:scale-110" />
 
             <div className="relative flex items-start justify-between gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm shadow-emerald-200">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm shadow-emerald-200">
                 <span className="text-sm font-extrabold tracking-tight">
                   2D
                 </span>
               </div>
 
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm transition group-hover:bg-emerald-500 group-hover:text-white">
-                <ArrowRight className="h-3.5 w-3.5" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm transition group-hover:bg-emerald-500 group-hover:text-white">
+                <ArrowRight className="h-4 w-4" />
               </div>
             </div>
 
-            <div className="relative mt-4">
+            <div className="relative mt-5">
               <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
                 Lottery
               </p>
 
-              <h3 className="mt-0.5 text-lg font-extrabold text-slate-900">
+              <h3 className="mt-1 text-lg font-extrabold text-slate-900">
                 Play 2D
               </h3>
 
-              <p className="mt-1 max-w-sm text-[11px] leading-5 text-slate-500">
-                Select AM or PM session and place your 2D bets.
+              <p className="mt-1.5 max-w-sm text-[11px] leading-5 text-slate-500">
+                Select your AM or PM session and place your 2D bets.
               </p>
             </div>
 
-            <div className="relative mt-4 flex items-center justify-between border-t border-emerald-100 pt-3">
+            <div className="relative mt-5 flex items-center justify-between border-t border-emerald-100 pt-3">
               <span className="text-[10px] font-bold text-emerald-600">
                 Start playing
               </span>
@@ -570,35 +603,35 @@ export default function Dashboard() {
             to="/player/play-3d"
             className="group relative overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-cyan-50 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md sm:p-5"
           >
-            <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-blue-100/60 transition group-hover:scale-110" />
+            <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-blue-100/60 transition duration-300 group-hover:scale-110" />
 
             <div className="relative flex items-start justify-between gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500 text-white shadow-sm shadow-blue-200">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500 text-white shadow-sm shadow-blue-200">
                 <span className="text-sm font-extrabold tracking-tight">
                   3D
                 </span>
               </div>
 
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm transition group-hover:bg-blue-500 group-hover:text-white">
-                <ArrowRight className="h-3.5 w-3.5" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm transition group-hover:bg-blue-500 group-hover:text-white">
+                <ArrowRight className="h-4 w-4" />
               </div>
             </div>
 
-            <div className="relative mt-4">
+            <div className="relative mt-5">
               <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
                 Lottery
               </p>
 
-              <h3 className="mt-0.5 text-lg font-extrabold text-slate-900">
+              <h3 className="mt-1 text-lg font-extrabold text-slate-900">
                 Play 3D
               </h3>
 
-              <p className="mt-1 max-w-sm text-[11px] leading-5 text-slate-500">
+              <p className="mt-1.5 max-w-sm text-[11px] leading-5 text-slate-500">
                 Select your 3D number and enter your bet amount.
               </p>
             </div>
 
-            <div className="relative mt-4 flex items-center justify-between border-t border-blue-100 pt-3">
+            <div className="relative mt-5 flex items-center justify-between border-t border-blue-100 pt-3">
               <span className="text-[10px] font-bold text-blue-600">
                 Start playing
               </span>
@@ -609,121 +642,28 @@ export default function Dashboard() {
             </div>
           </Link>
         </div>
-      </div>
+      </section>
 
       {/* ======================================================
-          LATEST DRAW
+          LATEST RESULTS
       ======================================================= */}
 
-      {latestDraw ? (
-        <div className="relative overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600 p-4 text-white shadow-md shadow-emerald-100 sm:p-5">
-          <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10" />
-
-          <div className="absolute -bottom-10 -left-10 h-28 w-28 rounded-full bg-white/5" />
-
-          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/10">
-                <Trophy className="h-5 w-5 text-amber-300" />
-              </div>
-
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-sm font-bold sm:text-base">
-                    Latest Draw
-                  </h2>
-
-                  <span className="rounded-md bg-white/15 px-2 py-1 text-[9px] font-bold text-emerald-50">
-                    {latestDraw.type}
-                  </span>
-
-                  {latestDraw.session && (
-                    <span className="rounded-md bg-amber-400 px-2 py-1 text-[9px] font-extrabold text-amber-950">
-                      {latestDraw.session}
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-1 flex flex-wrap items-center gap-3 text-[10px] text-emerald-100">
-                  <span className="flex items-center gap-1">
-                    <CalendarDays className="h-3 w-3" />
-
-                    {latestDraw.date}
-                  </span>
-
-                  {latestDraw.time && (
-                    <span className="flex items-center gap-1">
-                      <Clock3 className="h-3 w-3" />
-
-                      {latestDraw.time}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between gap-4 rounded-xl bg-white/10 px-4 py-3 ring-1 ring-white/10 sm:min-w-[210px]">
-              <div>
-                <p className="text-[9px] font-semibold uppercase tracking-wider text-emerald-100">
-                  Winning Number
-                </p>
-
-                <p className="mt-0.5 text-[10px] text-emerald-200">
-                  Latest result
-                </p>
-              </div>
-
-              <div className="flex h-14 w-20 items-center justify-center rounded-xl bg-white text-3xl font-black tracking-[0.15em] text-emerald-600 shadow-lg">
-                {latestDraw.number}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-          <Trophy className="mx-auto h-7 w-7 text-slate-300" />
-
-          <p className="mt-2 text-sm font-bold text-slate-600">
-            No published result yet
-          </p>
-
-          <p className="mt-1 text-xs text-slate-400">
-            The latest lottery result will appear here once published.
-          </p>
-        </div>
-      )}
-
-      {/* ======================================================
-          LATEST WINNERS
-      ======================================================= */}
-
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {/* HEADER */}
 
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-5">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-500">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
               <Trophy className="h-4 w-4" />
             </div>
 
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="truncate text-sm font-bold text-slate-900 sm:text-base">
-                  Latest Winners
-                </h2>
-
-                {latestDraw && (
-                  <span className="hidden rounded-md bg-emerald-50 px-2 py-1 text-[9px] font-bold text-emerald-600 sm:inline-block">
-                    {latestDraw.type}
-                    {latestDraw.session ? ` · ${latestDraw.session}` : ""}
-                  </span>
-                )}
-              </div>
+              <h2 className="truncate text-sm font-bold text-slate-900 sm:text-base">
+                Latest Results
+              </h2>
 
               <p className="mt-0.5 text-[10px] text-slate-400 sm:text-xs">
-                {latestDraw
-                  ? `Draw result · ${latestDraw.date}`
-                  : "Latest winning tickets"}
+                Latest published lottery results
               </p>
             </div>
           </div>
@@ -736,31 +676,152 @@ export default function Dashboard() {
           </Link>
         </div>
 
-        {/* DRAW NUMBER */}
+        {/* RESULTS */}
 
-        {latestDraw && (
-          <div className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50/60 px-4 py-2.5 sm:px-5">
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-600">
-                Latest Draw Number
-              </span>
+        {latestResults.length > 0 ? (
+          <div className="divide-y divide-slate-100">
+            {latestResults.slice(0, 3).map((result) => (
+              <div
+                key={result.id}
+                className="px-4 py-3.5 transition hover:bg-slate-50 sm:px-5"
+              >
+                <div className="flex items-center gap-3">
+                  {/* TYPE */}
 
-              <span className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-black tracking-[0.15em] text-white shadow-sm">
-                {latestDraw.number}
-              </span>
+                  <div className="w-10 shrink-0 sm:w-12">
+                    <span
+                      className={`inline-flex rounded-md px-2 py-1 text-[10px] font-extrabold ${
+                        result.type === "2D"
+                          ? "bg-emerald-50 text-emerald-600"
+                          : "bg-blue-50 text-blue-600"
+                      }`}
+                    >
+                      {result.type}
+                    </span>
+                  </div>
 
-              {latestDraw.session && (
-                <span className="rounded-md bg-white px-2 py-1 text-[9px] font-bold text-slate-500 ring-1 ring-emerald-100">
-                  {latestDraw.session}
-                </span>
-              )}
-            </div>
+                  {/* SESSION */}
 
-            <span className="hidden text-[9px] font-medium text-slate-400 sm:block">
-              {latestDraw.date}
-            </span>
+                  <div className="w-12 shrink-0">
+                    {result.session ? (
+                      <span
+                        className={`inline-flex rounded-md px-2 py-1 text-[9px] font-extrabold ${
+                          result.session === "AM"
+                            ? "bg-amber-50 text-amber-600"
+                            : "bg-indigo-50 text-indigo-600"
+                        }`}
+                      >
+                        {result.session}
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-semibold text-slate-300">
+                        —
+                      </span>
+                    )}
+                  </div>
+
+                  {/* NUMBER */}
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center">
+                      <span
+                        className={`inline-flex min-w-[58px] items-center justify-center rounded-lg px-3 py-1.5 text-base font-black tracking-[0.15em] sm:text-lg ${
+                          result.type === "2D"
+                            ? "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
+                            : "bg-blue-50 text-blue-600 ring-1 ring-blue-100"
+                        }`}
+                      >
+                        {result.number}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* DATE / TIME */}
+
+                  <div className="shrink-0 text-right">
+                    {result.time && (
+                      <div className="flex items-center justify-end gap-1 text-[9px] font-semibold text-slate-500 sm:text-[10px]">
+                        <Clock3 className="h-3 w-3 text-slate-400" />
+
+                        <span>{result.time}</span>
+                      </div>
+                    )}
+
+                    {result.date && (
+                      <div className="mt-0.5 flex items-center justify-end gap-1 text-[9px] text-slate-400">
+                        <CalendarDays className="h-3 w-3" />
+
+                        <span>{result.date}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="px-5 py-10 text-center">
+            <Trophy className="mx-auto h-7 w-7 text-slate-300" />
+
+            <p className="mt-2 text-xs font-bold text-slate-500">
+              No published results yet
+            </p>
+
+            <p className="mt-1 text-[10px] text-slate-400">
+              The latest lottery results will appear here once published.
+            </p>
           </div>
         )}
+
+        {/* FOOTER */}
+
+        <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-3 sm:px-5">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[9px] text-slate-400 sm:text-[10px]">
+              Showing the latest available results
+            </p>
+
+            <Link
+              to="/player/results-history"
+              className="text-[10px] font-semibold text-slate-500 transition hover:text-emerald-600"
+            >
+              Results History →
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ======================================================
+          LATEST WINNERS
+      ======================================================= */}
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {/* HEADER */}
+
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-500">
+              <Trophy className="h-4 w-4" />
+            </div>
+
+            <div className="min-w-0">
+              <h2 className="truncate text-sm font-bold text-slate-900 sm:text-base">
+                Latest Winners
+              </h2>
+
+              <p className="mt-0.5 text-[10px] text-slate-400 sm:text-xs">
+                Recent winning tickets
+              </p>
+            </div>
+          </div>
+
+          <Link
+            to="/player/results-history"
+            className="shrink-0 rounded-lg px-2 py-1.5 text-[10px] font-bold text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-700 sm:text-xs"
+          >
+            View Results →
+          </Link>
+        </div>
 
         {/* TABLE HEADER */}
 
@@ -776,16 +837,20 @@ export default function Dashboard() {
 
         {/* WINNERS */}
 
-        {winners.length > 0 ? (
+        {latestWinners.length > 0 ? (
           <div className="divide-y divide-slate-100">
-            {winners.slice(0, 3).map((winner, index) => (
+            {latestWinners.map((winner, index) => (
               <div
                 key={winner.id}
                 className="px-4 py-3 transition hover:bg-slate-50 sm:px-5"
               >
-                {/* DESKTOP */}
+                {/* ==================================================
+                    DESKTOP
+                ================================================== */}
 
                 <div className="hidden grid-cols-[55px_minmax(0,1fr)_150px_140px] items-center gap-3 sm:grid">
+                  {/* RANK */}
+
                   <div>
                     <div
                       className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-extrabold ${
@@ -800,18 +865,44 @@ export default function Dashboard() {
                     </div>
                   </div>
 
+                  {/* PLAYER */}
+
                   <div className="min-w-0">
                     <p className="truncate text-xs font-bold text-slate-900">
                       {winner.player}
                     </p>
 
-                    <p className="mt-0.5 text-[9px] text-slate-400">
-                      Winner · {winner.date}
+                    <p className="mt-0.5 flex items-center gap-1 text-[9px] text-slate-400">
+                      <span>{winner.type}</span>
+
+                      {winner.session && (
+                        <>
+                          <span>·</span>
+
+                          <span>{winner.session}</span>
+                        </>
+                      )}
+
+                      {winner.date && (
+                        <>
+                          <span>·</span>
+
+                          <span>{winner.date}</span>
+                        </>
+                      )}
                     </p>
                   </div>
 
+                  {/* NUMBER */}
+
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex h-8 items-center rounded-lg bg-emerald-50 px-3 text-sm font-extrabold tracking-[0.18em] text-emerald-600 ring-1 ring-emerald-100">
+                    <span
+                      className={`inline-flex h-8 items-center rounded-lg px-3 text-sm font-extrabold tracking-[0.18em] ${
+                        winner.type === "2D"
+                          ? "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
+                          : "bg-blue-50 text-blue-600 ring-1 ring-blue-100"
+                      }`}
+                    >
                       {winner.number}
                     </span>
 
@@ -821,6 +912,8 @@ export default function Dashboard() {
                       </span>
                     )}
                   </div>
+
+                  {/* PRIZE */}
 
                   <div className="text-right">
                     <p className="text-xs font-extrabold text-amber-600">
@@ -833,10 +926,14 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* MOBILE */}
+                {/* ==================================================
+                    MOBILE
+                ================================================== */}
 
                 <div className="sm:hidden">
                   <div className="flex items-center gap-3">
+                    {/* RANK */}
+
                     <div
                       className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold ${
                         index === 0
@@ -849,19 +946,33 @@ export default function Dashboard() {
                       {index + 1}
                     </div>
 
+                    {/* PLAYER */}
+
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-bold text-slate-900">
                         {winner.player}
                       </p>
 
                       <p className="mt-0.5 truncate text-[9px] text-slate-400">
-                        {winner.type} · {winner.date}
+                        {winner.type}
+
+                        {winner.session ? ` · ${winner.session}` : ""}
+
+                        {winner.date ? ` · ${winner.date}` : ""}
                       </p>
                     </div>
 
+                    {/* NUMBER */}
+
                     <div className="shrink-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="inline-flex h-8 items-center rounded-lg bg-emerald-50 px-2.5 text-xs font-extrabold tracking-[0.15em] text-emerald-600 ring-1 ring-emerald-100">
+                        <span
+                          className={`inline-flex h-8 items-center rounded-lg px-2.5 text-xs font-extrabold tracking-[0.15em] ${
+                            winner.type === "2D"
+                              ? "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
+                              : "bg-blue-50 text-blue-600 ring-1 ring-blue-100"
+                          }`}
+                        >
                           {winner.number}
                         </span>
 
@@ -873,6 +984,8 @@ export default function Dashboard() {
                       </div>
                     </div>
                   </div>
+
+                  {/* PRIZE */}
 
                   <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2.5 pl-11">
                     <span className="text-[9px] text-slate-400">Prize</span>
@@ -904,7 +1017,7 @@ export default function Dashboard() {
         <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-3 sm:px-5">
           <div className="flex items-center justify-between gap-3">
             <p className="text-[9px] text-slate-400 sm:text-[10px]">
-              Showing winners from the latest available winning tickets
+              Showing the latest available winners
             </p>
 
             <Link
@@ -915,7 +1028,7 @@ export default function Dashboard() {
             </Link>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
