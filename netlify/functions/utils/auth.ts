@@ -80,6 +80,10 @@ export async function verifyToken(token: string) {
   };
 }
 
+/* ============================================================
+   COOKIE HELPERS
+============================================================ */
+
 export function getCookie(event: HandlerEvent, name: string): string | null {
   const cookieHeader = event.headers.cookie ?? event.headers.Cookie;
 
@@ -106,6 +110,16 @@ export function getCookie(event: HandlerEvent, name: string): string | null {
   }
 
   return null;
+}
+
+/**
+ * Get the application's JWT from the existing
+ * HttpOnly authentication cookie.
+ *
+ * This does not change the existing authentication flow.
+ */
+export function getAuthTokenFromCookie(event: HandlerEvent): string | null {
+  return getCookie(event, COOKIE_NAME);
 }
 
 export function createAuthCookie(token: string): string {
@@ -150,6 +164,10 @@ export function clearAuthCookie(): string {
     .join("; ");
 }
 
+/* ============================================================
+   RESPONSE HELPERS
+============================================================ */
+
 export function jsonResponse(
   statusCode: number,
   body: unknown,
@@ -168,6 +186,10 @@ export function jsonResponse(
   };
 }
 
+/* ============================================================
+   REQUEST BODY
+============================================================ */
+
 export function parseBody<T>(event: HandlerEvent): T {
   if (!event.body) {
     throw new Error("Request body is required");
@@ -179,6 +201,10 @@ export function parseBody<T>(event: HandlerEvent): T {
     throw new Error("Invalid JSON request");
   }
 }
+
+/* ============================================================
+   PASSWORD
+============================================================ */
 
 const PASSWORD_SALT_ROUNDS = 12;
 

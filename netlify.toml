@@ -212,7 +212,16 @@
   status = 200
   force = true
 
+# ============================================================
+# REALTIME AUTHENTICATION API
+# ============================================================
 
+[[redirects]]
+  from = "/api/realtime-token"
+  to = "/.netlify/functions/realtime-token"
+  status = 200
+  force = true
+  
 # ============================================================
 # REACT SPA FALLBACK
 #
