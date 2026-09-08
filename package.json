@@ -13,6 +13,7 @@
     "db:seed:admin": "tsx scripts/seed-admin.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.115.0",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
