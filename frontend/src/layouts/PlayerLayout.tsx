@@ -156,9 +156,7 @@ function isRunningAsPWA(): boolean {
      STANDARD PWA STANDALONE MODE
   ========================================================== */
 
-  const standalone = window.matchMedia(
-    "(display-mode: standalone)",
-  ).matches;
+  const standalone = window.matchMedia("(display-mode: standalone)").matches;
 
   /* ==========================================================
      IOS SAFARI HOME SCREEN MODE
@@ -178,24 +176,15 @@ function isRunningAsPWA(): boolean {
      FULLSCREEN PWA MODE
   ========================================================== */
 
-  const fullscreen = window.matchMedia(
-    "(display-mode: fullscreen)",
-  ).matches;
+  const fullscreen = window.matchMedia("(display-mode: fullscreen)").matches;
 
   /* ==========================================================
      MINIMAL UI PWA MODE
   ========================================================== */
 
-  const minimalUi = window.matchMedia(
-    "(display-mode: minimal-ui)",
-  ).matches;
+  const minimalUi = window.matchMedia("(display-mode: minimal-ui)").matches;
 
-  return (
-    standalone ||
-    iosStandalone ||
-    fullscreen ||
-    minimalUi
-  );
+  return standalone || iosStandalone || fullscreen || minimalUi;
 }
 
 /* ============================================================
@@ -214,9 +203,7 @@ export default function PlayerLayout() {
      The JWT itself is NEVER read by the frontend.
   ========================================================== */
 
-  const [currentUserId, setCurrentUserId] = useState<
-    string | null
-  >(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const [authLoaded, setAuthLoaded] = useState(false);
 
@@ -236,8 +223,7 @@ export default function PlayerLayout() {
      WALLET BALANCE
   ========================================================== */
 
-  const [walletBalance, setWalletBalance] =
-    useState<number>(0);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
 
   /* ==========================================================
      DESKTOP DROPDOWN STATE
@@ -245,18 +231,15 @@ export default function PlayerLayout() {
 
   const [playMenuOpen, setPlayMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const [profileMenuOpen, setProfileMenuOpen] =
-    useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   /* ==========================================================
      MOBILE / PWA STATE
   ========================================================== */
 
-  const [mobilePlayOpen, setMobilePlayOpen] =
-    useState(false);
+  const [mobilePlayOpen, setMobilePlayOpen] = useState(false);
 
-  const [mobileMoreOpen, setMobileMoreOpen] =
-    useState(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
   /* ==========================================================
      MOBILE BROWSER SIDEBAR
@@ -271,8 +254,7 @@ export default function PlayerLayout() {
        - Bottom navigation is used instead
   ========================================================== */
 
-  const [mobileSidebarOpen, setMobileSidebarOpen] =
-    useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   /* ==========================================================
      ACTIVE ROUTES
@@ -283,9 +265,7 @@ export default function PlayerLayout() {
     location.pathname.startsWith("/player/play-3d");
 
   const isMoreActive =
-    location.pathname.startsWith(
-      "/player/results-history",
-    ) ||
+    location.pathname.startsWith("/player/results-history") ||
     location.pathname.startsWith("/player/contact") ||
     location.pathname.startsWith("/player/profile");
 
@@ -315,10 +295,7 @@ export default function PlayerLayout() {
           setCurrentUserId(null);
         }
       } catch (error) {
-        console.error(
-          "Failed to load authenticated player:",
-          error,
-        );
+        console.error("Failed to load authenticated player:", error);
 
         if (!cancelled) {
           setCurrentUserId(null);
@@ -338,42 +315,28 @@ export default function PlayerLayout() {
   }, []);
 
   /* ==========================================================
-     REALTIME AUTHENTICATION STATE
-  ========================================================== */
-
-  const realtimeAuthenticated =
-    authLoaded && currentUserId !== null;
-
-  /* ==========================================================
      LOAD WALLET BALANCE
   ========================================================== */
 
   const loadWalletBalance = useCallback(async () => {
     try {
-      const response = await fetch(
-        "/api/player/dashboard",
-        {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            Accept: "application/json",
-          },
+      const response = await fetch("/api/player/dashboard", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
         },
-      );
+      });
 
-      const contentType =
-        response.headers.get("content-type") || "";
+      const contentType = response.headers.get("content-type") || "";
 
       const rawResponse = await response.text();
 
       if (!rawResponse.trim()) {
-        console.error(
-          "Wallet balance API returned an empty response",
-          {
-            status: response.status,
-            contentType,
-          },
-        );
+        console.error("Wallet balance API returned an empty response", {
+          status: response.status,
+          contentType,
+        });
 
         return;
       }
@@ -381,35 +344,24 @@ export default function PlayerLayout() {
       let result: WalletBalanceResponse;
 
       try {
-        result = JSON.parse(
-          rawResponse,
-        ) as WalletBalanceResponse;
+        result = JSON.parse(rawResponse) as WalletBalanceResponse;
       } catch (parseError) {
-        console.error(
-          "Wallet balance API returned non-JSON response",
-          {
-            status: response.status,
-            contentType,
-            responsePreview: rawResponse.substring(
-              0,
-              500,
-            ),
-            parseError,
-          },
-        );
+        console.error("Wallet balance API returned non-JSON response", {
+          status: response.status,
+          contentType,
+          responsePreview: rawResponse.substring(0, 500),
+          parseError,
+        });
 
         return;
       }
 
       if (!response.ok || result.success === false) {
-        console.error(
-          "Failed to load player wallet balance",
-          {
-            status: response.status,
-            message: result.message,
-            response: result,
-          },
-        );
+        console.error("Failed to load player wallet balance", {
+          status: response.status,
+          message: result.message,
+          response: result,
+        });
 
         return;
       }
@@ -428,62 +380,40 @@ export default function PlayerLayout() {
       const numericBalance = Number(balance);
 
       if (!Number.isFinite(numericBalance)) {
-        console.error(
-          "Invalid wallet balance returned by API",
-          {
-            balance,
-            response: result,
-          },
-        );
+        console.error("Invalid wallet balance returned by API", {
+          balance,
+          response: result,
+        });
 
         return;
       }
 
       setWalletBalance(numericBalance);
     } catch (error) {
-      console.error(
-        "Wallet balance loading error:",
-        error,
-      );
+      console.error("Wallet balance loading error:", error);
     }
   }, []);
 
   /* ==========================================================
      REALTIME PLAYER CHANGES
-     
-     Realtime is used as a SIGNAL only.
 
-     The existing API remains the source of truth.
+     Realtime is used only as a SIGNAL.
 
-     Example:
-     
-     Supabase Realtime
-           ↓
-     wallet/deposit/withdrawal/transaction changed
-           ↓
-     loadWalletBalance()
-           ↓
-     /api/player/dashboard
-           ↓
-     PostgreSQL + Drizzle
-           ↓
-     setWalletBalance()
+     The existing /api/player/dashboard endpoint remains
+     the source of truth for the wallet balance.
+
+     Subscriptions:
+       - wallets       → refresh wallet balance
+       - deposits      → refresh wallet balance / notification data
+       - withdrawals   → refresh wallet balance / notification data
+
+     No transaction, announcement, lottery-result, or
+     lottery-draw realtime subscriptions are used here.
   ========================================================== */
 
-  const handlePlayerRealtimeChange =
-    useCallback(() => {
-      void loadWalletBalance();
-
-      /*
-       * Preserve compatibility with any other component
-       * already listening for this event.
-       */
-      window.dispatchEvent(
-        new CustomEvent(
-          WALLET_BALANCE_UPDATED_EVENT,
-        ),
-      );
-    }, [loadWalletBalance]);
+  const handlePlayerRealtimeChange = useCallback(() => {
+    void loadWalletBalance();
+  }, [loadWalletBalance]);
 
   /* ==========================================================
      PLAYER REALTIME SUBSCRIPTIONS
@@ -491,18 +421,9 @@ export default function PlayerLayout() {
 
   usePlayerRealtime({
     userId: currentUserId,
-
-    onWalletChanged:
-      handlePlayerRealtimeChange,
-
-    onDepositChanged:
-      handlePlayerRealtimeChange,
-
-    onWithdrawalChanged:
-      handlePlayerRealtimeChange,
-
-    onTransactionChanged:
-      handlePlayerRealtimeChange,
+    onWalletChanged: handlePlayerRealtimeChange,
+    onDepositChanged: handlePlayerRealtimeChange,
+    onWithdrawalChanged: handlePlayerRealtimeChange,
   });
 
   /* ==========================================================
@@ -517,70 +438,38 @@ export default function PlayerLayout() {
     /* Initial detection */
     updatePWAMode();
 
-    const standaloneMedia = window.matchMedia(
-      "(display-mode: standalone)",
-    );
+    const standaloneMedia = window.matchMedia("(display-mode: standalone)");
 
-    const fullscreenMedia = window.matchMedia(
-      "(display-mode: fullscreen)",
-    );
+    const fullscreenMedia = window.matchMedia("(display-mode: fullscreen)");
 
-    const minimalUiMedia = window.matchMedia(
-      "(display-mode: minimal-ui)",
-    );
+    const minimalUiMedia = window.matchMedia("(display-mode: minimal-ui)");
 
     const handleDisplayModeChange = () => {
       updatePWAMode();
     };
 
-    standaloneMedia.addEventListener(
-      "change",
-      handleDisplayModeChange,
-    );
+    standaloneMedia.addEventListener("change", handleDisplayModeChange);
 
-    fullscreenMedia.addEventListener(
-      "change",
-      handleDisplayModeChange,
-    );
+    fullscreenMedia.addEventListener("change", handleDisplayModeChange);
 
-    minimalUiMedia.addEventListener(
-      "change",
-      handleDisplayModeChange,
-    );
+    minimalUiMedia.addEventListener("change", handleDisplayModeChange);
 
     const handleVisibilityChange = () => {
-      if (
-        document.visibilityState === "visible"
-      ) {
+      if (document.visibilityState === "visible") {
         updatePWAMode();
       }
     };
 
-    document.addEventListener(
-      "visibilitychange",
-      handleVisibilityChange,
-    );
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      standaloneMedia.removeEventListener(
-        "change",
-        handleDisplayModeChange,
-      );
+      standaloneMedia.removeEventListener("change", handleDisplayModeChange);
 
-      fullscreenMedia.removeEventListener(
-        "change",
-        handleDisplayModeChange,
-      );
+      fullscreenMedia.removeEventListener("change", handleDisplayModeChange);
 
-      minimalUiMedia.removeEventListener(
-        "change",
-        handleDisplayModeChange,
-      );
+      minimalUiMedia.removeEventListener("change", handleDisplayModeChange);
 
-      document.removeEventListener(
-        "visibilitychange",
-        handleVisibilityChange,
-      );
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
@@ -598,10 +487,7 @@ export default function PlayerLayout() {
 
   useEffect(() => {
     void loadWalletBalance();
-  }, [
-    location.pathname,
-    loadWalletBalance,
-  ]);
+  }, [location.pathname, loadWalletBalance]);
 
   /* ==========================================================
      REFRESH WHEN PAGE BECOMES VISIBLE
@@ -609,23 +495,15 @@ export default function PlayerLayout() {
 
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (
-        document.visibilityState === "visible"
-      ) {
+      if (document.visibilityState === "visible") {
         void loadWalletBalance();
       }
     };
 
-    document.addEventListener(
-      "visibilitychange",
-      handleVisibilityChange,
-    );
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      document.removeEventListener(
-        "visibilitychange",
-        handleVisibilityChange,
-      );
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [loadWalletBalance]);
 
@@ -634,10 +512,9 @@ export default function PlayerLayout() {
   ========================================================== */
 
   useEffect(() => {
-    const handleWalletBalanceUpdated =
-      () => {
-        void loadWalletBalance();
-      };
+    const handleWalletBalanceUpdated = () => {
+      void loadWalletBalance();
+    };
 
     window.addEventListener(
       WALLET_BALANCE_UPDATED_EVENT,
@@ -662,17 +539,11 @@ export default function PlayerLayout() {
   ========================================================== */
 
   useEffect(() => {
-    const interval = window.setInterval(
-      () => {
-        if (
-          document.visibilityState ===
-          "visible"
-        ) {
-          void loadWalletBalance();
-        }
-      },
-      10000,
-    );
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadWalletBalance();
+      }
+    }, 10000);
 
     return () => {
       window.clearInterval(interval);
@@ -703,9 +574,7 @@ export default function PlayerLayout() {
       return;
     }
 
-    setMobileSidebarOpen(
-      (current) => !current,
-    );
+    setMobileSidebarOpen((current) => !current);
 
     setMobilePlayOpen(false);
     setMobileMoreOpen(false);
@@ -718,16 +587,15 @@ export default function PlayerLayout() {
      MOBILE BROWSER SIDEBAR NAVIGATION
   ========================================================== */
 
-  const handleMobileSidebarNavigation =
-    () => {
-      setMobileSidebarOpen(false);
-      closeAllMenus();
+  const handleMobileSidebarNavigation = () => {
+    setMobileSidebarOpen(false);
+    closeAllMenus();
 
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth",
-      });
-    };
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
 
   /* ==========================================================
      MOBILE / PWA NAVIGATION
@@ -754,9 +622,7 @@ export default function PlayerLayout() {
       return;
     }
 
-    setMobilePlayOpen(
-      (current) => !current,
-    );
+    setMobilePlayOpen((current) => !current);
 
     setMobileMoreOpen(false);
 
@@ -777,9 +643,7 @@ export default function PlayerLayout() {
       return;
     }
 
-    setMobileMoreOpen(
-      (current) => !current,
-    );
+    setMobileMoreOpen((current) => !current);
 
     setMobilePlayOpen(false);
 
@@ -793,9 +657,7 @@ export default function PlayerLayout() {
   ========================================================== */
 
   const togglePlayMenu = () => {
-    setPlayMenuOpen(
-      (current) => !current,
-    );
+    setPlayMenuOpen((current) => !current);
 
     setMoreMenuOpen(false);
     setProfileMenuOpen(false);
@@ -806,9 +668,7 @@ export default function PlayerLayout() {
   ========================================================== */
 
   const toggleMoreMenu = () => {
-    setMoreMenuOpen(
-      (current) => !current,
-    );
+    setMoreMenuOpen((current) => !current);
 
     setPlayMenuOpen(false);
     setProfileMenuOpen(false);
@@ -819,9 +679,7 @@ export default function PlayerLayout() {
   ========================================================== */
 
   const toggleProfileMenu = () => {
-    setProfileMenuOpen(
-      (current) => !current,
-    );
+    setProfileMenuOpen((current) => !current);
 
     setPlayMenuOpen(false);
     setMoreMenuOpen(false);
@@ -845,16 +703,10 @@ export default function PlayerLayout() {
   ========================================================== */
 
   useEffect(() => {
-    const handleClickOutside = (
-      event: MouseEvent,
-    ) => {
-      const target =
-        event.target as Node;
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
 
-      const menus =
-        document.querySelectorAll(
-          "[data-player-menu]",
-        );
+      const menus = document.querySelectorAll("[data-player-menu]");
 
       let clickedInsideMenu = false;
 
@@ -871,16 +723,10 @@ export default function PlayerLayout() {
       }
     };
 
-    document.addEventListener(
-      "mousedown",
-      handleClickOutside,
-    );
+    document.addEventListener("mousedown", handleClickOutside);
 
     return () => {
-      document.removeEventListener(
-        "mousedown",
-        handleClickOutside,
-      );
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -902,10 +748,7 @@ export default function PlayerLayout() {
 
       window.location.href = "/login";
     } catch (error) {
-      console.error(
-        "Logout error:",
-        error,
-      );
+      console.error("Logout error:", error);
 
       window.location.href = "/login";
     }
@@ -915,11 +758,7 @@ export default function PlayerLayout() {
      DESKTOP NAV CLASS
   ========================================================== */
 
-  const navClass = ({
-    isActive,
-  }: {
-    isActive: boolean;
-  }) =>
+  const navClass = ({ isActive }: { isActive: boolean }) =>
     `group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
       isActive
         ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
@@ -930,10 +769,7 @@ export default function PlayerLayout() {
      PLAY ITEM CLASS
   ========================================================== */
 
-  const playItemClass = (
-    isActive: boolean,
-    is2D: boolean,
-  ) =>
+  const playItemClass = (isActive: boolean, is2D: boolean) =>
     `group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200 ${
       isActive
         ? is2D
@@ -948,16 +784,13 @@ export default function PlayerLayout() {
      FORMATTED BALANCE
   ========================================================== */
 
-  const formattedWalletBalance =
-    formatWalletBalance(walletBalance);
+  const formattedWalletBalance = formatWalletBalance(walletBalance);
 
   /* ==========================================================
      PWA BOTTOM SPACING
   ========================================================== */
 
-  const mainPaddingBottom = isPWA
-    ? "pb-28"
-    : "pb-6";
+  const mainPaddingBottom = isPWA ? "pb-28" : "pb-6";
 
   /* ==========================================================
      RENDER
@@ -975,9 +808,7 @@ export default function PlayerLayout() {
       ======================================================= */}
 
       <RealtimeInitializer
-        isAuthenticated={
-          realtimeAuthenticated
-        }
+        isAuthenticated={authLoaded && currentUserId !== null}
       />
 
       <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -1026,28 +857,19 @@ export default function PlayerLayout() {
               <nav className="hidden min-w-0 items-center justify-center rounded-2xl border border-slate-700/80 bg-slate-800 p-1.5 shadow-lg shadow-slate-950/20 lg:flex">
                 {/* DASHBOARD */}
 
-                <NavLink
-                  to="/player"
-                  end
-                  className={navClass}
-                >
+                <NavLink to="/player" end className={navClass}>
                   <LayoutDashboard size={17} />
                   Dashboard
                 </NavLink>
 
                 {/* PLAY */}
 
-                <div
-                  data-player-menu
-                  className="relative"
-                >
+                <div data-player-menu className="relative">
                   <button
                     type="button"
                     onClick={togglePlayMenu}
                     aria-haspopup="menu"
-                    aria-expanded={
-                      playMenuOpen
-                    }
+                    aria-expanded={playMenuOpen}
                     className={`group relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
                       isPlayActive
                         ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
@@ -1057,9 +879,7 @@ export default function PlayerLayout() {
                     <Dice5
                       size={17}
                       className={`transition-all duration-200 ${
-                        playMenuOpen
-                          ? "rotate-6 text-indigo-300"
-                          : ""
+                        playMenuOpen ? "rotate-6 text-indigo-300" : ""
                       }`}
                     />
 
@@ -1067,13 +887,9 @@ export default function PlayerLayout() {
 
                     <ChevronDown
                       size={15}
-                      strokeWidth={
-                        2.5
-                      }
+                      strokeWidth={2.5}
                       className={`transition-transform duration-200 ${
-                        playMenuOpen
-                          ? "rotate-180"
-                          : ""
+                        playMenuOpen ? "rotate-180" : ""
                       }`}
                     />
 
@@ -1097,125 +913,82 @@ export default function PlayerLayout() {
                         </div>
                       </div>
 
-                      {playNavigation.map(
-                        (
-                          item,
-                          index,
-                        ) => {
-                          const Icon =
-                            item.icon;
+                      {playNavigation.map((item, index) => {
+                        const Icon = item.icon;
 
-                          const is2D =
-                            index === 0;
+                        const is2D = index === 0;
 
-                          return (
-                            <NavLink
-                              key={
-                                item.path
-                              }
-                              to={
-                                item.path
-                              }
-                              role="menuitem"
-                              onClick={
-                                closeAllMenus
-                              }
-                              className={({
-                                isActive,
-                              }) =>
-                                playItemClass(
-                                  isActive,
-                                  is2D,
-                                )
-                              }
+                        return (
+                          <NavLink
+                            key={item.path}
+                            to={item.path}
+                            role="menuitem"
+                            onClick={closeAllMenus}
+                            className={({ isActive }) =>
+                              playItemClass(isActive, is2D)
+                            }
+                          >
+                            <div
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                                is2D
+                                  ? "bg-indigo-500/15 text-indigo-400"
+                                  : "bg-violet-500/15 text-violet-400"
+                              }`}
                             >
-                              <div
-                                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                                  is2D
-                                    ? "bg-indigo-500/15 text-indigo-400"
-                                    : "bg-violet-500/15 text-violet-400"
-                                }`}
-                              >
-                                <Icon className="h-5 w-5" />
-                              </div>
+                              <Icon className="h-5 w-5" />
+                            </div>
 
-                              <div className="min-w-0">
-                                <p className="text-sm font-bold text-white">
-                                  {
-                                    item.name
-                                  }
-                                </p>
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-white">
+                                {item.name}
+                              </p>
 
-                                <p className="mt-0.5 text-xs text-slate-400">
-                                  {
-                                    item.description
-                                  }
-                                </p>
-                              </div>
-                            </NavLink>
-                          );
-                        },
-                      )}
+                              <p className="mt-0.5 text-xs text-slate-400">
+                                {item.description}
+                              </p>
+                            </div>
+                          </NavLink>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
 
                 {/* MY TICKETS */}
 
-                <NavLink
-                  to="/player/tickets"
-                  className={navClass}
-                >
+                <NavLink to="/player/tickets" className={navClass}>
                   <Ticket size={17} />
                   My Tickets
                 </NavLink>
 
                 {/* WALLET */}
 
-                <NavLink
-                  to="/player/wallet"
-                  className={navClass}
-                >
-                  <WalletCards
-                    size={17}
-                  />
+                <NavLink to="/player/wallet" className={navClass}>
+                  <WalletCards size={17} />
                   Wallet
                 </NavLink>
 
                 {/* MORE */}
 
-                <div
-                  data-player-menu
-                  className="relative"
-                >
+                <div data-player-menu className="relative">
                   <button
                     type="button"
-                    onClick={
-                      toggleMoreMenu
-                    }
+                    onClick={toggleMoreMenu}
                     aria-haspopup="menu"
-                    aria-expanded={
-                      moreMenuOpen
-                    }
+                    aria-expanded={moreMenuOpen}
                     className={`relative flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 ${
                       isMoreActive
                         ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
                         : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
                     }`}
                   >
-                    <span>
-                      More
-                    </span>
+                    <span>More</span>
 
                     <ChevronDown
                       size={15}
-                      strokeWidth={
-                        2.5
-                      }
+                      strokeWidth={2.5}
                       className={`transition-transform duration-200 ${
-                        moreMenuOpen
-                          ? "rotate-180"
-                          : ""
+                        moreMenuOpen ? "rotate-180" : ""
                       }`}
                     />
 
@@ -1226,43 +999,28 @@ export default function PlayerLayout() {
 
                   {moreMenuOpen && (
                     <div className="absolute right-0 top-full z-[100] mt-2 w-56 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 p-2 shadow-2xl shadow-slate-950/50">
-                      {moreNavigation.map(
-                        (item) => {
-                          const Icon =
-                            item.icon;
+                      {moreNavigation.map((item) => {
+                        const Icon = item.icon;
 
-                          return (
-                            <NavLink
-                              key={
-                                item.path
-                              }
-                              to={
-                                item.path
-                              }
-                              onClick={
-                                closeAllMenus
-                              }
-                              className={({
-                                isActive,
-                              }) =>
-                                `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
-                                  isActive
-                                    ? "bg-indigo-500/20 text-indigo-300"
-                                    : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
-                                }`
-                              }
-                            >
-                              <Icon
-                                size={17}
-                              />
+                        return (
+                          <NavLink
+                            key={item.path}
+                            to={item.path}
+                            onClick={closeAllMenus}
+                            className={({ isActive }) =>
+                              `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
+                                isActive
+                                  ? "bg-indigo-500/20 text-indigo-300"
+                                  : "text-slate-300 hover:bg-indigo-500/15 hover:text-white"
+                              }`
+                            }
+                          >
+                            <Icon size={17} />
 
-                              {
-                                item.name
-                              }
-                            </NavLink>
-                          );
-                        },
-                      )}
+                            {item.name}
+                          </NavLink>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1278,17 +1036,13 @@ export default function PlayerLayout() {
                 {!isPWA && (
                   <button
                     type="button"
-                    onClick={
-                      toggleMobileSidebar
-                    }
+                    onClick={toggleMobileSidebar}
                     aria-label={
                       mobileSidebarOpen
                         ? "Close navigation menu"
                         : "Open navigation menu"
                     }
-                    aria-expanded={
-                      mobileSidebarOpen
-                    }
+                    aria-expanded={mobileSidebarOpen}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-300 transition-all duration-200 hover:bg-slate-700 hover:text-white active:scale-95 lg:hidden"
                   >
                     {mobileSidebarOpen ? (
@@ -1303,15 +1057,11 @@ export default function PlayerLayout() {
 
                 <NavLink
                   to="/player/wallet"
-                  onClick={
-                    closeAllMenus
-                  }
+                  onClick={closeAllMenus}
                   className="hidden shrink-0 items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 transition-all hover:border-emerald-400/30 hover:bg-emerald-500/15 lg:flex"
                 >
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-emerald-400">
-                    <WalletCards
-                      size={16}
-                    />
+                    <WalletCards size={16} />
                   </div>
 
                   <div className="leading-tight">
@@ -1320,10 +1070,7 @@ export default function PlayerLayout() {
                     </p>
 
                     <p className="whitespace-nowrap text-sm font-bold text-white">
-                      {
-                        formattedWalletBalance
-                      }{" "}
-                      MMK
+                      {formattedWalletBalance} MMK
                     </p>
                   </div>
                 </NavLink>
@@ -1332,9 +1079,7 @@ export default function PlayerLayout() {
 
                 <NavLink
                   to="/player/wallet"
-                  onClick={
-                    closeAllMenus
-                  }
+                  onClick={closeAllMenus}
                   className="flex min-w-0 shrink-0 items-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-2 py-2 lg:hidden sm:px-2.5"
                 >
                   <WalletCards
@@ -1343,9 +1088,7 @@ export default function PlayerLayout() {
                   />
 
                   <span className="ml-1.5 max-w-[24vw] truncate text-xs font-bold text-white sm:max-w-none">
-                    {
-                      formattedWalletBalance
-                    }
+                    {formattedWalletBalance}
                   </span>
 
                   <span className="ml-1 shrink-0 text-[9px] font-semibold text-emerald-400">
@@ -1356,15 +1099,11 @@ export default function PlayerLayout() {
                 {/* NOTIFICATIONS */}
 
                 <div className="hidden shrink-0 rounded-xl lg:block">
-                  <NotificationBell
-                    role="PLAYER"
-                  />
+                  <NotificationBell role="PLAYER" />
                 </div>
 
                 <div className="flex shrink-0 rounded-xl lg:hidden">
-                  <NotificationBell
-                    role="PLAYER"
-                  />
+                  <NotificationBell role="PLAYER" />
                 </div>
 
                 {/* DESKTOP PROFILE */}
@@ -1375,14 +1114,10 @@ export default function PlayerLayout() {
                 >
                   <button
                     type="button"
-                    onClick={
-                      toggleProfileMenu
-                    }
+                    onClick={toggleProfileMenu}
                     aria-label="Open profile menu"
                     aria-haspopup="menu"
-                    aria-expanded={
-                      profileMenuOpen
-                    }
+                    aria-expanded={profileMenuOpen}
                     className={`flex items-center gap-2 rounded-xl px-2 py-1.5 transition-all ${
                       profileMenuOpen
                         ? "bg-indigo-500/20 text-indigo-300"
@@ -1394,9 +1129,7 @@ export default function PlayerLayout() {
                     </div>
 
                     <div className="hidden text-left xl:block">
-                      <p className="text-xs font-bold text-white">
-                        Player
-                      </p>
+                      <p className="text-xs font-bold text-white">Player</p>
 
                       <p className="max-w-[130px] truncate text-[10px] text-slate-400">
                         player@example.com
@@ -1406,9 +1139,7 @@ export default function PlayerLayout() {
                     <ChevronDown
                       size={15}
                       className={`transition-transform duration-200 ${
-                        profileMenuOpen
-                          ? "rotate-180"
-                          : ""
+                        profileMenuOpen ? "rotate-180" : ""
                       }`}
                     />
                   </button>
@@ -1436,12 +1167,8 @@ export default function PlayerLayout() {
                       <div className="p-2">
                         <NavLink
                           to="/player/profile"
-                          onClick={
-                            closeAllMenus
-                          }
-                          className={({
-                            isActive,
-                          }) =>
+                          onClick={closeAllMenus}
+                          className={({ isActive }) =>
                             `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
                               isActive
                                 ? "bg-indigo-500/20 text-indigo-300"
@@ -1455,14 +1182,10 @@ export default function PlayerLayout() {
 
                         <button
                           type="button"
-                          onClick={
-                            handleLogout
-                          }
+                          onClick={handleLogout}
                           className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
                         >
-                          <LogOut
-                            size={17}
-                          />
+                          <LogOut size={17} />
                           Logout
                         </button>
                       </div>
@@ -1478,568 +1201,279 @@ export default function PlayerLayout() {
             MOBILE BROWSER SIDEBAR
         ======================================================= */}
 
-        {!isPWA &&
-          mobileSidebarOpen && (
-            <>
-              {/* BACKDROP */}
+        {!isPWA && mobileSidebarOpen && (
+          <>
+            {/* BACKDROP */}
 
-              <button
-                type="button"
-                aria-label="Close navigation menu"
-                onClick={() =>
-                  setMobileSidebarOpen(
-                    false,
-                  )
-                }
-                className="fixed inset-0 z-[90] bg-slate-950/60 backdrop-blur-[2px] lg:hidden"
-              />
+            <button
+              type="button"
+              aria-label="Close navigation menu"
+              onClick={() => setMobileSidebarOpen(false)}
+              className="fixed inset-0 z-[90] bg-slate-950/60 backdrop-blur-[2px] lg:hidden"
+            />
 
-              {/* SIDEBAR */}
+            {/* SIDEBAR */}
 
-              <aside
-                className="fixed inset-y-0 left-0 z-[100] flex w-[min(84vw,320px)] flex-col border-r border-slate-700 bg-slate-900 shadow-2xl shadow-slate-950/60 lg:hidden"
-                aria-label="Player navigation"
-              >
-                {/* SIDEBAR HEADER */}
+            <aside
+              className="fixed inset-y-0 left-0 z-[100] flex w-[min(84vw,320px)] flex-col border-r border-slate-700 bg-slate-900 shadow-2xl shadow-slate-950/60 lg:hidden"
+              aria-label="Player navigation"
+            >
+              {/* SIDEBAR HEADER */}
 
-                <div className="safe-area-top flex min-h-[64px] shrink-0 items-center justify-between border-b border-slate-700/80 px-3 sm:min-h-[72px] sm:px-6">
+              <div className="safe-area-top flex min-h-[64px] shrink-0 items-center justify-between border-b border-slate-700/80 px-3 sm:min-h-[72px] sm:px-6">
+                <NavLink
+                  to="/player"
+                  onClick={handleMobileSidebarNavigation}
+                  className="header-logo group flex min-w-0 items-center gap-2.5"
+                  aria-label="LotteryPlay Dashboard"
+                >
+                  <img
+                    src="/logo.png"
+                    alt="Logo"
+                    className="block h-7 w-7 shrink-0 rounded-lg object-contain"
+                  />
+
+                  <div className="flex min-w-0 items-center">
+                    <span className="text-lg font-extrabold tracking-tight text-white">
+                      AB
+                    </span>
+
+                    <span className="text-lg font-extrabold tracking-tight text-indigo-400">
+                      CD
+                    </span>
+                  </div>
+                </NavLink>
+
+                <button
+                  type="button"
+                  onClick={() => setMobileSidebarOpen(false)}
+                  aria-label="Close navigation menu"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* SIDEBAR CONTENT */}
+
+              <div className="flex-1 overflow-y-auto px-3 py-4">
+                <div className="space-y-1">
+                  {/* DASHBOARD */}
+
                   <NavLink
                     to="/player"
-                    onClick={
-                      handleMobileSidebarNavigation
+                    end
+                    onClick={handleMobileSidebarNavigation}
+                    className={({ isActive }) =>
+                      `flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
+                        isActive
+                          ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
+                          : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                      }`
                     }
-                    className="header-logo group flex min-w-0 items-center gap-2.5"
-                    aria-label="LotteryPlay Dashboard"
                   >
-                    <img
-                      src="/logo.png"
-                      alt="Logo"
-                      className="block h-7 w-7 shrink-0 rounded-lg object-contain"
-                    />
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                      <LayoutDashboard size={17} />
+                    </span>
 
-                    <div className="flex min-w-0 items-center">
-                      <span className="text-lg font-extrabold tracking-tight text-white">
-                        AB
-                      </span>
-
-                      <span className="text-lg font-extrabold tracking-tight text-indigo-400">
-                        CD
-                      </span>
-                    </div>
+                    <span>Dashboard</span>
                   </NavLink>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMobileSidebarOpen(
-                        false,
-                      )
+                  {/* PLAY */}
+
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobilePlayOpen((current) => !current);
+
+                        setMobileMoreOpen(false);
+                      }}
+                      aria-haspopup="menu"
+                      aria-expanded={mobilePlayOpen}
+                      className={`flex min-h-12 w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm font-semibold transition-all ${
+                        isPlayActive || mobilePlayOpen
+                          ? "bg-indigo-500/15 text-indigo-300"
+                          : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                      }`}
+                    >
+                      <span className="flex items-center gap-3">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                          <Dice5 size={17} />
+                        </span>
+
+                        <span>Play</span>
+                      </span>
+
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform duration-200 ${
+                          mobilePlayOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {mobilePlayOpen && (
+                      <div className="mt-1 space-y-1 pl-3">
+                        {playNavigation.map((item, index) => {
+                          const Icon = item.icon;
+
+                          const is2D = index === 0;
+
+                          return (
+                            <NavLink
+                              key={item.path}
+                              to={item.path}
+                              onClick={handleMobileSidebarNavigation}
+                              className={({ isActive }) =>
+                                playItemClass(isActive, is2D)
+                              }
+                            >
+                              <div
+                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                                  is2D
+                                    ? "bg-indigo-500/15 text-indigo-400"
+                                    : "bg-violet-500/15 text-violet-400"
+                                }`}
+                              >
+                                <Icon className="h-4 w-4" />
+                              </div>
+
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-white">
+                                  {item.name}
+                                </p>
+
+                                <p className="mt-0.5 text-xs text-slate-400">
+                                  {item.description}
+                                </p>
+                              </div>
+                            </NavLink>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* MY TICKETS */}
+
+                  <NavLink
+                    to="/player/tickets"
+                    onClick={handleMobileSidebarNavigation}
+                    className={({ isActive }) =>
+                      `flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
+                        isActive
+                          ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
+                          : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                      }`
                     }
-                    aria-label="Close navigation menu"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
                   >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                      <Ticket size={17} />
+                    </span>
 
-                {/* SIDEBAR CONTENT */}
+                    <span>My Tickets</span>
+                  </NavLink>
 
-                <div className="flex-1 overflow-y-auto px-3 py-4">
-                  <div className="space-y-1">
-                    {/* DASHBOARD */}
+                  {/* WALLET */}
 
-                    <NavLink
-                      to="/player"
-                      end
-                      onClick={
-                        handleMobileSidebarNavigation
-                      }
-                      className={({
-                        isActive,
-                      }) =>
-                        `flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
-                          isActive
-                            ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
-                            : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                        }`
-                      }
+                  <NavLink
+                    to="/player/wallet"
+                    onClick={handleMobileSidebarNavigation}
+                    className={({ isActive }) =>
+                      `flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
+                        isActive
+                          ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
+                          : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                      }`
+                    }
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                      <WalletCards size={17} />
+                    </span>
+
+                    <span>Wallet</span>
+                  </NavLink>
+
+                  {/* MORE */}
+
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMoreOpen((current) => !current);
+
+                        setMobilePlayOpen(false);
+                      }}
+                      aria-haspopup="menu"
+                      aria-expanded={mobileMoreOpen}
+                      className={`flex min-h-12 w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm font-semibold transition-all ${
+                        isMoreActive || mobileMoreOpen
+                          ? "bg-indigo-500/15 text-indigo-300"
+                          : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                      }`}
                     >
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
-                        <LayoutDashboard
-                          size={17}
-                        />
-                      </span>
-
-                      <span>
-                        Dashboard
-                      </span>
-                    </NavLink>
-
-                    {/* PLAY */}
-
-                    <div className="pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMobilePlayOpen(
-                            (current) =>
-                              !current,
-                          );
-
-                          setMobileMoreOpen(
-                            false,
-                          );
-                        }}
-                        aria-haspopup="menu"
-                        aria-expanded={
-                          mobilePlayOpen
-                        }
-                        className={`flex min-h-12 w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm font-semibold transition-all ${
-                          isPlayActive ||
-                          mobilePlayOpen
-                            ? "bg-indigo-500/15 text-indigo-300"
-                            : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                        }`}
-                      >
-                        <span className="flex items-center gap-3">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
-                            <Dice5
-                              size={17}
-                            />
-                          </span>
-
-                          <span>
-                            Play
-                          </span>
+                      <span className="flex items-center gap-3">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                          <MoreHorizontal size={17} />
                         </span>
 
-                        <ChevronDown
-                          className={`h-4 w-4 transition-transform duration-200 ${
-                            mobilePlayOpen
-                              ? "rotate-180"
-                              : ""
-                          }`}
-                        />
-                      </button>
-
-                      {mobilePlayOpen && (
-                        <div className="mt-1 space-y-1 pl-3">
-                          {playNavigation.map(
-                            (
-                              item,
-                              index,
-                            ) => {
-                              const Icon =
-                                item.icon;
-
-                              const is2D =
-                                index ===
-                                0;
-
-                              return (
-                                <NavLink
-                                  key={
-                                    item.path
-                                  }
-                                  to={
-                                    item.path
-                                  }
-                                  onClick={
-                                    handleMobileSidebarNavigation
-                                  }
-                                  className={({
-                                    isActive,
-                                  }) =>
-                                    playItemClass(
-                                      isActive,
-                                      is2D,
-                                    )
-                                  }
-                                >
-                                  <div
-                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                                      is2D
-                                        ? "bg-indigo-500/15 text-indigo-400"
-                                        : "bg-violet-500/15 text-violet-400"
-                                    }`}
-                                  >
-                                    <Icon className="h-4 w-4" />
-                                  </div>
-
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-bold text-white">
-                                      {
-                                        item.name
-                                      }
-                                    </p>
-
-                                    <p className="mt-0.5 text-xs text-slate-400">
-                                      {
-                                        item.description
-                                      }
-                                    </p>
-                                  </div>
-                                </NavLink>
-                              );
-                            },
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* MY TICKETS */}
-
-                    <NavLink
-                      to="/player/tickets"
-                      onClick={
-                        handleMobileSidebarNavigation
-                      }
-                      className={({
-                        isActive,
-                      }) =>
-                        `flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
-                          isActive
-                            ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
-                            : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                        }`
-                      }
-                    >
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
-                        <Ticket size={17} />
+                        <span>More</span>
                       </span>
 
-                      <span>
-                        My Tickets
-                      </span>
-                    </NavLink>
-
-                    {/* WALLET */}
-
-                    <NavLink
-                      to="/player/wallet"
-                      onClick={
-                        handleMobileSidebarNavigation
-                      }
-                      className={({
-                        isActive,
-                      }) =>
-                        `flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
-                          isActive
-                            ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/30"
-                            : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                        }`
-                      }
-                    >
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
-                        <WalletCards
-                          size={17}
-                        />
-                      </span>
-
-                      <span>
-                        Wallet
-                      </span>
-                    </NavLink>
-
-                    {/* MORE */}
-
-                    <div className="pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMobileMoreOpen(
-                            (current) =>
-                              !current,
-                          );
-
-                          setMobilePlayOpen(
-                            false,
-                          );
-                        }}
-                        aria-haspopup="menu"
-                        aria-expanded={
-                          mobileMoreOpen
-                        }
-                        className={`flex min-h-12 w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm font-semibold transition-all ${
-                          isMoreActive ||
-                          mobileMoreOpen
-                            ? "bg-indigo-500/15 text-indigo-300"
-                            : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform duration-200 ${
+                          mobileMoreOpen ? "rotate-180" : ""
                         }`}
-                      >
-                        <span className="flex items-center gap-3">
+                      />
+                    </button>
+
+                    {mobileMoreOpen && (
+                      <div className="mt-1 space-y-1 pl-3">
+                        {moreNavigation.map((item) => {
+                          const Icon = item.icon;
+
+                          return (
+                            <NavLink
+                              key={item.path}
+                              to={item.path}
+                              onClick={handleMobileSidebarNavigation}
+                              className={({ isActive }) =>
+                                `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
+                                  isActive
+                                    ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                                }`
+                              }
+                            >
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                                <Icon size={17} />
+                              </span>
+
+                              <span>{item.name}</span>
+                            </NavLink>
+                          );
+                        })}
+
+                        {/* NOTIFICATIONS */}
+
+                        <div className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold text-slate-300">
                           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
-                            <MoreHorizontal
-                              size={17}
-                            />
+                            <Bell size={17} />
                           </span>
 
-                          <span>
-                            More
-                          </span>
-                        </span>
+                          <span>Notifications</span>
 
-                        <ChevronDown
-                          className={`h-4 w-4 transition-transform duration-200 ${
-                            mobileMoreOpen
-                              ? "rotate-180"
-                              : ""
-                          }`}
-                        />
-                      </button>
-
-                      {mobileMoreOpen && (
-                        <div className="mt-1 space-y-1 pl-3">
-                          {moreNavigation.map(
-                            (item) => {
-                              const Icon =
-                                item.icon;
-
-                              return (
-                                <NavLink
-                                  key={
-                                    item.path
-                                  }
-                                  to={
-                                    item.path
-                                  }
-                                  onClick={
-                                    handleMobileSidebarNavigation
-                                  }
-                                  className={({
-                                    isActive,
-                                  }) =>
-                                    `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
-                                      isActive
-                                        ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
-                                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                                    }`
-                                  }
-                                >
-                                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
-                                    <Icon
-                                      size={
-                                        17
-                                      }
-                                    />
-                                  </span>
-
-                                  <span>
-                                    {
-                                      item.name
-                                    }
-                                  </span>
-                                </NavLink>
-                              );
-                            },
-                          )}
-
-                          {/* NOTIFICATIONS */}
-
-                          <div className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold text-slate-300">
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
-                              <Bell
-                                size={
-                                  17
-                                }
-                              />
-                            </span>
-
-                            <span>
-                              Notifications
-                            </span>
-
-                            <div className="ml-auto">
-                              <NotificationBell
-                                role="PLAYER"
-                              />
-                            </div>
+                          <div className="ml-auto">
+                            <NotificationBell role="PLAYER" />
                           </div>
-
-                          {/* PROFILE */}
-
-                          <NavLink
-                            to="/player/profile"
-                            onClick={
-                              handleMobileSidebarNavigation
-                            }
-                            className={({
-                              isActive,
-                            }) =>
-                              `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
-                                isActive
-                                  ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
-                                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                              }`
-                            }
-                          >
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
-                              <User
-                                size={
-                                  17
-                                }
-                              />
-                            </span>
-
-                            <span>
-                              Profile
-                            </span>
-                          </NavLink>
-
-                          {/* LOGOUT */}
-
-                          <button
-                            type="button"
-                            onClick={
-                              handleLogout
-                            }
-                            className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold text-red-400 transition-all hover:bg-red-500/10 hover:text-red-300"
-                          >
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-500/10">
-                              <LogOut
-                                size={
-                                  17
-                                }
-                              />
-                            </span>
-
-                            <span>
-                              Logout
-                            </span>
-                          </button>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
 
-                {/* SIDEBAR FOOTER */}
+                        {/* PROFILE */}
 
-                <div className="shrink-0 border-t border-slate-800 px-4 py-4 text-center text-[11px] text-slate-500">
-                  LotteryPlay
-                </div>
-              </aside>
-            </>
-          )}
-
-        {/* ======================================================
-            PWA MOBILE PLAY POPUP
-        ======================================================= */}
-
-        {isPWA &&
-          mobilePlayOpen && (
-            <div className="fixed inset-x-3 bottom-[82px] z-[80] lg:hidden">
-              <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/98 p-2 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">
-                <div className="px-3 pb-2 pt-1">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
-
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      Choose Game
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {playNavigation.map(
-                    (item, index) => {
-                      const Icon =
-                        item.icon;
-
-                      const is2D =
-                        index === 0;
-
-                      return (
                         <NavLink
-                          key={
-                            item.path
-                          }
-                          to={
-                            item.path
-                          }
-                          onClick={
-                            handleMobileNavigation
-                          }
-                          className={({
-                            isActive,
-                          }) =>
-                            `flex flex-col items-center justify-center rounded-xl border px-3 py-4 text-center transition-all ${
-                              isActive
-                                ? is2D
-                                  ? "border-indigo-500/40 bg-indigo-500/20 text-indigo-300"
-                                  : "border-violet-500/40 bg-violet-500/20 text-violet-300"
-                                : "border-slate-700 bg-slate-800/80 text-slate-300 hover:bg-slate-700"
-                            }`
-                          }
-                        >
-                          <div
-                            className={`mb-2 flex h-11 w-11 items-center justify-center rounded-xl ${
-                              is2D
-                                ? "bg-indigo-500/15 text-indigo-400"
-                                : "bg-violet-500/15 text-violet-400"
-                            }`}
-                          >
-                            <Icon className="h-5 w-5" />
-                          </div>
-
-                          <span className="text-xs font-bold">
-                            {
-                              item.name
-                            }
-                          </span>
-
-                          <span className="mt-0.5 text-[9px] text-slate-500">
-                            {
-                              item.description
-                            }
-                          </span>
-                        </NavLink>
-                      );
-                    },
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-        {/* ======================================================
-            PWA MOBILE MORE POPUP
-        ======================================================= */}
-
-        {isPWA &&
-          mobileMoreOpen && (
-            <div className="fixed inset-x-3 bottom-[82px] z-[80] lg:hidden">
-              <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/98 p-2 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">
-                <div className="px-3 pb-2 pt-1">
-                  <div className="flex items-center gap-2">
-                    <MoreHorizontal className="h-3.5 w-3.5 text-indigo-400" />
-
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      More
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  {moreNavigation.map(
-                    (item) => {
-                      const Icon =
-                        item.icon;
-
-                      return (
-                        <NavLink
-                          key={
-                            item.path
-                          }
-                          to={
-                            item.path
-                          }
-                          onClick={
-                            handleMobileNavigation
-                          }
-                          className={({
-                            isActive,
-                          }) =>
+                          to="/player/profile"
+                          onClick={handleMobileSidebarNavigation}
+                          className={({ isActive }) =>
                             `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
                               isActive
                                 ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
@@ -2048,90 +1482,195 @@ export default function PlayerLayout() {
                           }
                         >
                           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
-                            <Icon
-                              size={17}
-                            />
+                            <User size={17} />
                           </span>
 
-                          <span>
-                            {
-                              item.name
-                            }
-                          </span>
+                          <span>Profile</span>
                         </NavLink>
-                      );
-                    },
-                  )}
 
-                  {/* NOTIFICATIONS */}
+                        {/* LOGOUT */}
 
-                  <div className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold text-slate-300">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
-                      <Bell
-                        size={17}
-                      />
-                    </span>
+                        <button
+                          type="button"
+                          onClick={handleLogout}
+                          className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold text-red-400 transition-all hover:bg-red-500/10 hover:text-red-300"
+                        >
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-500/10">
+                            <LogOut size={17} />
+                          </span>
 
-                    <span>
-                      Notifications
-                    </span>
-
-                    <div className="ml-auto">
-                      <NotificationBell
-                        role="PLAYER"
-                      />
-                    </div>
+                          <span>Logout</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
-
-                  {/* PROFILE */}
-
-                  <NavLink
-                    to="/player/profile"
-                    onClick={
-                      handleMobileNavigation
-                    }
-                    className={({
-                      isActive,
-                    }) =>
-                      `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
-                        isActive
-                          ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
-                          : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                      }`
-                    }
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
-                      <User size={17} />
-                    </span>
-
-                    <span>
-                      Profile
-                    </span>
-                  </NavLink>
-
-                  {/* LOGOUT */}
-
-                  <button
-                    type="button"
-                    onClick={
-                      handleLogout
-                    }
-                    className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold text-red-400 transition-all hover:bg-red-500/10 hover:text-red-300"
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-500/10">
-                      <LogOut
-                        size={17}
-                      />
-                    </span>
-
-                    <span>
-                      Logout
-                    </span>
-                  </button>
                 </div>
               </div>
+
+              {/* SIDEBAR FOOTER */}
+
+              <div className="shrink-0 border-t border-slate-800 px-4 py-4 text-center text-[11px] text-slate-500">
+                LotteryPlay
+              </div>
+            </aside>
+          </>
+        )}
+
+        {/* ======================================================
+            PWA MOBILE PLAY POPUP
+        ======================================================= */}
+
+        {isPWA && mobilePlayOpen && (
+          <div className="fixed inset-x-3 bottom-[82px] z-[80] lg:hidden">
+            <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/98 p-2 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">
+              <div className="px-3 pb-2 pt-1">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Choose Game
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {playNavigation.map((item, index) => {
+                  const Icon = item.icon;
+
+                  const is2D = index === 0;
+
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      onClick={handleMobileNavigation}
+                      className={({ isActive }) =>
+                        `flex flex-col items-center justify-center rounded-xl border px-3 py-4 text-center transition-all ${
+                          isActive
+                            ? is2D
+                              ? "border-indigo-500/40 bg-indigo-500/20 text-indigo-300"
+                              : "border-violet-500/40 bg-violet-500/20 text-violet-300"
+                            : "border-slate-700 bg-slate-800/80 text-slate-300 hover:bg-slate-700"
+                        }`
+                      }
+                    >
+                      <div
+                        className={`mb-2 flex h-11 w-11 items-center justify-center rounded-xl ${
+                          is2D
+                            ? "bg-indigo-500/15 text-indigo-400"
+                            : "bg-violet-500/15 text-violet-400"
+                        }`}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </div>
+
+                      <span className="text-xs font-bold">{item.name}</span>
+
+                      <span className="mt-0.5 text-[9px] text-slate-500">
+                        {item.description}
+                      </span>
+                    </NavLink>
+                  );
+                })}
+              </div>
             </div>
-          )}
+          </div>
+        )}
+
+        {/* ======================================================
+            PWA MOBILE MORE POPUP
+        ======================================================= */}
+
+        {isPWA && mobileMoreOpen && (
+          <div className="fixed inset-x-3 bottom-[82px] z-[80] lg:hidden">
+            <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/98 p-2 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">
+              <div className="px-3 pb-2 pt-1">
+                <div className="flex items-center gap-2">
+                  <MoreHorizontal className="h-3.5 w-3.5 text-indigo-400" />
+
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    More
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                {moreNavigation.map((item) => {
+                  const Icon = item.icon;
+
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      onClick={handleMobileNavigation}
+                      className={({ isActive }) =>
+                        `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
+                          isActive
+                            ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                            : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                        }`
+                      }
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                        <Icon size={17} />
+                      </span>
+
+                      <span>{item.name}</span>
+                    </NavLink>
+                  );
+                })}
+
+                {/* NOTIFICATIONS */}
+
+                <div className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold text-slate-300">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                    <Bell size={17} />
+                  </span>
+
+                  <span>Notifications</span>
+
+                  <div className="ml-auto">
+                    <NotificationBell role="PLAYER" />
+                  </div>
+                </div>
+
+                {/* PROFILE */}
+
+                <NavLink
+                  to="/player/profile"
+                  onClick={handleMobileNavigation}
+                  className={({ isActive }) =>
+                    `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
+                      isActive
+                        ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                    }`
+                  }
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                    <User size={17} />
+                  </span>
+
+                  <span>Profile</span>
+                </NavLink>
+
+                {/* LOGOUT */}
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold text-red-400 transition-all hover:bg-red-500/10 hover:text-red-300"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-500/10">
+                    <LogOut size={17} />
+                  </span>
+
+                  <span>Logout</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ======================================================
             PWA MOBILE BOTTOM NAVIGATION
@@ -2145,12 +1684,8 @@ export default function PlayerLayout() {
               <NavLink
                 to="/player"
                 end
-                onClick={
-                  handleMobileNavigation
-                }
-                className={({
-                  isActive,
-                }) =>
+                onClick={handleMobileNavigation}
+                className={({ isActive }) =>
                   `relative flex flex-col items-center justify-center gap-1 transition-all ${
                     isActive
                       ? "text-indigo-300"
@@ -2162,24 +1697,16 @@ export default function PlayerLayout() {
                   <>
                     <div
                       className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
-                        isActive
-                          ? "bg-indigo-500/15"
-                          : "bg-transparent"
+                        isActive ? "bg-indigo-500/15" : "bg-transparent"
                       }`}
                     >
                       <LayoutDashboard
                         className="h-[19px] w-[19px]"
-                        strokeWidth={
-                          isActive
-                            ? 2.5
-                            : 2
-                        }
+                        strokeWidth={isActive ? 2.5 : 2}
                       />
                     </div>
 
-                    <span className="text-[10px] font-semibold">
-                      Home
-                    </span>
+                    <span className="text-[10px] font-semibold">Home</span>
 
                     {isActive && (
                       <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
@@ -2192,45 +1719,31 @@ export default function PlayerLayout() {
 
               <button
                 type="button"
-                onClick={
-                  toggleMobilePlay
-                }
+                onClick={toggleMobilePlay}
                 aria-label="Open Play menu"
-                aria-expanded={
-                  mobilePlayOpen
-                }
+                aria-expanded={mobilePlayOpen}
                 className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
-                  isPlayActive ||
-                  mobilePlayOpen
+                  isPlayActive || mobilePlayOpen
                     ? "text-indigo-300"
                     : "text-slate-400 hover:text-white"
                 }`}
               >
                 <div
                   className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
-                    isPlayActive ||
-                    mobilePlayOpen
+                    isPlayActive || mobilePlayOpen
                       ? "bg-indigo-500/15"
                       : "bg-transparent"
                   }`}
                 >
                   <Dice5
                     className="h-[20px] w-[20px]"
-                    strokeWidth={
-                      isPlayActive ||
-                      mobilePlayOpen
-                        ? 2.5
-                        : 2
-                    }
+                    strokeWidth={isPlayActive || mobilePlayOpen ? 2.5 : 2}
                   />
                 </div>
 
-                <span className="text-[10px] font-semibold">
-                  Play
-                </span>
+                <span className="text-[10px] font-semibold">Play</span>
 
-                {(isPlayActive ||
-                  mobilePlayOpen) && (
+                {(isPlayActive || mobilePlayOpen) && (
                   <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
                 )}
               </button>
@@ -2239,12 +1752,8 @@ export default function PlayerLayout() {
 
               <NavLink
                 to="/player/tickets"
-                onClick={
-                  handleMobileNavigation
-                }
-                className={({
-                  isActive,
-                }) =>
+                onClick={handleMobileNavigation}
+                className={({ isActive }) =>
                   `relative flex flex-col items-center justify-center gap-1 transition-all ${
                     isActive
                       ? "text-indigo-300"
@@ -2256,24 +1765,16 @@ export default function PlayerLayout() {
                   <>
                     <div
                       className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
-                        isActive
-                          ? "bg-indigo-500/15"
-                          : "bg-transparent"
+                        isActive ? "bg-indigo-500/15" : "bg-transparent"
                       }`}
                     >
                       <Ticket
                         className="h-[19px] w-[19px]"
-                        strokeWidth={
-                          isActive
-                            ? 2.5
-                            : 2
-                        }
+                        strokeWidth={isActive ? 2.5 : 2}
                       />
                     </div>
 
-                    <span className="text-[10px] font-semibold">
-                      Tickets
-                    </span>
+                    <span className="text-[10px] font-semibold">Tickets</span>
 
                     {isActive && (
                       <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
@@ -2286,12 +1787,8 @@ export default function PlayerLayout() {
 
               <NavLink
                 to="/player/wallet"
-                onClick={
-                  handleMobileNavigation
-                }
-                className={({
-                  isActive,
-                }) =>
+                onClick={handleMobileNavigation}
+                className={({ isActive }) =>
                   `relative flex flex-col items-center justify-center gap-1 transition-all ${
                     isActive
                       ? "text-emerald-300"
@@ -2303,24 +1800,16 @@ export default function PlayerLayout() {
                   <>
                     <div
                       className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
-                        isActive
-                          ? "bg-emerald-500/15"
-                          : "bg-transparent"
+                        isActive ? "bg-emerald-500/15" : "bg-transparent"
                       }`}
                     >
                       <WalletCards
                         className="h-[19px] w-[19px]"
-                        strokeWidth={
-                          isActive
-                            ? 2.5
-                            : 2
-                        }
+                        strokeWidth={isActive ? 2.5 : 2}
                       />
                     </div>
 
-                    <span className="text-[10px] font-semibold">
-                      Wallet
-                    </span>
+                    <span className="text-[10px] font-semibold">Wallet</span>
 
                     {isActive && (
                       <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-emerald-400" />
@@ -2333,45 +1822,31 @@ export default function PlayerLayout() {
 
               <button
                 type="button"
-                onClick={
-                  toggleMobileMore
-                }
+                onClick={toggleMobileMore}
                 aria-label="Open more menu"
-                aria-expanded={
-                  mobileMoreOpen
-                }
+                aria-expanded={mobileMoreOpen}
                 className={`relative flex flex-col items-center justify-center gap-1 transition-all ${
-                  isMoreActive ||
-                  mobileMoreOpen
+                  isMoreActive || mobileMoreOpen
                     ? "text-indigo-300"
                     : "text-slate-400 hover:text-white"
                 }`}
               >
                 <div
                   className={`flex h-8 w-10 items-center justify-center rounded-xl transition-all ${
-                    isMoreActive ||
-                    mobileMoreOpen
+                    isMoreActive || mobileMoreOpen
                       ? "bg-indigo-500/15"
                       : "bg-transparent"
                   }`}
                 >
                   <MoreHorizontal
                     className="h-[21px] w-[21px]"
-                    strokeWidth={
-                      isMoreActive ||
-                      mobileMoreOpen
-                        ? 2.5
-                        : 2
-                    }
+                    strokeWidth={isMoreActive || mobileMoreOpen ? 2.5 : 2}
                   />
                 </div>
 
-                <span className="text-[10px] font-semibold">
-                  More
-                </span>
+                <span className="text-[10px] font-semibold">More</span>
 
-                {(isMoreActive ||
-                  mobileMoreOpen) && (
+                {(isMoreActive || mobileMoreOpen) && (
                   <span className="absolute bottom-1 h-0.5 w-5 rounded-full bg-indigo-400" />
                 )}
               </button>

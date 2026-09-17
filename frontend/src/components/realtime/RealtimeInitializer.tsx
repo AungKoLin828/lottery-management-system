@@ -19,7 +19,6 @@ export default function RealtimeInitializer({
     if (!isAuthenticated) {
       if (initializedRef.current) {
         clearRealtimeAuth();
-
         initializedRef.current = false;
       }
 
@@ -43,21 +42,11 @@ export default function RealtimeInitializer({
     };
   }, [isAuthenticated]);
 
-  /* ==========================================================
-     REFRESH TOKEN BEFORE EXPIRATION
-  ========================================================== */
-
   useEffect(() => {
     if (!isAuthenticated) {
       return;
     }
 
-    /*
-     * The server issues a 10-minute JWT.
-     *
-     * Refresh every 8 minutes so the WebSocket does not
-     * reach the expiration point.
-     */
     const interval = window.setInterval(
       () => {
         void refreshRealtimeAuth();
@@ -69,10 +58,6 @@ export default function RealtimeInitializer({
       window.clearInterval(interval);
     };
   }, [isAuthenticated]);
-
-  /* ==========================================================
-     PWA / BROWSER VISIBILITY
-  ========================================================== */
 
   useEffect(() => {
     if (!isAuthenticated) {

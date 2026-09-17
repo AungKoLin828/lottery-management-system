@@ -4,19 +4,14 @@ import {
   useWalletRealtime,
   useDepositRealtime,
   useWithdrawalRealtime,
-  useTransactionRealtime,
 } from "@/hooks/realtime";
 
 interface UsePlayerRealtimeOptions {
   userId: string | null;
 
   onWalletChanged?: () => void;
-
   onDepositChanged?: () => void;
-
   onWithdrawalChanged?: () => void;
-
-  onTransactionChanged?: () => void;
 }
 
 export function usePlayerRealtime({
@@ -24,7 +19,6 @@ export function usePlayerRealtime({
   onWalletChanged,
   onDepositChanged,
   onWithdrawalChanged,
-  onTransactionChanged,
 }: UsePlayerRealtimeOptions): void {
   const handleWalletChanged = useCallback(() => {
     onWalletChanged?.();
@@ -37,10 +31,6 @@ export function usePlayerRealtime({
   const handleWithdrawalChanged = useCallback(() => {
     onWithdrawalChanged?.();
   }, [onWithdrawalChanged]);
-
-  const handleTransactionChanged = useCallback(() => {
-    onTransactionChanged?.();
-  }, [onTransactionChanged]);
 
   useWalletRealtime({
     userId,
@@ -55,10 +45,5 @@ export function usePlayerRealtime({
   useWithdrawalRealtime({
     userId,
     onChanged: handleWithdrawalChanged,
-  });
-
-  useTransactionRealtime({
-    userId,
-    onChanged: handleTransactionChanged,
   });
 }
