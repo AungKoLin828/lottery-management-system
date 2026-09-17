@@ -11,7 +11,7 @@ import {
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 /* ============================================================
    TYPES
@@ -98,7 +98,21 @@ type TransactionsResponse = {
 };
 
 /* ============================================================
-   HELPERS
+   AUTHENTICATION ERROR
+============================================================ */
+
+class AuthenticationError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "AuthenticationError";
+    this.status = status;
+  }
+}
+
+/* ============================================================
+   FORMAT AMOUNT
 ============================================================ */
 
 const formatAmount = (amount: number | string | null | undefined) => {
@@ -291,6 +305,38 @@ function normalizeTransaction(transaction: any): WalletTransaction {
 }
 
 /* ============================================================
+   RESPONSE HELPER
+============================================================ */
+
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  const contentType = response.headers.get("content-type") || "";
+
+  const rawResponse = await response.text();
+
+  if (!rawResponse.trim()) {
+    throw new Error(
+      response.status === 404
+        ? "API endpoint was not found"
+        : "API returned an empty response",
+    );
+  }
+
+  if (!contentType.toLowerCase().includes("application/json")) {
+    throw new Error(
+      response.status === 404
+        ? "API endpoint was not found"
+        : "API returned an invalid response",
+    );
+  }
+
+  try {
+    return JSON.parse(rawResponse) as T;
+  } catch {
+    throw new Error("API returned invalid JSON");
+  }
+}
+
+/* ============================================================
    GET DASHBOARD STATS
 ============================================================ */
 
@@ -301,27 +347,39 @@ async function loadDashboardStats(): Promise<{
 }> {
   const response = await fetch("/api/player/dashboard", {
     method: "GET",
-
     credentials: "include",
-
     headers: {
       Accept: "application/json",
     },
   });
 
-  const contentType = response.headers.get("content-type") || "";
+  /*
+   * IMPORTANT:
+   *
+   * 401 / 403 means the current player session
+   * cannot access this player API.
+   *
+   * Do not treat this as a wallet-data error.
+   */
+  if (response.status === 401 || response.status === 403) {
+    let message = "Authentication required";
 
-  if (!contentType.toLowerCase().includes("application/json")) {
-    await response.text();
+    try {
+      const result = await parseJsonResponse<DashboardResponse>(response);
 
-    throw new Error(
-      response.status === 404
-        ? "Dashboard API endpoint was not found"
-        : "Dashboard API returned an invalid response",
-    );
+      message =
+        result.message ||
+        (response.status === 403
+          ? "Player access required"
+          : "Authentication required");
+    } catch {
+      // Keep default authentication message.
+    }
+
+    throw new AuthenticationError(message, response.status);
   }
 
-  const result = (await response.json()) as DashboardResponse;
+  const result = await parseJsonResponse<DashboardResponse>(response);
 
   console.log("Wallet dashboard API response:", result);
 
@@ -369,27 +427,35 @@ async function loadDashboardStats(): Promise<{
 async function loadTransactions(): Promise<WalletTransaction[]> {
   const response = await fetch("/api/player/transactions?limit=20", {
     method: "GET",
-
     credentials: "include",
-
     headers: {
       Accept: "application/json",
     },
   });
 
-  const contentType = response.headers.get("content-type") || "";
+  /*
+   * Authentication can also fail on the
+   * transactions endpoint.
+   */
+  if (response.status === 401 || response.status === 403) {
+    let message = "Authentication required";
 
-  if (!contentType.toLowerCase().includes("application/json")) {
-    await response.text();
+    try {
+      const result = await parseJsonResponse<TransactionsResponse>(response);
 
-    throw new Error(
-      response.status === 404
-        ? "Transaction API endpoint was not found"
-        : "Transaction API returned an invalid response",
-    );
+      message =
+        result.message ||
+        (response.status === 403
+          ? "Player access required"
+          : "Authentication required");
+    } catch {
+      // Keep default authentication message.
+    }
+
+    throw new AuthenticationError(message, response.status);
   }
 
-  const result = (await response.json()) as TransactionsResponse;
+  const result = await parseJsonResponse<TransactionsResponse>(response);
 
   console.log("Wallet transactions API response:", result);
 
@@ -430,19 +496,20 @@ async function loadTransactions(): Promise<WalletTransaction[]> {
 ============================================================ */
 
 export default function Wallet() {
+  const navigate = useNavigate();
+
   const [wallet, setWallet] = useState<WalletData>({
     balance: 0,
-
     recentDeposits: 0,
-
     recentWithdrawals: 0,
-
     transactions: [],
   });
 
   const [loading, setLoading] = useState(true);
 
   const [error, setError] = useState("");
+
+  const [authenticationError, setAuthenticationError] = useState(false);
 
   /* ==========================================================
      LOAD WALLET
@@ -454,13 +521,16 @@ export default function Wallet() {
      
      Transactions come from:
        /api/player/transactions
+     
+     Realtime does NOT replace these APIs.
+     Realtime should only trigger a reload.
   ========================================================== */
 
   const loadWallet = useCallback(async () => {
     try {
       setLoading(true);
-
       setError("");
+      setAuthenticationError(false);
 
       /*
        * Load both APIs together.
@@ -476,7 +546,6 @@ export default function Wallet() {
 
       const [dashboardData, transactionData] = await Promise.all([
         loadDashboardStats(),
-
         loadTransactions(),
       ]);
 
@@ -492,6 +561,17 @@ export default function Wallet() {
     } catch (err) {
       console.error("Wallet loading error:", err);
 
+      /*
+       * If backend says 401/403, the current
+       * session cannot access the player API.
+       */
+      if (err instanceof AuthenticationError) {
+        setAuthenticationError(true);
+        setError(err.message);
+
+        return;
+      }
+
       setError(err instanceof Error ? err.message : "Failed to load wallet");
     } finally {
       setLoading(false);
@@ -505,6 +585,37 @@ export default function Wallet() {
   useEffect(() => {
     void loadWallet();
   }, [loadWallet]);
+
+  /* ==========================================================
+     AUTHENTICATION FAILURE
+     
+     Do not modify the authentication cookie here.
+     The server owns the HttpOnly cookie.
+     
+     Redirecting to login lets the user establish a
+     fresh PLAYER session.
+  ========================================================== */
+
+  useEffect(() => {
+    if (!authenticationError) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      navigate("/login", {
+        replace: true,
+        state: {
+          from: "/player/wallet",
+          message:
+            "Your player session is no longer valid. Please log in again.",
+        },
+      });
+    }, 1200);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [authenticationError, navigate]);
 
   /* ==========================================================
      LOADING
@@ -532,6 +643,67 @@ export default function Wallet() {
         </div>
 
         <div className="h-80 animate-pulse rounded-2xl bg-slate-200" />
+      </div>
+    );
+  }
+
+  /* ==========================================================
+     AUTHENTICATION ERROR
+  ========================================================== */
+
+  if (authenticationError) {
+    return (
+      <div className="space-y-5 pb-6">
+        <div>
+          <div className="flex items-center gap-1 text-xs font-semibold">
+            <span className="text-slate-400">Player</span>
+
+            <span className="text-indigo-400">/</span>
+
+            <span className="text-indigo-500">Wallet</span>
+          </div>
+
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            Wallet
+          </h1>
+
+          <p className="mt-1.5 text-xs text-slate-500 sm:text-sm">
+            Manage your balance, deposits, withdrawals and transactions.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-bold text-amber-700">
+                Player authentication required
+              </p>
+
+              <p className="mt-1 text-xs text-amber-600">
+                {error || "Please log in again to access your wallet."}
+              </p>
+
+              <p className="mt-1 text-[10px] text-amber-500">
+                Redirecting to login...
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                navigate("/login", {
+                  replace: true,
+                  state: {
+                    from: "/player/wallet",
+                  },
+                })
+              }
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-amber-700"
+            >
+              Log In
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
