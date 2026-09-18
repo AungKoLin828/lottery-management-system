@@ -1,12 +1,15 @@
 import type { Handler } from "@netlify/functions";
-
 import { SignJWT } from "jose";
 
 import {
-  jsonResponse,
   getAuthTokenFromCookie,
+  jsonResponse,
   verifyToken,
 } from "./utils/auth";
+
+/* ============================================================
+   SUPABASE JWT SECRET
+============================================================ */
 
 function getSupabaseJwtSecret(): Uint8Array {
   const secret = process.env.SUPABASE_JWT_SECRET;
@@ -19,6 +22,10 @@ function getSupabaseJwtSecret(): Uint8Array {
 
   return new TextEncoder().encode(secret);
 }
+
+/* ============================================================
+   HANDLER
+============================================================ */
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "GET") {
@@ -36,7 +43,7 @@ export const handler: Handler = async (event) => {
 
   try {
     /* ========================================================
-       READ EXISTING APPLICATION AUTH COOKIE
+       APPLICATION AUTH
     ======================================================== */
 
     const authToken = getAuthTokenFromCookie(event);
@@ -48,12 +55,6 @@ export const handler: Handler = async (event) => {
       });
     }
 
-    /* ========================================================
-       VERIFY EXISTING APPLICATION JWT
-
-       This continues using your existing JWT_SECRET.
-    ======================================================== */
-
     const payload = await verifyToken(authToken);
 
     if (!payload.userId) {
@@ -64,19 +65,32 @@ export const handler: Handler = async (event) => {
     }
 
     /* ========================================================
-       CREATE SHORT-LIVED SUPABASE REALTIME JWT
+       ALLOW PLAYER + ADMIN
+    ======================================================== */
 
-       IMPORTANT:
-       - sub = your application's user ID
-       - role = Supabase PostgreSQL role
-       - app_role = your application's ADMIN / PLAYER role
+    if (payload.role !== "PLAYER" && payload.role !== "ADMIN") {
+      return jsonResponse(403, {
+        success: false,
+        message: "Realtime access denied",
+      });
+    }
+
+    /* ========================================================
+       SUPABASE REALTIME JWT
     ======================================================== */
 
     const realtimeToken = await new SignJWT({
       user_id: payload.userId,
 
+      /*
+       * Keep application role so RLS policies can distinguish
+       * ADMIN from PLAYER if needed.
+       */
       app_role: payload.role,
 
+      /*
+       * Supabase Realtime expects an authenticated role.
+       */
       role: "authenticated",
     })
       .setProtectedHeader({
@@ -97,6 +111,12 @@ export const handler: Handler = async (event) => {
 
       data: {
         token: realtimeToken,
+
+        /*
+         * Useful for debugging on the frontend.
+         * Does not contain any secret.
+         */
+        role: payload.role,
       },
     });
   } catch (error) {

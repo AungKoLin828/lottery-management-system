@@ -10,9 +10,15 @@ interface UsePlayerRealtimeOptions {
   userId: string | null;
 
   onWalletChanged?: () => void;
+
   onDepositChanged?: () => void;
+
   onWithdrawalChanged?: () => void;
 }
+
+/* ============================================================
+   PLAYER REALTIME
+============================================================ */
 
 export function usePlayerRealtime({
   userId,
@@ -20,17 +26,33 @@ export function usePlayerRealtime({
   onDepositChanged,
   onWithdrawalChanged,
 }: UsePlayerRealtimeOptions): void {
+  /* ==========================================================
+     WALLET
+  ========================================================== */
+
   const handleWalletChanged = useCallback(() => {
     onWalletChanged?.();
   }, [onWalletChanged]);
+
+  /* ==========================================================
+     DEPOSIT
+  ========================================================== */
 
   const handleDepositChanged = useCallback(() => {
     onDepositChanged?.();
   }, [onDepositChanged]);
 
+  /* ==========================================================
+     WITHDRAWAL
+  ========================================================== */
+
   const handleWithdrawalChanged = useCallback(() => {
     onWithdrawalChanged?.();
   }, [onWithdrawalChanged]);
+
+  /* ==========================================================
+     SUBSCRIPTIONS
+  ========================================================== */
 
   useWalletRealtime({
     userId,

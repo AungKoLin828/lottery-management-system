@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
 import {
@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 
 import NotificationBell from "@/components/common/notification/NotificationBell";
+import RealtimeInitializer from "@/components/realtime/RealtimeInitializer";
+import { useAdminDepositRealtime } from "@/hooks/realtime/useAdminDepositRealtime";
 
 /* ============================================================
    LOGOUT
@@ -99,7 +101,7 @@ const moreNavigation = [
 ];
 
 /* ============================================================
-   PLAYER / ADMIN ROUTE CHECK
+   ADMIN ROUTE CHECK
 ============================================================ */
 
 function isAdminPath(path: string) {
@@ -107,52 +109,56 @@ function isAdminPath(path: string) {
 }
 
 /* ============================================================
-   PWA DISPLAY MODE CHECK
+   PWA / STANDALONE DETECTION
 ============================================================ */
 
-function checkIsPWA() {
+/**
+ * Returns true only when the website is running as an
+ * installed PWA / Add to Home Screen application.
+ *
+ * Browser:
+ *   false
+ *
+ * Installed PWA:
+ *   true
+ *
+ * iOS Add to Home Screen:
+ *   true
+ *
+ * Android/Chrome installed PWA:
+ *   true
+ */
+function isPWAStandalone() {
   if (typeof window === "undefined") {
     return false;
   }
 
-  /*
-   * Chrome / Edge / Android / installed PWA
-   */
+  /* Android / Chrome / Edge / modern browsers */
   const standaloneMediaQuery = window.matchMedia(
     "(display-mode: standalone)",
   ).matches;
 
-  /*
-   * iOS Safari installed to Home Screen
-   */
+  /* iOS Safari Add to Home Screen */
   const iosStandalone =
     "standalone" in window.navigator &&
     Boolean(
-      (
-        window.navigator as Navigator & {
-          standalone?: boolean;
-        }
-      ).standalone,
+      (window.navigator as Navigator & { standalone?: boolean }).standalone,
     );
 
-  /*
-   * Some browsers can use fullscreen/minimal-ui
-   * when launched as an installed web app.
-   */
-  const fullscreenMediaQuery = window.matchMedia(
-    "(display-mode: fullscreen)",
-  ).matches;
+  return standaloneMediaQuery || iosStandalone;
+}
 
-  const minimalUiMediaQuery = window.matchMedia(
-    "(display-mode: minimal-ui)",
-  ).matches;
+/* ============================================================
+   ADMIN DEPOSIT ALERT TYPES
+============================================================ */
 
-  return (
-    standaloneMediaQuery ||
-    iosStandalone ||
-    fullscreenMediaQuery ||
-    minimalUiMediaQuery
-  );
+interface AdminDepositAlert {
+  id: string;
+  amount?: string | number;
+  transactionNumber?: string;
+  paymentMethodId?: string;
+  status?: string;
+  createdAt?: string;
 }
 
 /* ============================================================
@@ -163,10 +169,16 @@ export default function AdminLayout() {
   const location = useLocation();
 
   /* ==========================================================
-     MOBILE / SIDEBAR
+     DESKTOP / MOBILE SIDEBAR
   ========================================================== */
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  /* ==========================================================
+     PWA DETECTION
+  ========================================================== */
+
+  const [isInstalledPWA, setIsInstalledPWA] = useState(false);
 
   /* ==========================================================
      MOBILE MORE
@@ -178,13 +190,21 @@ export default function AdminLayout() {
      MOBILE TRANSACTION MENU
   ========================================================== */
 
-  const [mobileTransactionOpen, setMobileTransactionOpen] = useState(false);
+  const [mobileTransactionOpen, setMobileTransactionOpen] =
+    useState(false);
 
   /* ==========================================================
-     PWA MODE
+     MOBILE BACK BUTTON
   ========================================================== */
 
-  const [isPWA, setIsPWA] = useState(false);
+  const [showBackButton, setShowBackButton] = useState(false);
+
+  /* ==========================================================
+     ADMIN DEPOSIT REALTIME ALERT
+  ========================================================== */
+
+  const [adminDepositAlert, setAdminDepositAlert] =
+    useState<AdminDepositAlert | null>(null);
 
   /* ==========================================================
      ADMIN HISTORY STORAGE
@@ -193,36 +213,100 @@ export default function AdminLayout() {
   const ADMIN_HISTORY_KEY = "lottery_admin_navigation_history";
 
   /* ==========================================================
-     DETECT INSTALLED PWA / HOME SCREEN MODE
+     DETECT PWA INSTALL / STANDALONE MODE
   ========================================================== */
 
   useEffect(() => {
-    const updatePwaMode = () => {
-      setIsPWA(checkIsPWA());
+    const updatePWAState = () => {
+      setIsInstalledPWA(isPWAStandalone());
     };
 
-    updatePwaMode();
+    updatePWAState();
+
+    const mediaQuery = window.matchMedia(
+      "(display-mode: standalone)",
+    );
+
+    const handleMediaChange = () => {
+      updatePWAState();
+    };
 
     /*
-     * display-mode can change while the application is running.
-     * Listen for changes so the bottom menu updates immediately.
+     * Modern browsers
      */
-    const standaloneQuery = window.matchMedia("(display-mode: standalone)");
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleMediaChange);
+    } else {
+      /*
+       * Older Safari/browser fallback
+       */
+      mediaQuery.addListener(handleMediaChange);
+    }
 
-    const fullscreenQuery = window.matchMedia("(display-mode: fullscreen)");
-
-    const minimalUiQuery = window.matchMedia("(display-mode: minimal-ui)");
-
-    standaloneQuery.addEventListener("change", updatePwaMode);
-    fullscreenQuery.addEventListener("change", updatePwaMode);
-    minimalUiQuery.addEventListener("change", updatePwaMode);
+    /*
+     * pageshow helps when the browser moves between
+     * normal browser mode and installed PWA mode.
+     */
+    window.addEventListener("pageshow", updatePWAState);
 
     return () => {
-      standaloneQuery.removeEventListener("change", updatePwaMode);
-      fullscreenQuery.removeEventListener("change", updatePwaMode);
-      minimalUiQuery.removeEventListener("change", updatePwaMode);
+      if (typeof mediaQuery.removeEventListener === "function") {
+        mediaQuery.removeEventListener(
+          "change",
+          handleMediaChange,
+        );
+      } else {
+        mediaQuery.removeListener(handleMediaChange);
+      }
+
+      window.removeEventListener("pageshow", updatePWAState);
     };
   }, []);
+
+  /* ==========================================================
+     ADMIN DEPOSIT REALTIME
+     
+     Player:
+       Deposit Request
+            ↓
+       deposits INSERT
+            ↓
+       Supabase Realtime
+            ↓
+       AdminLayout
+            ↓
+       New Deposit Request alert
+  ========================================================== */
+
+  const handleNewAdminDeposit = useCallback(
+    (deposit: AdminDepositAlert) => {
+      console.log(
+        "[Admin Realtime] New deposit request:",
+        deposit,
+      );
+
+      setAdminDepositAlert(deposit);
+
+      /*
+       * Automatically hide the temporary alert after 8 seconds.
+       */
+      window.setTimeout(() => {
+        setAdminDepositAlert((current) => {
+          if (current?.id === deposit.id) {
+            return null;
+          }
+
+          return current;
+        });
+      }, 8000);
+    },
+    [],
+  );
+
+  useAdminDepositRealtime({
+    enabled: true,
+    onNewDeposit: handleNewAdminDeposit,
+  });
 
   /* ==========================================================
      ACTIVE NAVIGATION
@@ -240,7 +324,9 @@ export default function AdminLayout() {
      ACTIVE TRANSACTION
   ========================================================== */
 
-  const isTransactionActive = location.pathname.startsWith("/admin/balance");
+  const isTransactionActive = location.pathname.startsWith(
+    "/admin/balance",
+  );
 
   /* ==========================================================
      ACTIVE MORE
@@ -287,7 +373,6 @@ export default function AdminLayout() {
 
   const toggleMobileTransaction = () => {
     setMobileTransactionOpen((current) => !current);
-
     setMobileMoreOpen(false);
   };
 
@@ -297,7 +382,6 @@ export default function AdminLayout() {
 
   const toggleMobileMore = () => {
     setMobileMoreOpen((current) => !current);
-
     setMobileTransactionOpen(false);
   };
 
@@ -396,7 +480,8 @@ export default function AdminLayout() {
           if (Array.isArray(parsed)) {
             history = parsed.filter(
               (item): item is string =>
-                typeof item === "string" && isAdminPath(item),
+                typeof item === "string" &&
+                isAdminPath(item),
             );
           }
         } catch {
@@ -414,11 +499,127 @@ export default function AdminLayout() {
         history = history.slice(-30);
       }
 
-      sessionStorage.setItem(ADMIN_HISTORY_KEY, JSON.stringify(history));
+      sessionStorage.setItem(
+        ADMIN_HISTORY_KEY,
+        JSON.stringify(history),
+      );
     } catch {
       // Ignore sessionStorage errors.
     }
   }, [location.pathname]);
+
+  /* ==========================================================
+     PWA BACK BUTTON VISIBILITY
+  ========================================================== */
+
+  useEffect(() => {
+    /*
+     * Normal browser:
+     * Back button is completely disabled.
+     */
+    if (!isInstalledPWA) {
+      setShowBackButton(false);
+      return;
+    }
+
+    /*
+     * Installed PWA:
+     * Show back button after scrolling.
+     */
+    const handleScroll = () => {
+      setShowBackButton(window.scrollY > 120);
+    };
+
+    handleScroll();
+
+    window.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [isInstalledPWA]);
+
+  /* ==========================================================
+     SAFE ADMIN BACK
+  ========================================================== */
+
+  const handleAdminBack = () => {
+    /*
+     * Extra safety:
+     * Never execute the PWA back action in normal browser mode.
+     */
+    if (!isInstalledPWA) {
+      return;
+    }
+
+    try {
+      const stored = sessionStorage.getItem(ADMIN_HISTORY_KEY);
+
+      let history: string[] = [];
+
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+
+          if (Array.isArray(parsed)) {
+            history = parsed.filter(
+              (item): item is string =>
+                typeof item === "string" &&
+                isAdminPath(item),
+            );
+          }
+        } catch {
+          history = [];
+        }
+      }
+
+      if (
+        history.length > 0 &&
+        history[history.length - 1] === location.pathname
+      ) {
+        history.pop();
+      }
+
+      const previousAdminPage =
+        history[history.length - 1];
+
+      sessionStorage.setItem(
+        ADMIN_HISTORY_KEY,
+        JSON.stringify(history),
+      );
+
+      if (
+        previousAdminPage &&
+        isAdminPath(previousAdminPage)
+      ) {
+        window.history.pushState(
+          null,
+          "",
+          previousAdminPage,
+        );
+
+        window.dispatchEvent(
+          new PopStateEvent("popstate"),
+        );
+
+        return;
+      }
+
+      window.history.pushState(
+        null,
+        "",
+        "/admin",
+      );
+
+      window.dispatchEvent(
+        new PopStateEvent("popstate"),
+      );
+    } catch {
+      window.location.href = "/admin";
+    }
+  };
 
   /* ==========================================================
      ROUTE CHANGE
@@ -462,14 +663,148 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-900">
       {/* ======================================================
-          MOBILE BROWSER SIDEBAR OVERLAY
+          REALTIME INITIALIZER
 
-          IMPORTANT:
-          - Only used when sidebar is open
-          - Hidden on desktop
+          Admin route is already protected by your admin
+          authentication/route guard.
+
+          Realtime failure must NOT block the Admin UI.
       ======================================================= */}
 
-      {sidebarOpen && !isPWA && (
+      <RealtimeInitializer isAuthenticated={true} />
+
+      {/* ======================================================
+          ADMIN DEPOSIT ALERT
+
+          This is separate from NotificationBell.
+
+          NotificationBell remains unchanged.
+      ======================================================= */}
+
+      {adminDepositAlert && (
+        <div
+          className="
+            fixed
+            right-3
+            top-3
+            z-[200]
+            w-[calc(100vw-1.5rem)]
+            max-w-sm
+            overflow-hidden
+            rounded-2xl
+            border
+            border-indigo-200
+            bg-white
+            shadow-2xl
+            shadow-slate-950/20
+            sm:right-5
+            sm:top-5
+          "
+          role="alert"
+        >
+          <div className="flex items-start gap-3 p-4">
+            {/* ICON */}
+
+            <div
+              className="
+                flex
+                h-10
+                w-10
+                shrink-0
+                items-center
+                justify-center
+                rounded-xl
+                bg-indigo-50
+                text-indigo-600
+              "
+            >
+              <Bell
+                className="h-5 w-5"
+                strokeWidth={2.3}
+              />
+            </div>
+
+            {/* CONTENT */}
+
+            <button
+              type="button"
+              onClick={() => {
+                setAdminDepositAlert(null);
+                window.location.href =
+                  "/admin/balance/deposits";
+              }}
+              className="min-w-0 flex-1 text-left"
+            >
+              <p className="text-sm font-bold text-slate-900">
+                New Deposit Request
+              </p>
+
+              <p className="mt-0.5 text-xs text-slate-500">
+                A player has submitted a new deposit request.
+              </p>
+
+              {adminDepositAlert.amount !==
+                undefined && (
+                <p className="mt-2 text-sm font-bold text-indigo-600">
+                  Amount:{" "}
+                  {Number(
+                    adminDepositAlert.amount,
+                  ).toLocaleString("en-US")}{" "}
+                  MMK
+                </p>
+              )}
+
+              {adminDepositAlert.transactionNumber && (
+                <p className="mt-1 truncate text-[11px] text-slate-400">
+                  Transaction:{" "}
+                  {adminDepositAlert.transactionNumber}
+                </p>
+              )}
+
+              <p className="mt-2 text-[11px] font-semibold text-indigo-500">
+                Click to view deposit requests
+              </p>
+            </button>
+
+            {/* CLOSE */}
+
+            <button
+              type="button"
+              onClick={() =>
+                setAdminDepositAlert(null)
+              }
+              aria-label="Close deposit notification"
+              className="
+                flex
+                h-7
+                w-7
+                shrink-0
+                items-center
+                justify-center
+                rounded-lg
+                text-slate-400
+                transition
+                hover:bg-slate-100
+                hover:text-slate-700
+              "
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* PROGRESS BAR */}
+
+          <div className="h-1 bg-slate-100">
+            <div className="h-full w-full origin-left animate-[shrink_8s_linear_forwards] bg-gradient-to-r from-indigo-600 to-violet-600" />
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================
+          DESKTOP / MOBILE SIDEBAR OVERLAY
+      ======================================================= */}
+
+      {sidebarOpen && (
         <button
           type="button"
           aria-label="Close sidebar"
@@ -486,17 +821,7 @@ export default function AdminLayout() {
       )}
 
       {/* ======================================================
-          SIDEBAR
-
-          MOBILE:
-          - fixed
-          - slides from left
-          - hidden until hamburger opens it
-
-          DESKTOP:
-          - fixed
-          - permanently visible
-          - main content reserves 16rem
+          DESKTOP SIDEBAR
       ======================================================= */}
 
       <aside
@@ -516,9 +841,13 @@ export default function AdminLayout() {
           transition-transform
           duration-300
           ease-in-out
-
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-
+          ${
+            sidebarOpen
+              ? "translate-x-0"
+              : "-translate-x-full"
+          }
+          lg:static
+          lg:z-auto
           lg:translate-x-0
           lg:shadow-none
         `}
@@ -531,7 +860,6 @@ export default function AdminLayout() {
           className="
             flex
             min-h-[73px]
-            shrink-0
             items-center
             justify-between
             border-b
@@ -543,18 +871,49 @@ export default function AdminLayout() {
           <Link
             to="/admin"
             onClick={closeAllMenus}
-            className="flex min-w-0 items-center gap-2.5"
+            className="flex items-center gap-2.5"
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-950/30">
+            <div
+              className="
+                flex
+                h-9
+                w-9
+                items-center
+                justify-center
+                rounded-xl
+                bg-gradient-to-br
+                from-indigo-600
+                to-violet-600
+                text-white
+                shadow-md
+                shadow-indigo-950/30
+              "
+            >
               <Ticket className="h-5 w-5" />
             </div>
 
-            <div className="min-w-0">
-              <h1 className="truncate text-base font-extrabold tracking-tight text-white sm:text-lg">
+            <div>
+              <h1
+                className="
+                  text-base
+                  font-extrabold
+                  tracking-tight
+                  text-white
+                  sm:text-lg
+                "
+              >
                 Administrator
               </h1>
 
-              <p className="truncate text-[10px] font-medium uppercase tracking-wider text-slate-500">
+              <p
+                className="
+                  text-[10px]
+                  font-medium
+                  uppercase
+                  tracking-wider
+                  text-slate-500
+                "
+              >
                 Management Panel
               </p>
             </div>
@@ -567,7 +926,6 @@ export default function AdminLayout() {
             onClick={closeSidebar}
             aria-label="Close sidebar"
             className="
-              shrink-0
               rounded-xl
               p-2
               text-slate-400
@@ -587,7 +945,6 @@ export default function AdminLayout() {
 
         <nav
           className="
-            min-h-0
             flex-1
             space-y-1
             overflow-y-auto
@@ -597,7 +954,6 @@ export default function AdminLayout() {
         >
           {navigation.map((item) => {
             const Icon = item.icon;
-
             const active = isActive(item.path);
 
             return (
@@ -608,90 +964,38 @@ export default function AdminLayout() {
                 className={desktopNavClass(active)}
               >
                 <span
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                    active
-                      ? "bg-white/15 text-white"
-                      : "bg-slate-800 text-slate-400 group-hover:text-indigo-300"
-                  }`}
+                  className={`
+                    flex
+                    h-9
+                    w-9
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-lg
+                    ${
+                      active
+                        ? "bg-white/15 text-white"
+                        : "bg-slate-800 text-slate-400 group-hover:text-indigo-300"
+                    }
+                  `}
                 >
-                  <Icon className="h-[18px] w-[18px]" />
+                  <Icon className="h-4.5 w-4.5" />
                 </span>
 
-                <span className="truncate">{item.label}</span>
+                <span className="truncate">
+                  {item.label}
+                </span>
               </Link>
             );
           })}
         </nav>
 
         {/* ==================================================
-            MOBILE LOGOUT
-
-            IMPORTANT:
-            This is the missing logout menu.
-
-            It displays only on mobile browser because:
-            - lg:hidden
-            - sidebar itself is used by mobile browser
-            - installed PWA uses More -> Logout
-        ================================================== */}
-
-        {!isPWA && (
-          <div className="shrink-0 border-t border-slate-800 p-3 sm:p-4 lg:hidden">
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="
-                flex
-                min-h-11
-                w-full
-                items-center
-                gap-3
-                rounded-xl
-                px-3
-                py-2.5
-                text-left
-                text-sm
-                font-semibold
-                text-red-400
-                transition
-                hover:bg-red-500/10
-                hover:text-red-300
-              "
-            >
-              <span
-                className="
-                  flex
-                  h-9
-                  w-9
-                  shrink-0
-                  items-center
-                  justify-center
-                  rounded-lg
-                  bg-red-500/10
-                  text-red-400
-                "
-              >
-                <LogOut className="h-4 w-4" />
-              </span>
-
-              <span>Logout</span>
-            </button>
-          </div>
-        )}
-
-        {/* ==================================================
             SIDEBAR FOOTER
-
-            Desktop only.
-
-            Keeping the mobile sidebar cleaner prevents the
-            footer from pushing the Logout/navigation around.
         ================================================== */}
 
         <div
           className="
-            hidden
-            shrink-0
             border-t
             border-slate-800
             px-5
@@ -699,26 +1003,33 @@ export default function AdminLayout() {
             text-xs
             text-slate-500
             sm:px-6
-            lg:block
           "
         >
-          <p className="font-semibold text-slate-400">Admin Panel</p>
+          <p className="font-semibold text-slate-400">
+            Admin Panel
+          </p>
 
-          <p className="mt-1">Lottery Management System</p>
+          <p className="mt-1">
+            Lottery Management System
+          </p>
         </div>
       </aside>
 
       {/* ======================================================
           MAIN AREA
-
-          IMPORTANT:
-          Desktop reserves the 16rem sidebar width.
-          Mobile remains full width.
       ======================================================= */}
 
-      <main className="flex min-h-screen min-w-0 flex-col lg:ml-64">
+      <main
+        className="
+          flex
+          min-h-screen
+          min-w-0
+          flex-col
+          lg:ml-0
+        "
+      >
         {/* ==================================================
-            HEADER
+            DESKTOP / MOBILE HEADER
         ================================================== */}
 
         <header
@@ -747,79 +1058,94 @@ export default function AdminLayout() {
           ================================================== */}
 
           <div className="flex min-w-0 items-center gap-3">
-            {/* ==================================================
-                MOBILE MENU
+            {/* MOBILE MENU */}
 
-                IMPORTANT:
-                - Mobile browser: DISPLAY
-                - Installed PWA: HIDDEN
-                - Desktop: HIDDEN
-            ================================================== */}
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open sidebar"
+              className="
+                flex
+                h-10
+                w-10
+                shrink-0
+                items-center
+                justify-center
+                rounded-xl
+                border
+                border-slate-200
+                bg-white
+                text-slate-600
+                shadow-sm
+                transition
+                hover:border-indigo-300
+                hover:bg-indigo-50
+                hover:text-indigo-600
+                lg:hidden
+              "
+            >
+              <Menu className="h-5 w-5" />
+            </button>
 
-            {!isPWA && (
-              <button
-                type="button"
-                onClick={() => setSidebarOpen(true)}
-                aria-label="Open sidebar"
-                aria-expanded={sidebarOpen}
+            {/* MOBILE LOGO */}
+
+            <Link
+              to="/admin"
+              onClick={closeAllMenus}
+              className="
+                flex
+                shrink-0
+                items-center
+                gap-2
+                lg:hidden
+              "
+            >
+              <div
                 className="
                   flex
-                  h-10
-                  w-10
-                  shrink-0
+                  h-9
+                  w-9
                   items-center
                   justify-center
                   rounded-xl
-                  border
-                  border-slate-200
-                  bg-white
-                  text-slate-600
-                  shadow-sm
-                  transition
-                  hover:border-indigo-300
-                  hover:bg-indigo-50
-                  hover:text-indigo-600
-                  lg:hidden
+                  bg-gradient-to-br
+                  from-indigo-600
+                  to-violet-600
+                  text-white
+                  shadow-md
+                  shadow-indigo-900/20
                 "
               >
-                <Menu className="h-5 w-5" />
-              </button>
-            )}
+                <Ticket className="h-4.5 w-4.5" />
+              </div>
+            </Link>
 
-            {/* ==================================================
-                MOBILE LOGO
-
-                Normal mobile browser only.
-            ================================================== */}
-
-            {!isPWA && (
-              <Link
-                to="/admin"
-                onClick={closeAllMenus}
-                className="
-                  flex
-                  shrink-0
-                  items-center
-                  gap-2
-                  lg:hidden
-                "
-              >
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/20">
-                  <Ticket className="h-4.5 w-4.5" />
-                </div>
-              </Link>
-            )}
-
-            {/* ==================================================
-                PAGE TITLE
-            ================================================== */}
+            {/* PAGE TITLE */}
 
             <div className="min-w-0">
-              <h2 className="truncate text-sm font-bold text-slate-800 sm:text-base">
+              <h2
+                className="
+                  truncate
+                  text-sm
+                  font-bold
+                  text-slate-800
+                  sm:text-base
+                "
+              >
                 {getPageTitle()}
               </h2>
 
-              <p className="hidden text-[10px] font-medium uppercase tracking-wider text-slate-400 sm:block">
+              <p
+                className="
+                  hidden
+                  text-[10px]
+                  font-medium
+                  uppercase
+                  tracking-wider
+                  text-slate-400
+                  sm:block
+                "
+              >
                 Lottery Management System
               </p>
             </div>
@@ -830,17 +1156,13 @@ export default function AdminLayout() {
           ================================================== */}
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            {/* ==================================================
-                DESKTOP NOTIFICATION
-            ================================================== */}
+            {/* DESKTOP NOTIFICATION */}
 
             <div className="hidden rounded-xl sm:block">
               <NotificationBell role="ADMIN" />
             </div>
 
-            {/* ==================================================
-                DESKTOP LOGOUT
-            ================================================== */}
+            {/* DESKTOP LOGOUT */}
 
             <button
               type="button"
@@ -877,19 +1199,21 @@ export default function AdminLayout() {
         ================================================== */}
 
         <section
-          className="
+          className={`
             min-w-0
             flex-1
             px-3
             py-4
-            pb-28
             sm:px-4
             sm:py-5
-            sm:pb-28
             md:px-6
             md:py-6
-            lg:pb-6
-          "
+            ${
+              isInstalledPWA
+                ? "pb-28 sm:pb-28 lg:pb-28"
+                : "pb-4 sm:pb-5 md:pb-6"
+            }
+          `}
         >
           <Outlet />
         </section>
@@ -915,19 +1239,22 @@ export default function AdminLayout() {
           "
         >
           © {new Date().getFullYear()} Lottery Management System.
-          <span className="hidden sm:inline"> All rights reserved.</span>
+          <span className="hidden sm:inline">
+            {" "}
+            All rights reserved.
+          </span>
         </footer>
       </main>
 
       {/* ======================================================
-          MOBILE / PWA MORE PANEL
+          PWA MOBILE / MORE PANEL
 
           IMPORTANT:
-          - Used only by installed PWA bottom navigation
-          - Normal mobile browser uses sidebar Logout instead
+          This entire section only exists when the application
+          is running as an installed PWA.
       ======================================================= */}
 
-      {mobileMoreOpen && isPWA && (
+      {isInstalledPWA && mobileMoreOpen && (
         <>
           {/* BACKDROP */}
 
@@ -954,8 +1281,7 @@ export default function AdminLayout() {
               left-3
               right-3
               z-[70]
-              max-h-[calc(100vh-110px)]
-              overflow-y-auto
+              overflow-hidden
               rounded-2xl
               border
               border-slate-700
@@ -966,8 +1292,23 @@ export default function AdminLayout() {
               lg:hidden
             "
           >
-            <div className="border-b border-slate-800 px-3 py-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <div
+              className="
+                border-b
+                border-slate-800
+                px-3
+                py-2
+              "
+            >
+              <p
+                className="
+                  text-[10px]
+                  font-bold
+                  uppercase
+                  tracking-wider
+                  text-slate-500
+                "
+              >
                 More
               </p>
             </div>
@@ -982,7 +1323,9 @@ export default function AdminLayout() {
                   key={item.path}
                   to={item.path}
                   onClick={handleMobileNavigation}
-                  className={({ isActive: linkActive }) =>
+                  className={({
+                    isActive: linkActive,
+                  }) =>
                     `mt-1 flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
                       linkActive
                         ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
@@ -990,7 +1333,18 @@ export default function AdminLayout() {
                     }`
                   }
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                  <span
+                    className="
+                      flex
+                      h-8
+                      w-8
+                      shrink-0
+                      items-center
+                      justify-center
+                      rounded-lg
+                      bg-slate-800
+                    "
+                  >
                     <Icon className="h-4 w-4" />
                   </span>
 
@@ -1016,7 +1370,21 @@ export default function AdminLayout() {
                 text-slate-300
               "
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 text-white">
+              <span
+                className="
+                  flex
+                  h-8
+                  w-8
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-lg
+                  bg-gradient-to-br
+                  from-indigo-600
+                  to-violet-600
+                  text-white
+                "
+              >
                 <Bell className="h-4 w-4" />
               </span>
 
@@ -1051,7 +1419,18 @@ export default function AdminLayout() {
                 hover:text-red-300
               "
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-500/10">
+              <span
+                className="
+                  flex
+                  h-8
+                  w-8
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-lg
+                  bg-red-500/10
+                "
+              >
                 <LogOut className="h-4 w-4" />
               </span>
 
@@ -1062,19 +1441,19 @@ export default function AdminLayout() {
       )}
 
       {/* ======================================================
-          MOBILE TRANSACTION SUBMENU
-
-          PWA ONLY
+          PWA TRANSACTION SUBMENU
       ======================================================= */}
 
-      {mobileTransactionOpen && isPWA && (
+      {isInstalledPWA && mobileTransactionOpen && (
         <>
           {/* BACKDROP */}
 
           <button
             type="button"
             aria-label="Close transaction menu"
-            onClick={() => setMobileTransactionOpen(false)}
+            onClick={() =>
+              setMobileTransactionOpen(false)
+            }
             className="
               fixed
               inset-0
@@ -1094,8 +1473,7 @@ export default function AdminLayout() {
               left-3
               right-3
               z-[70]
-              max-h-[calc(100vh-110px)]
-              overflow-y-auto
+              overflow-hidden
               rounded-2xl
               border
               border-slate-700
@@ -1106,11 +1484,26 @@ export default function AdminLayout() {
               lg:hidden
             "
           >
-            <div className="border-b border-slate-800 px-3 py-2">
+            <div
+              className="
+                border-b
+                border-slate-800
+                px-3
+                py-2
+              "
+            >
               <div className="flex items-center gap-2">
                 <Wallet className="h-3.5 w-3.5 text-emerald-400" />
 
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                <p
+                  className="
+                    text-[10px]
+                    font-bold
+                    uppercase
+                    tracking-wider
+                    text-slate-500
+                  "
+                >
                   Transaction Management
                 </p>
               </div>
@@ -1129,7 +1522,18 @@ export default function AdminLayout() {
                 }`
               }
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+              <span
+                className="
+                  flex
+                  h-8
+                  w-8
+                  items-center
+                  justify-center
+                  rounded-lg
+                  bg-emerald-500/10
+                  text-emerald-400
+                "
+              >
                 <Wallet className="h-4 w-4" />
               </span>
 
@@ -1149,7 +1553,18 @@ export default function AdminLayout() {
                 }`
               }
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400">
+              <span
+                className="
+                  flex
+                  h-8
+                  w-8
+                  items-center
+                  justify-center
+                  rounded-lg
+                  bg-indigo-500/10
+                  text-indigo-400
+                "
+              >
                 <BarChart3 className="h-4 w-4" />
               </span>
 
@@ -1169,7 +1584,18 @@ export default function AdminLayout() {
                 }`
               }
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400">
+              <span
+                className="
+                  flex
+                  h-8
+                  w-8
+                  items-center
+                  justify-center
+                  rounded-lg
+                  bg-violet-500/10
+                  text-violet-400
+                "
+              >
                 <Wallet className="h-4 w-4" />
               </span>
 
@@ -1180,15 +1606,15 @@ export default function AdminLayout() {
       )}
 
       {/* ======================================================
-          PWA BOTTOM NAVIGATION
+          PWA MOBILE BOTTOM NAVIGATION
 
           IMPORTANT:
-          - Normal desktop browser: HIDDEN
-          - Normal mobile browser: HIDDEN
-          - Installed PWA: DISPLAYED
+          NOT rendered in normal browser.
+          Only rendered after PWA installation / Add to Home
+          Screen and launch in standalone mode.
       ======================================================= */}
 
-      {isPWA && (
+      {isInstalledPWA && (
         <nav
           className="
             fixed
@@ -1207,7 +1633,15 @@ export default function AdminLayout() {
             lg:hidden
           "
         >
-          <div className="mx-auto flex max-w-xl items-center gap-1">
+          <div
+            className="
+              mx-auto
+              flex
+              max-w-xl
+              items-center
+              gap-1
+            "
+          >
             {/* HOME */}
 
             <NavLink
@@ -1259,7 +1693,8 @@ export default function AdminLayout() {
               aria-label="Open transaction management"
               aria-expanded={mobileTransactionOpen}
               className={mobileBottomNavClass(
-                isTransactionActive || mobileTransactionOpen,
+                isTransactionActive ||
+                  mobileTransactionOpen,
               )}
             >
               <Wallet className="h-5 w-5" />
@@ -1267,7 +1702,18 @@ export default function AdminLayout() {
               <span>Transactions</span>
 
               {isTransactionActive && (
-                <span className="absolute right-1/2 top-1 h-1 w-1 translate-x-1/2 rounded-full bg-white" />
+                <span
+                  className="
+                    absolute
+                    right-1/2
+                    top-1
+                    h-1
+                    w-1
+                    translate-x-1/2
+                    rounded-full
+                    bg-white
+                  "
+                />
               )}
             </button>
 
@@ -1278,7 +1724,9 @@ export default function AdminLayout() {
               onClick={toggleMobileMore}
               aria-label="Open more menu"
               aria-expanded={mobileMoreOpen}
-              className={mobileBottomNavClass(isMoreActive || mobileMoreOpen)}
+              className={mobileBottomNavClass(
+                isMoreActive || mobileMoreOpen,
+              )}
             >
               <MoreHorizontal className="h-5 w-5" />
 
@@ -1286,6 +1734,114 @@ export default function AdminLayout() {
             </button>
           </div>
         </nav>
+      )}
+
+      {/* ======================================================
+          PWA MOBILE FLOATING BACK BUTTON
+
+          Hidden completely in normal browser.
+      ======================================================= */}
+
+      {isInstalledPWA && (
+        <div
+          className={`
+            fixed
+            bottom-[92px]
+            right-4
+            z-[75]
+            lg:hidden
+            ${
+              showBackButton
+                ? "translate-y-0 opacity-100"
+                : "pointer-events-none translate-y-6 opacity-0"
+            }
+            transition-all
+            duration-300
+            ease-out
+          `}
+        >
+          <button
+            type="button"
+            onClick={handleAdminBack}
+            aria-label="Go back"
+            className="
+              group
+              flex
+              items-center
+              gap-2
+              rounded-full
+              border
+              border-indigo-400/40
+              bg-gradient-to-r
+              from-indigo-600
+              to-violet-600
+              px-3
+              py-2.5
+              text-sm
+              font-bold
+              text-white
+              shadow-lg
+              shadow-indigo-900/40
+              ring-1
+              ring-white/10
+              backdrop-blur-md
+              transition-all
+              duration-200
+              hover:-translate-y-1
+              hover:border-indigo-300/60
+              hover:from-indigo-500
+              hover:to-violet-500
+              hover:shadow-xl
+              active:translate-y-0
+              active:scale-95
+              focus:outline-none
+              focus:ring-2
+              focus:ring-indigo-400/60
+              focus:ring-offset-2
+              focus:ring-offset-slate-50
+            "
+          >
+            <span
+              className="
+                flex
+                h-8
+                w-8
+                shrink-0
+                items-center
+                justify-center
+                rounded-full
+                bg-white/15
+                text-white
+                shadow-inner
+                shadow-white/10
+                ring-1
+                ring-white/20
+                transition-all
+                duration-200
+                group-hover:-translate-x-0.5
+                group-hover:bg-white/20
+              "
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+                aria-hidden="true"
+              >
+                <path d="M19 12H5" />
+                <path d="M12 19l-7-7 7-7" />
+              </svg>
+            </span>
+
+            <span className="pr-1 tracking-wide">
+              Back
+            </span>
+          </button>
+        </div>
       )}
     </div>
   );

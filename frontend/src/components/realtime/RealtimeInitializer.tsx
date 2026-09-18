@@ -10,15 +10,24 @@ interface RealtimeInitializerProps {
   isAuthenticated: boolean;
 }
 
+/* ============================================================
+   COMPONENT
+============================================================ */
+
 export default function RealtimeInitializer({
   isAuthenticated,
 }: RealtimeInitializerProps) {
   const initializedRef = useRef(false);
 
+  /* ==========================================================
+     INITIALIZE
+  ========================================================== */
+
   useEffect(() => {
     if (!isAuthenticated) {
       if (initializedRef.current) {
         clearRealtimeAuth();
+
         initializedRef.current = false;
       }
 
@@ -28,10 +37,23 @@ export default function RealtimeInitializer({
     let cancelled = false;
 
     const initialize = async () => {
-      const success = await initializeRealtimeAuth();
+      try {
+        const success = await initializeRealtimeAuth();
 
-      if (!cancelled && success) {
-        initializedRef.current = true;
+        if (!cancelled && success) {
+          initializedRef.current = true;
+        }
+      } catch (error) {
+        /*
+         * IMPORTANT:
+         *
+         * Realtime must NEVER break normal application
+         * authentication or page rendering.
+         */
+        console.warn(
+          "[Realtime] Initialization failed. Continuing without Realtime.",
+          error,
+        );
       }
     };
 
@@ -42,22 +64,32 @@ export default function RealtimeInitializer({
     };
   }, [isAuthenticated]);
 
+  /* ==========================================================
+     REFRESH TOKEN
+  ========================================================== */
+
   useEffect(() => {
     if (!isAuthenticated) {
       return;
     }
 
-    const interval = window.setInterval(
-      () => {
-        void refreshRealtimeAuth();
-      },
-      8 * 60 * 1000,
-    );
+    const interval = window.setInterval(() => {
+      void refreshRealtimeAuth().catch((error) => {
+        console.warn(
+          "[Realtime] Token refresh failed. Continuing without Realtime.",
+          error,
+        );
+      });
+    }, 8 * 60 * 1000);
 
     return () => {
       window.clearInterval(interval);
     };
   }, [isAuthenticated]);
+
+  /* ==========================================================
+     REFRESH WHEN TAB/PWA BECOMES VISIBLE
+  ========================================================== */
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -65,15 +97,28 @@ export default function RealtimeInitializer({
     }
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void refreshRealtimeAuth();
+      if (document.visibilityState !== "visible") {
+        return;
       }
+
+      void refreshRealtimeAuth().catch((error) => {
+        console.warn(
+          "[Realtime] Visibility refresh failed.",
+          error,
+        );
+      });
     };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange,
+    );
 
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange,
+      );
     };
   }, [isAuthenticated]);
 
