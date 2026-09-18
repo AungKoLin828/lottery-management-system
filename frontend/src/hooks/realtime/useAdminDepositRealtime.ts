@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import type {
+  RealtimeChannel,
+  RealtimePostgresInsertPayload,
+} from "@supabase/supabase-js";
 
 import {
   removeRealtimeChannel,
@@ -65,26 +68,34 @@ export function useAdminDepositRealtime({
       event: "INSERT",
 
       onEvent: (payload) => {
-        console.log(
-          "[Admin Realtime] New deposit request received:",
-          payload,
-        );
+        console.log("[Admin Realtime] New deposit request received:", payload);
 
         /*
-         * The realtime manager may return the complete
-         * payload or only the database record depending
-         * on its implementation.
+         * The subscription is configured for INSERT events.
          *
-         * Support both forms safely.
+         * Supabase Realtime provides the newly inserted
+         * database record in payload.new.
          */
-        const deposit =
-          payload &&
-          typeof payload === "object" &&
-          "new" in payload
-            ? (payload as { new: AdminDepositRequest }).new
-            : (payload as AdminDepositRequest);
+        const insertPayload = payload as RealtimePostgresInsertPayload<
+          Record<string, unknown>
+        >;
+
+        const deposit = insertPayload.new as AdminDepositRequest;
 
         if (!deposit || typeof deposit !== "object") {
+          return;
+        }
+
+        /*
+         * Make sure the record contains the required
+         * deposit ID before notifying the admin UI.
+         */
+        if (typeof deposit.id !== "string" || !deposit.id) {
+          console.warn(
+            "[Admin Realtime] Received deposit without a valid ID:",
+            deposit,
+          );
+
           return;
         }
 
