@@ -11,6 +11,7 @@
   targetPort = 5173
   port = 8888
 
+
 # ============================================================
 # AUTH API
 # ============================================================
@@ -64,6 +65,32 @@
 [[redirects]]
   from = "/api/admin/lottery-number-settings"
   to = "/.netlify/functions/admin-lottery-number-settings"
+  status = 200
+  force = true
+
+
+# ============================================================
+# ADMIN DEPOSITS API
+# ============================================================
+
+# Get admin deposit requests
+[[redirects]]
+  from = "/api/admin-deposits"
+  to = "/.netlify/functions/admin-deposits"
+  status = 200
+  force = true
+
+# Approve admin deposit
+[[redirects]]
+  from = "/api/admin-deposit-approve"
+  to = "/.netlify/functions/admin-deposit-approve"
+  status = 200
+  force = true
+
+# Reject admin deposit
+[[redirects]]
+  from = "/api/admin-deposit-reject"
+  to = "/.netlify/functions/admin-deposit-reject"
   status = 200
   force = true
 
@@ -191,6 +218,51 @@
 
 
 # ============================================================
+# ADMIN WITHDRAWALS API
+# ============================================================
+
+# Get all withdrawal requests
+[[redirects]]
+  from = "/api/admin/withdrawals"
+  to = "/.netlify/functions/admin-withdrawals"
+  status = 200
+  force = true
+
+# Get single withdrawal
+#
+# Example:
+# /api/admin/withdrawals/123
+#
+[[redirects]]
+  from = "/api/admin/withdrawals/:withdrawId"
+  to = "/.netlify/functions/admin-withdrawals?withdrawId=:withdrawId"
+  status = 200
+  force = true
+
+# Approve withdrawal
+#
+# Example:
+# /api/admin/withdrawals/123/approve
+#
+[[redirects]]
+  from = "/api/admin/withdrawals/:withdrawId/approve"
+  to = "/.netlify/functions/admin-withdrawals?withdrawId=:withdrawId&action=approve"
+  status = 200
+  force = true
+
+# Reject withdrawal
+#
+# Example:
+# /api/admin/withdrawals/123/reject
+#
+[[redirects]]
+  from = "/api/admin/withdrawals/:withdrawId/reject"
+  to = "/.netlify/functions/admin-withdrawals?withdrawId=:withdrawId&action=reject"
+  status = 200
+  force = true
+
+
+# ============================================================
 # PLAYER DEPOSIT API
 # ============================================================
 
@@ -212,6 +284,7 @@
   status = 200
   force = true
 
+
 # ============================================================
 # REALTIME AUTHENTICATION API
 # ============================================================
@@ -221,7 +294,8 @@
   to = "/.netlify/functions/realtime-token"
   status = 200
   force = true
-  
+
+
 # ============================================================
 # REACT SPA FALLBACK
 #

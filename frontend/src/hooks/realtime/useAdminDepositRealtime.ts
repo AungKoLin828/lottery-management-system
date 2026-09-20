@@ -10,21 +10,11 @@ import {
   subscribeToPostgresChanges,
 } from "@/services/realtime/realtimeManager";
 
+import type { AdminDepositRequest } from "@/services/adminDepositService";
+
 /* ============================================================
    TYPES
 ============================================================ */
-
-export interface AdminDepositRequest {
-  id: string;
-  userId?: string;
-  amount?: string | number;
-  status?: string;
-  transactionNumber?: string;
-  paymentMethodId?: string;
-  note?: string | null;
-  createdAt?: string;
-  [key: string]: unknown;
-}
 
 interface AdminDepositRealtimeOptions {
   enabled?: boolean;
@@ -62,8 +52,8 @@ export function useAdminDepositRealtime({
       /*
        * We only need INSERT.
        *
-       * A new deposit request is created when the player
-       * submits the deposit form.
+       * A new deposit request is created when the
+       * player submits the deposit form.
        */
       event: "INSERT",
 
@@ -71,8 +61,6 @@ export function useAdminDepositRealtime({
         console.log("[Admin Realtime] New deposit request received:", payload);
 
         /*
-         * The subscription is configured for INSERT events.
-         *
          * Supabase Realtime provides the newly inserted
          * database record in payload.new.
          */
@@ -80,31 +68,134 @@ export function useAdminDepositRealtime({
           Record<string, unknown>
         >;
 
-        const deposit = insertPayload.new as AdminDepositRequest;
+        const row = insertPayload.new;
 
-        if (!deposit || typeof deposit !== "object") {
+        if (!row || typeof row !== "object") {
           return;
         }
 
         /*
-         * Make sure the record contains the required
-         * deposit ID before notifying the admin UI.
+         * Validate deposit ID.
          */
-        if (typeof deposit.id !== "string" || !deposit.id) {
+        if (typeof row.id !== "string" || !row.id) {
           console.warn(
             "[Admin Realtime] Received deposit without a valid ID:",
-            deposit,
+            row,
           );
 
           return;
         }
 
+        /*
+         * Convert the raw Supabase row to the same
+         * AdminDepositRequest type used by
+         * DepositRequests.tsx.
+         *
+         * Realtime gives us the deposits table row only.
+         * Joined user/payment-method data is not available
+         * here.
+         */
+        const deposit: AdminDepositRequest = {
+          id: row.id,
+
+          userId:
+            typeof row.userId === "string"
+              ? row.userId
+              : typeof row.user_id === "string"
+                ? row.user_id
+                : "",
+
+          requestedAmount:
+            typeof row.requestedAmount === "string" ||
+            typeof row.requestedAmount === "number"
+              ? row.requestedAmount
+              : typeof row.requested_amount === "string" ||
+                  typeof row.requested_amount === "number"
+                ? row.requested_amount
+                : "0",
+
+          approvedAmount:
+            typeof row.approvedAmount === "string" ||
+            typeof row.approvedAmount === "number"
+              ? row.approvedAmount
+              : typeof row.approved_amount === "string" ||
+                  typeof row.approved_amount === "number"
+                ? row.approved_amount
+                : null,
+
+          paymentMethodId:
+            typeof row.paymentMethodId === "string"
+              ? row.paymentMethodId
+              : typeof row.payment_method_id === "string"
+                ? row.payment_method_id
+                : "",
+
+          transactionNumber:
+            typeof row.transactionNumber === "string"
+              ? row.transactionNumber
+              : typeof row.transaction_number === "string"
+                ? row.transaction_number
+                : null,
+
+          status:
+            row.status === "PENDING" ||
+            row.status === "APPROVED" ||
+            row.status === "REJECTED" ||
+            row.status === "CANCELLED"
+              ? row.status
+              : "PENDING",
+
+          note: typeof row.note === "string" ? row.note : null,
+
+          rejectionReason:
+            typeof row.rejectionReason === "string"
+              ? row.rejectionReason
+              : typeof row.rejection_reason === "string"
+                ? row.rejection_reason
+                : null,
+
+          approvedBy:
+            typeof row.approvedBy === "string"
+              ? row.approvedBy
+              : typeof row.approved_by === "string"
+                ? row.approved_by
+                : null,
+
+          approvedAt:
+            typeof row.approvedAt === "string"
+              ? row.approvedAt
+              : typeof row.approved_at === "string"
+                ? row.approved_at
+                : null,
+
+          createdAt:
+            typeof row.createdAt === "string"
+              ? row.createdAt
+              : typeof row.created_at === "string"
+                ? row.created_at
+                : undefined,
+
+          updatedAt:
+            typeof row.updatedAt === "string"
+              ? row.updatedAt
+              : typeof row.updated_at === "string"
+                ? row.updated_at
+                : undefined,
+        };
+
+        console.log("[Admin Realtime] Normalized deposit:", deposit);
+
+        /*
+         * Notify DepositRequests.tsx.
+         */
         onNewDeposit?.(deposit);
       },
     });
 
     return () => {
-      void removeRealtimeChannel(channel);
+      if (channel) {
+        void removeRealtimeChannel(channel);
+      }
     };
   }, [enabled, onNewDeposit]);
 }
