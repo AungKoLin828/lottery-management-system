@@ -12,6 +12,7 @@
     "packageJson": {
       "dependencies": [
         "npm:@netlify/functions@^5.3.0",
+        "npm:@supabase/supabase-js@^2.115.0",
         "npm:@types/node@^26.2.0",
         "npm:@types/pg@^8.21.0",
         "npm:bcryptjs@^3.0.3",
