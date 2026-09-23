@@ -19,17 +19,6 @@ import {
    TYPES
 ============================================================ */
 
-/*
- * walletPaymentMethods may not currently define a `logo`
- * property in its TypeScript type.
- *
- * This extended type allows the UI to safely support:
- *
- *   logo
- *   logoUrl
- *
- * without requiring changes to the backend.
- */
 type PaymentMethod = (typeof walletPaymentMethods)[number];
 
 type PaymentMethodWithLogo = PaymentMethod & {
@@ -37,13 +26,31 @@ type PaymentMethodWithLogo = PaymentMethod & {
   logoUrl?: string | null;
 };
 
+interface WithdrawApiResponse {
+  success?: boolean;
+  message?: string;
+  withdrawal?: {
+    id?: string;
+    status?: string;
+    amount?: number | string;
+    requestedAmount?: number | string;
+    approvedAmount?: number | string | null;
+    fee?: number | string;
+    paymentMethodId?: string;
+    accountName?: string;
+    accountNumber?: string;
+    createdAt?: string;
+  };
+}
+
 /* ============================================================
    CONSTANTS
 ============================================================ */
 
 const FIRST_WITHDRAWAL_WAIT_HOURS = 24;
 
-const FIRST_WITHDRAWAL_KEY = "lottery_first_withdrawal_completed";
+const FIRST_WITHDRAWAL_KEY =
+  "lottery_first_withdrawal_completed";
 
 /* ============================================================
    HELPERS
@@ -51,23 +58,25 @@ const FIRST_WITHDRAWAL_KEY = "lottery_first_withdrawal_completed";
 
 /**
  * Safely get payment method logo.
- *
- * Supports:
- * - logo
- * - logoUrl
- *
- * If neither exists, returns an empty string.
  */
-const getPaymentMethodLogo = (method: PaymentMethod): string => {
+const getPaymentMethodLogo = (
+  method: PaymentMethod,
+): string => {
   const paymentMethod = method as PaymentMethodWithLogo;
 
-  return paymentMethod.logo?.trim() || paymentMethod.logoUrl?.trim() || "";
+  return (
+    paymentMethod.logo?.trim() ||
+    paymentMethod.logoUrl?.trim() ||
+    ""
+  );
 };
 
 /**
  * Normalize payment method name.
  */
-const normalizePaymentMethodName = (name: unknown): string => {
+const normalizePaymentMethodName = (
+  name: unknown,
+): string => {
   return String(name ?? "")
     .trim()
     .toLowerCase()
@@ -76,20 +85,64 @@ const normalizePaymentMethodName = (name: unknown): string => {
 };
 
 /**
- * Convert payment method ID to a number.
+ * Normalize payment method ID.
  *
- * This prevents problems when the API/database returns:
+ * The frontend settings may currently contain numeric IDs
+ * while the real database may return UUID/string IDs.
  *
- *   1
- *
- * or:
- *
- *   "1"
+ * We therefore keep the value as a string.
  */
-const normalizePaymentMethodId = (id: unknown): number => {
-  const numericId = Number(id);
+const normalizePaymentMethodId = (
+  id: unknown,
+): string => {
+  if (id === null || id === undefined) {
+    return "";
+  }
 
-  return Number.isFinite(numericId) ? numericId : 0;
+  return String(id).trim();
+};
+
+/**
+ * Normalize allowed payment method IDs.
+ */
+const normalizeAllowedPaymentMethodIds = (
+  ids: unknown,
+): Set<string> => {
+  if (!Array.isArray(ids)) {
+    return new Set<string>();
+  }
+
+  return new Set(
+    ids
+      .map((id) => normalizePaymentMethodId(id))
+      .filter(Boolean),
+  );
+};
+
+/**
+ * Safely convert a value to number.
+ */
+const toNumber = (
+  value: unknown,
+  fallback = 0,
+): number => {
+  const numericValue = Number(value);
+
+  return Number.isFinite(numericValue)
+    ? numericValue
+    : fallback;
+};
+
+/**
+ * Extract a useful error message from an API response.
+ */
+const getApiErrorMessage = (
+  responseBody: WithdrawApiResponse | null,
+  fallback: string,
+): string => {
+  const message = responseBody?.message?.trim();
+
+  return message || fallback;
 };
 
 /* ============================================================
@@ -103,11 +156,13 @@ export default function Withdraw() {
 
   const [amount, setAmount] = useState("");
 
-  const [paymentMethodId, setPaymentMethodId] = useState<number | null>(null);
+  const [paymentMethodId, setPaymentMethodId] =
+    useState<string | null>(null);
 
   const [accountName, setAccountName] = useState("");
 
-  const [accountNumber, setAccountNumber] = useState("");
+  const [accountNumber, setAccountNumber] =
+    useState("");
 
   const [note, setNote] = useState("");
 
@@ -115,11 +170,21 @@ export default function Withdraw() {
 
   const [error, setError] = useState("");
 
+  const [successMessage, setSuccessMessage] =
+    useState("");
+
+  const [isSubmitting, setIsSubmitting] =
+    useState(false);
+
   /* ==========================================================
      DEMO WALLET BALANCE
 
-     Replace this with the logged-in player's wallet balance
-     API when the wallet balance API is connected.
+     IMPORTANT:
+     Replace this with your existing realtime wallet
+     balance state/hook when the wallet API is connected.
+
+     The backend remains the final authority when the
+     withdrawal is approved.
   ========================================================== */
 
   const balance = 125000;
@@ -127,68 +192,90 @@ export default function Withdraw() {
   /* ==========================================================
      FIRST WITHDRAWAL STATUS
 
-     Frontend-only persistence for now.
+     This is currently UI persistence only.
 
-     Backend should eventually store whether the player has
-     already completed a first withdrawal.
+     The backend should remain the source of truth for
+     whether this is actually the player's first withdrawal.
   ========================================================== */
 
-  const [isFirstWithdrawal, setIsFirstWithdrawal] = useState(() => {
-    try {
-      return localStorage.getItem(FIRST_WITHDRAWAL_KEY) !== "true";
-    } catch {
-      return true;
-    }
-  });
+  const [isFirstWithdrawal, setIsFirstWithdrawal] =
+    useState(() => {
+      try {
+        return (
+          localStorage.getItem(
+            FIRST_WITHDRAWAL_KEY,
+          ) !== "true"
+        );
+      } catch {
+        return true;
+      }
+    });
 
   /* ==========================================================
      PAYMENT METHODS
-
-     Only KPay and WavePay are displayed.
-
-     Supported names:
-       KPay
-       KBZPay
-       KBZ Pay
-       WavePay
-       Wave Pay
   ========================================================== */
+
+  const normalizedAllowedMethodIds =
+    useMemo(
+      () =>
+        normalizeAllowedPaymentMethodIds(
+          withdrawSettings.allowedPaymentMethods,
+        ),
+      [],
+    );
 
   const paymentMethods = useMemo(() => {
     return walletPaymentMethods
       .filter((method) => {
-        const methodName = normalizePaymentMethodName(method.name);
+        const methodName =
+          normalizePaymentMethodName(method.name);
 
         const isKPay =
           methodName === "kpay" ||
           methodName === "kbzpay" ||
           methodName === "kbz pay";
 
-        const isWavePay = methodName === "wavepay" || methodName === "wave pay";
+        const isWavePay =
+          methodName === "wavepay" ||
+          methodName === "wave pay";
 
-        const supportedMethod = isKPay || isWavePay;
-
+        return isKPay || isWavePay;
+      })
+      .filter((method) => {
         const supportedType =
-          method.type === "Withdraw" || method.type === "Both";
+          method.type === "Withdraw" ||
+          method.type === "Both";
+
+        return supportedType;
+      })
+      .filter((method) => {
+        const methodId =
+          normalizePaymentMethodId(method.id);
 
         /*
-         * Normalize both sides of the ID comparison.
+         * If allowedPaymentMethods is configured,
+         * respect it.
          *
-         * This avoids:
-         *
-         * number 1 !== string "1"
+         * If it is empty, allow all enabled withdrawal
+         * methods.
          */
-        const methodId = normalizePaymentMethodId(method.id);
+        if (
+          normalizedAllowedMethodIds.size === 0
+        ) {
+          return true;
+        }
 
-        const allowed = withdrawSettings.allowedPaymentMethods.some(
-          (allowedId) => normalizePaymentMethodId(allowedId) === methodId,
+        return normalizedAllowedMethodIds.has(
+          methodId,
         );
-
-        return method.enabled && supportedMethod && supportedType && allowed;
       })
+      .filter((method) => Boolean(method.enabled))
       .sort((a, b) => {
-        const getPriority = (name: string) => {
-          const normalized = normalizePaymentMethodName(name);
+        const getPriority = (
+          name: string,
+        ): number => {
+          const normalized =
+            normalizePaymentMethodName(name);
 
           if (
             normalized === "kpay" ||
@@ -198,29 +285,40 @@ export default function Withdraw() {
             return 1;
           }
 
-          if (normalized === "wavepay" || normalized === "wave pay") {
+          if (
+            normalized === "wavepay" ||
+            normalized === "wave pay"
+          ) {
             return 2;
           }
 
           return 99;
         };
 
-        const priorityDifference = getPriority(a.name) - getPriority(b.name);
+        const priorityDifference =
+          getPriority(a.name) -
+          getPriority(b.name);
 
         if (priorityDifference !== 0) {
           return priorityDifference;
         }
 
-        return Number(a.displayOrder ?? 0) - Number(b.displayOrder ?? 0);
+        return (
+          Number(a.displayOrder ?? 0) -
+          Number(b.displayOrder ?? 0)
+        );
       });
-  }, []);
+  }, [normalizedAllowedMethodIds]);
 
   /* ==========================================================
      GET DISPLAY NAME
   ========================================================== */
 
-  const getPaymentMethodDisplayName = (method: PaymentMethod) => {
-    const normalizedName = normalizePaymentMethodName(method.name);
+  const getPaymentMethodDisplayName = (
+    method: PaymentMethod,
+  ): string => {
+    const normalizedName =
+      normalizePaymentMethodName(method.name);
 
     if (
       normalizedName === "kpay" ||
@@ -230,7 +328,10 @@ export default function Withdraw() {
       return "KPay";
     }
 
-    if (normalizedName === "wavepay" || normalizedName === "wave pay") {
+    if (
+      normalizedName === "wavepay" ||
+      normalizedName === "wave pay"
+    ) {
       return "WavePay";
     }
 
@@ -242,89 +343,137 @@ export default function Withdraw() {
   ========================================================== */
 
   const selectedMethod = paymentMethods.find(
-    (method) => normalizePaymentMethodId(method.id) === paymentMethodId,
+    (method) =>
+      normalizePaymentMethodId(method.id) ===
+      paymentMethodId,
   );
 
-  const selectedPaymentMethodName = selectedMethod
-    ? getPaymentMethodDisplayName(selectedMethod)
-    : "";
+  const selectedPaymentMethodName =
+    selectedMethod
+      ? getPaymentMethodDisplayName(selectedMethod)
+      : "";
 
   /* ==========================================================
      AMOUNT / FEE
   ========================================================== */
 
-  const numericAmount = Number(amount);
+  const numericAmount = toNumber(amount);
 
-  const fee = Number(withdrawSettings.withdrawFee) || 0;
+  const fee = Math.max(
+    0,
+    toNumber(withdrawSettings.withdrawFee),
+  );
 
-  const totalDeduction = numericAmount > 0 ? numericAmount + fee : 0;
+  /*
+   * Requested withdrawal amount must be covered by
+   * the wallet balance plus any applicable fee.
+   *
+   * Your current setting has fee = 0.
+   */
+  const totalDeduction =
+    numericAmount > 0
+      ? numericAmount + fee
+      : 0;
 
-  const netAmount = numericAmount > 0 ? numericAmount - fee : 0;
+  const netAmount =
+    numericAmount > 0
+      ? Math.max(numericAmount - fee, 0)
+      : 0;
 
   /* ==========================================================
      SELECT PAYMENT METHOD
   ========================================================== */
 
-  const handleSelectPaymentMethod = (methodId: unknown) => {
-    const normalizedId = normalizePaymentMethodId(methodId);
+  const handleSelectPaymentMethod = (
+    methodId: unknown,
+  ) => {
+    const normalizedId =
+      normalizePaymentMethodId(methodId);
 
-    setPaymentMethodId(normalizedId || null);
+    setPaymentMethodId(
+      normalizedId || null,
+    );
 
     /*
-     * Do not automatically copy the admin's configured
-     * payment account.
+     * Do not automatically copy the admin payment
+     * account.
      *
      * Player enters their own account.
      */
     setAccountNumber("");
 
     setError("");
+    setSuccessMessage("");
   };
 
   /* ==========================================================
-     SUBMIT
+     SUBMIT WITHDRAWAL REQUEST
   ========================================================== */
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
     event.preventDefault();
 
+    /*
+     * Prevent double-click / duplicate requests.
+     */
+    if (isSubmitting) {
+      return;
+    }
+
     setError("");
+    setSuccessMessage("");
 
     /* --------------------------------------------------------
        AMOUNT
     -------------------------------------------------------- */
 
-    if (!numericAmount || numericAmount <= 0) {
-      setError("Please enter a valid withdrawal amount.");
-
+    if (
+      !amount.trim() ||
+      !Number.isFinite(numericAmount) ||
+      numericAmount <= 0
+    ) {
+      setError(
+        "Please enter a valid withdrawal amount.",
+      );
       return;
     }
 
-    if (numericAmount < withdrawSettings.minimumWithdraw) {
-      setError(
-        `Minimum withdrawal is ${withdrawSettings.minimumWithdraw.toLocaleString()} MMK.`,
-      );
+    const minimumWithdraw = toNumber(
+      withdrawSettings.minimumWithdraw,
+    );
 
+    const maximumWithdraw = toNumber(
+      withdrawSettings.maximumWithdraw,
+    );
+
+    if (
+      numericAmount < minimumWithdraw
+    ) {
+      setError(
+        `Minimum withdrawal is ${minimumWithdraw.toLocaleString()} MMK.`,
+      );
       return;
     }
 
-    if (numericAmount > withdrawSettings.maximumWithdraw) {
+    if (
+      numericAmount > maximumWithdraw
+    ) {
       setError(
-        `Maximum withdrawal is ${withdrawSettings.maximumWithdraw.toLocaleString()} MMK.`,
+        `Maximum withdrawal is ${maximumWithdraw.toLocaleString()} MMK.`,
       );
-
       return;
     }
 
     /* --------------------------------------------------------
-       FEE / BALANCE
+       BALANCE
     -------------------------------------------------------- */
 
     if (totalDeduction > balance) {
       setError(
         `Insufficient wallet balance. Available balance is ${balance.toLocaleString()} MMK.`,
       );
-
       return;
     }
 
@@ -332,9 +481,47 @@ export default function Withdraw() {
        PAYMENT METHOD
     -------------------------------------------------------- */
 
-    if (!paymentMethodId || !selectedMethod) {
-      setError("Please select KPay or WavePay.");
+    if (
+      !paymentMethodId ||
+      !selectedMethod
+    ) {
+      setError(
+        "Please select KPay or WavePay.",
+      );
+      return;
+    }
 
+    const normalizedSelectedMethodId =
+      normalizePaymentMethodId(
+        selectedMethod.id,
+      );
+
+    if (!normalizedSelectedMethodId) {
+      setError(
+        "Invalid payment method. Please select another payment method.",
+      );
+      return;
+    }
+
+    if (!selectedMethod.enabled) {
+      setError(
+        "The selected payment method is currently unavailable.",
+      );
+      return;
+    }
+
+    const selectedMethodType =
+      String(
+        selectedMethod.type ?? "",
+      ).toLowerCase();
+
+    if (
+      selectedMethodType !== "withdraw" &&
+      selectedMethodType !== "both"
+    ) {
+      setError(
+        "The selected payment method cannot be used for withdrawal.",
+      );
       return;
     }
 
@@ -342,9 +529,13 @@ export default function Withdraw() {
        ACCOUNT NAME
     -------------------------------------------------------- */
 
-    if (!accountName.trim()) {
-      setError("Account name is required.");
+    const trimmedAccountName =
+      accountName.trim();
 
+    if (!trimmedAccountName) {
+      setError(
+        "Account name is required.",
+      );
       return;
     }
 
@@ -352,93 +543,249 @@ export default function Withdraw() {
        ACCOUNT NUMBER
     -------------------------------------------------------- */
 
-    if (!accountNumber.trim()) {
+    const trimmedAccountNumber =
+      accountNumber.trim();
+
+    if (!trimmedAccountNumber) {
       setError(
         `Please enter your ${selectedPaymentMethodName} account number.`,
       );
+      return;
+    }
 
+    /* --------------------------------------------------------
+       ACCOUNT NUMBER BASIC VALIDATION
+    -------------------------------------------------------- */
+
+    if (
+      trimmedAccountNumber.length < 5
+    ) {
+      setError(
+        `Please enter a valid ${selectedPaymentMethodName} account number.`,
+      );
+      return;
+    }
+
+    /* --------------------------------------------------------
+       NOTE
+    -------------------------------------------------------- */
+
+    const trimmedNote =
+      note.trim();
+
+    if (trimmedNote.length > 500) {
+      setError(
+        "Note cannot be longer than 500 characters.",
+      );
       return;
     }
 
     /* --------------------------------------------------------
        FIRST WITHDRAWAL
+
+       This value is used only for UI messaging.
+       Backend must remain the source of truth.
     -------------------------------------------------------- */
 
-    const firstWithdrawal = isFirstWithdrawal;
+    const firstWithdrawal =
+      isFirstWithdrawal;
 
     /* --------------------------------------------------------
-       CREATE REQUEST
+       REQUEST PAYLOAD
+
+       IMPORTANT:
+
+       Do NOT send:
+       - playerId
+       - playerName
+       - status
+       - createdAt
+       - approvedBy
+       - approvedAmount
+
+       The backend gets the authenticated player from
+       the JWT cookie and creates the request as PENDING.
     -------------------------------------------------------- */
 
-    // const withdrawId = `WDR-${Date.now()}`;
+    const requestBody = {
+      amount: numericAmount,
+      paymentMethodId:
+        normalizedSelectedMethodId,
+      accountName: trimmedAccountName,
+      accountNumber: trimmedAccountNumber,
+      note:
+        trimmedNote || undefined,
+    };
 
-    // const request = createWithdrawRequest({
-    //   id: withdrawId,
+    try {
+      setIsSubmitting(true);
 
-    //   playerId: "PLAYER-001",
+      /* ------------------------------------------------------
+         REAL BACKEND REQUEST
 
-    //   playerName: "Player",
+         Browser automatically sends the authentication
+         cookie because credentials are included.
+      ------------------------------------------------------ */
 
-    //   amount: numericAmount,
+      const response = await fetch(
+        "/api/player/withdraw-request",
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify(
+            requestBody,
+          ),
+        },
+      );
 
-    //   fee,
+      let responseBody:
+        | WithdrawApiResponse
+        | null = null;
 
-    //   netAmount,
-
-    //   paymentMethodId: normalizePaymentMethodId(selectedMethod.id),
-
-    //   paymentMethodName: selectedPaymentMethodName,
-
-    //   accountName: accountName.trim(),
-
-    //   accountNumber: accountNumber.trim(),
-
-    //   note: note.trim() || undefined,
-
-    //   /*
-    //    * Withdrawal must remain pending until admin approval.
-    //    */
-    //   status: "PENDING",
-
-    //   createdAt: new Date().toISOString(),
-    // });
-
-    /* --------------------------------------------------------
-       NOTIFY ADMIN
-    -------------------------------------------------------- */
-
-    // notifyAdminWithdrawRequest({
-    //   withdrawId: request.id,
-
-    //   playerId: request.playerId,
-
-    //   playerName: request.playerName,
-
-    //   amount: request.amount,
-    // });
-
-    /* --------------------------------------------------------
-       MARK FIRST WITHDRAWAL AS COMPLETED
-
-       Frontend persistence only.
-       Backend should eventually control this.
-    -------------------------------------------------------- */
-
-    if (firstWithdrawal) {
       try {
-        localStorage.setItem(FIRST_WITHDRAWAL_KEY, "true");
+        responseBody =
+          (await response.json()) as WithdrawApiResponse;
       } catch {
-        // Ignore localStorage errors.
+        responseBody = null;
       }
 
-      setIsFirstWithdrawal(false);
+      /* ------------------------------------------------------
+         API ERROR
+      ------------------------------------------------------ */
+
+      if (!response.ok) {
+        throw new Error(
+          getApiErrorMessage(
+            responseBody,
+            `Unable to submit withdrawal request. Server returned ${response.status}.`,
+          ),
+        );
+      }
+
+      if (
+        responseBody?.success !== true
+      ) {
+        throw new Error(
+          getApiErrorMessage(
+            responseBody,
+            "Unable to submit withdrawal request.",
+          ),
+        );
+      }
+
+      /* ------------------------------------------------------
+         SUCCESS
+      ------------------------------------------------------ */
+
+      /*
+       * Keep the method name before resetting the form.
+       */
+      const submittedMethodName =
+        selectedPaymentMethodName;
+
+      /*
+       * Backend has successfully created the
+       * withdrawal request.
+       *
+       * It should now be PENDING.
+       */
+      const backendStatus =
+        responseBody.withdrawal?.status;
+
+      if (
+        backendStatus &&
+        backendStatus !== "PENDING"
+      ) {
+        console.warn(
+          "Unexpected withdrawal status:",
+          backendStatus,
+        );
+      }
+
+      /* ------------------------------------------------------
+         FIRST WITHDRAWAL UI STATE
+         
+         This is only local UI persistence.
+         Backend remains the source of truth.
+      ------------------------------------------------------ */
+
+      if (firstWithdrawal) {
+        try {
+          localStorage.setItem(
+            FIRST_WITHDRAWAL_KEY,
+            "true",
+          );
+        } catch {
+          // Ignore localStorage failures.
+        }
+
+        setIsFirstWithdrawal(false);
+      }
+
+      /* ------------------------------------------------------
+         SUCCESS MESSAGE
+      ------------------------------------------------------ */
+
+      setSuccessMessage(
+        firstWithdrawal
+          ? "Your first withdrawal request has been submitted successfully and is waiting for admin approval."
+          : "Your withdrawal request has been submitted successfully and is waiting for admin approval.",
+      );
+
+      /*
+       * IMPORTANT:
+       *
+       * Do not reduce the wallet balance here.
+       *
+       * The request is only PENDING.
+       *
+       * Wallet deduction must happen atomically when
+       * admin approves the withdrawal.
+       */
+
+      console.info(
+        "Withdrawal request submitted successfully",
+        {
+          method: submittedMethodName,
+          amount: numericAmount,
+          fee,
+          netAmount,
+          status:
+            responseBody.withdrawal?.status ??
+            "PENDING",
+        },
+      );
+
+      /* ------------------------------------------------------
+         RESET FORM
+      ------------------------------------------------------ */
+
+      setAmount("");
+      setPaymentMethodId(null);
+      setAccountName("");
+      setAccountNumber("");
+      setNote("");
+
+      setSubmitted(true);
+    } catch (submitError) {
+      console.error(
+        "Withdrawal request failed:",
+        submitError,
+      );
+
+      const message =
+        submitError instanceof Error
+          ? submitError.message
+          : "Unable to submit withdrawal request.";
+
+      setError(message);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    /* --------------------------------------------------------
-       SUCCESS
-    -------------------------------------------------------- */
-
-    setSubmitted(true);
   };
 
   /* ==========================================================
@@ -449,26 +796,19 @@ export default function Withdraw() {
     return (
       <div className="mx-auto max-w-xl py-10">
         <div className="rounded-2xl border border-emerald-200 bg-white p-8 text-center shadow-sm">
-          {/* SUCCESS ICON */}
 
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
             <CheckCircle2 size={32} />
           </div>
 
-          {/* TITLE */}
-
           <h1 className="mt-5 text-2xl font-bold text-slate-900">
             Withdrawal Request Submitted
           </h1>
 
-          {/* MESSAGE */}
-
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            Your withdrawal request has been submitted successfully and is
-            waiting for admin approval.
+            {successMessage ||
+              "Your withdrawal request has been submitted successfully and is waiting for admin approval."}
           </p>
-
-          {/* PAYMENT METHOD */}
 
           {selectedPaymentMethodName && (
             <div className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-left">
@@ -482,34 +822,35 @@ export default function Withdraw() {
             </div>
           )}
 
-          {/* FIRST WITHDRAWAL MESSAGE */}
-
           <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-left">
             <div className="flex items-start gap-3">
               <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
 
               <div>
                 <p className="text-sm font-semibold text-amber-800">
-                  First Withdrawal Review
+                  {isFirstWithdrawal
+                    ? "First Withdrawal Review"
+                    : "Withdrawal Under Review"}
                 </p>
 
                 <p className="mt-1 text-xs leading-5 text-amber-700">
-                  Because this is your first withdrawal, admin verification is
-                  required. Please allow up to{" "}
-                  <strong>{FIRST_WITHDRAWAL_WAIT_HOURS} hours</strong> for the
-                  first withdrawal to be reviewed and approved.
+                  Your withdrawal request is waiting for
+                  admin approval. Please allow up to{" "}
+                  <strong>
+                    {isFirstWithdrawal
+                      ? FIRST_WITHDRAWAL_WAIT_HOURS
+                      : withdrawSettings.processingTime}
+                  </strong>{" "}
+                  for processing.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* PROCESSING TIME */}
-
           <p className="mt-4 text-sm text-slate-500">
-            Normal processing time: {withdrawSettings.processingTime}
+            Normal processing time:{" "}
+            {withdrawSettings.processingTime}
           </p>
-
-          {/* BUTTON */}
 
           <div className="mt-6">
             <Link
@@ -530,6 +871,7 @@ export default function Withdraw() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+
       {/* ======================================================
           HEADER
       ====================================================== */}
@@ -548,7 +890,9 @@ export default function Withdraw() {
           </div>
 
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Withdraw</h1>
+            <h1 className="text-2xl font-bold text-slate-900">
+              Withdraw
+            </h1>
 
             <p className="mt-1 text-sm text-slate-500">
               Withdraw money from your wallet.
@@ -574,10 +918,13 @@ export default function Withdraw() {
               </p>
 
               <p className="mt-1 text-sm leading-6 text-amber-700">
-                Your first withdrawal request will be manually reviewed by
-                admin. Please allow up to{" "}
-                <strong>{FIRST_WITHDRAWAL_WAIT_HOURS} hours</strong> for
-                approval.
+                Your first withdrawal request will be
+                manually reviewed by admin. Please allow
+                up to{" "}
+                <strong>
+                  {FIRST_WITHDRAWAL_WAIT_HOURS} hours
+                </strong>{" "}
+                for approval.
               </p>
             </div>
           </div>
@@ -589,11 +936,15 @@ export default function Withdraw() {
       ====================================================== */}
 
       <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-5">
-        <p className="text-sm text-slate-500">Available Balance</p>
+        <p className="text-sm text-slate-500">
+          Available Balance
+        </p>
 
         <p className="mt-1 text-2xl font-bold text-slate-900">
           {balance.toLocaleString()}{" "}
-          <span className="text-sm font-medium text-slate-500">MMK</span>
+          <span className="text-sm font-medium text-slate-500">
+            MMK
+          </span>
         </p>
       </div>
 
@@ -605,6 +956,7 @@ export default function Withdraw() {
         onSubmit={handleSubmit}
         className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
       >
+
         {/* ====================================================
             AMOUNT
         ==================================================== */}
@@ -621,17 +973,21 @@ export default function Withdraw() {
             value={amount}
             onChange={(event) => {
               setAmount(event.target.value);
-
               setError("");
             }}
             placeholder="Enter amount"
-            className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            disabled={isSubmitting}
+            className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-50"
           />
 
           <p className="mt-2 text-xs text-slate-400">
-            Min: {withdrawSettings.minimumWithdraw.toLocaleString()} MMK
+            Min:{" "}
+            {withdrawSettings.minimumWithdraw.toLocaleString()}{" "}
+            MMK
             {" · "}
-            Max: {withdrawSettings.maximumWithdraw.toLocaleString()} MMK
+            Max:{" "}
+            {withdrawSettings.maximumWithdraw.toLocaleString()}{" "}
+            MMK
           </p>
         </div>
 
@@ -646,34 +1002,38 @@ export default function Withdraw() {
 
           <div className="grid gap-3 sm:grid-cols-2">
             {paymentMethods.map((method) => {
-              const methodId = normalizePaymentMethodId(method.id);
+              const methodId =
+                normalizePaymentMethodId(
+                  method.id,
+                );
 
-              const selected = paymentMethodId === methodId;
+              const selected =
+                paymentMethodId === methodId;
 
-              const displayName = getPaymentMethodDisplayName(method);
+              const displayName =
+                getPaymentMethodDisplayName(
+                  method,
+                );
 
-              /*
-               * IMPORTANT:
-               *
-               * Do not access method.logo directly.
-               *
-               * The current PaymentMethod type may not contain
-               * a logo property.
-               */
-              const logo = getPaymentMethodLogo(method);
+              const logo =
+                getPaymentMethodLogo(method);
 
               return (
                 <button
                   key={methodId}
                   type="button"
-                  onClick={() => handleSelectPaymentMethod(methodId)}
-                  className={`relative rounded-xl border p-4 text-left transition-all ${
+                  disabled={isSubmitting}
+                  onClick={() =>
+                    handleSelectPaymentMethod(
+                      methodId,
+                    )
+                  }
+                  className={`relative rounded-xl border p-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
                     selected
                       ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100"
                       : "border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50"
                   }`}
                 >
-                  {/* SELECTED CHECK */}
 
                   {selected && (
                     <div className="absolute right-3 top-3">
@@ -681,10 +1041,7 @@ export default function Withdraw() {
                     </div>
                   )}
 
-                  {/* METHOD HEADER */}
-
                   <div className="flex items-center gap-3">
-                    {/* LOGO */}
 
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
                       {logo ? (
@@ -693,21 +1050,8 @@ export default function Withdraw() {
                           alt={`${displayName} logo`}
                           className="h-full w-full object-contain p-1.5"
                           onError={(event) => {
-                            /*
-                             * Hide broken image and show the
-                             * fallback icon.
-                             */
-                            event.currentTarget.style.display = "none";
-
-                            const parent = event.currentTarget.parentElement;
-
-                            if (parent) {
-                              parent.classList.add(
-                                "flex",
-                                "items-center",
-                                "justify-center",
-                              );
-                            }
+                            event.currentTarget.style.display =
+                              "none";
                           }}
                         />
                       ) : (
@@ -715,12 +1059,12 @@ export default function Withdraw() {
                       )}
                     </div>
 
-                    {/* NAME */}
-
                     <div className="min-w-0 flex-1 pr-6">
                       <p
                         className={`text-base font-bold ${
-                          selected ? "text-indigo-700" : "text-slate-800"
+                          selected
+                            ? "text-indigo-700"
+                            : "text-slate-800"
                         }`}
                       >
                         {displayName}
@@ -731,8 +1075,6 @@ export default function Withdraw() {
                       </p>
                     </div>
                   </div>
-
-                  {/* ACCOUNT INFORMATION */}
 
                   <div
                     className={`mt-4 rounded-lg border px-3 py-2.5 ${
@@ -746,7 +1088,8 @@ export default function Withdraw() {
                     </p>
 
                     <p className="mt-1 text-xs text-slate-500">
-                      Enter your own {displayName} account number below.
+                      Enter your own {displayName} account
+                      number below.
                     </p>
                   </div>
                 </button>
@@ -754,17 +1097,17 @@ export default function Withdraw() {
             })}
           </div>
 
-          {/* NO METHODS */}
-
           {paymentMethods.length === 0 && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
               <p className="text-sm font-semibold text-amber-800">
-                No KPay or WavePay withdrawal methods available
+                No KPay or WavePay withdrawal methods
+                available
               </p>
 
               <p className="mt-1 text-xs leading-5 text-amber-700">
-                KPay and WavePay are currently unavailable for withdrawal.
-                Please contact support or try again later.
+                KPay and WavePay are currently unavailable
+                for withdrawal. Please contact support or
+                try again later.
               </p>
             </div>
           )}
@@ -785,8 +1128,8 @@ export default function Withdraw() {
             </div>
 
             <p className="mt-1 text-xs leading-5 text-indigo-600">
-              Enter the {selectedPaymentMethodName} account where you want to
-              receive your withdrawal.
+              Enter the {selectedPaymentMethodName} account
+              where you want to receive your withdrawal.
             </p>
           </div>
         )}
@@ -803,17 +1146,19 @@ export default function Withdraw() {
           <input
             type="text"
             value={accountName}
+            maxLength={150}
             onChange={(event) => {
               setAccountName(event.target.value);
-
               setError("");
             }}
             placeholder="Enter account holder name"
-            className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            disabled={isSubmitting}
+            className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-50"
           />
 
           <p className="mt-2 text-xs text-slate-400">
-            Enter the name registered with your KPay or WavePay account.
+            Enter the name registered with your KPay or
+            WavePay account.
           </p>
         </div>
 
@@ -830,9 +1175,9 @@ export default function Withdraw() {
             type="text"
             inputMode="tel"
             value={accountNumber}
+            maxLength={50}
             onChange={(event) => {
               setAccountNumber(event.target.value);
-
               setError("");
             }}
             placeholder={
@@ -840,16 +1185,21 @@ export default function Withdraw() {
                 ? `Enter ${selectedPaymentMethodName} account number`
                 : "Select KPay or WavePay first"
             }
-            disabled={!selectedMethod}
+            disabled={
+              !selectedMethod ||
+              isSubmitting
+            }
             className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 ${
-              !selectedMethod
+              !selectedMethod ||
+              isSubmitting
                 ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
                 : "border-slate-200 bg-white"
             }`}
           />
 
           <p className="mt-2 text-xs text-slate-400">
-            Make sure the account number is correct before submitting.
+            Make sure the account number is correct before
+            submitting.
           </p>
         </div>
 
@@ -860,15 +1210,22 @@ export default function Withdraw() {
         <div className="mt-6">
           <label className="mb-2 block text-sm font-semibold text-slate-700">
             Note
-            <span className="ml-1 font-normal text-slate-400">(Optional)</span>
+            <span className="ml-1 font-normal text-slate-400">
+              (Optional)
+            </span>
           </label>
 
           <textarea
             rows={3}
+            maxLength={500}
             value={note}
-            onChange={(event) => setNote(event.target.value)}
+            onChange={(event) => {
+              setNote(event.target.value);
+              setError("");
+            }}
             placeholder="Optional note"
-            className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            disabled={isSubmitting}
+            className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-50"
           />
         </div>
 
@@ -878,8 +1235,11 @@ export default function Withdraw() {
 
         {numericAmount > 0 && (
           <div className="mt-6 rounded-xl bg-slate-50 p-4">
+
             <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Withdrawal</span>
+              <span className="text-slate-500">
+                Withdrawal
+              </span>
 
               <span className="font-medium text-slate-800">
                 {numericAmount.toLocaleString()} MMK
@@ -887,7 +1247,9 @@ export default function Withdraw() {
             </div>
 
             <div className="mt-2 flex justify-between text-sm">
-              <span className="text-slate-500">Withdrawal Fee</span>
+              <span className="text-slate-500">
+                Withdrawal Fee
+              </span>
 
               <span className="font-medium text-slate-800">
                 {fee.toLocaleString()} MMK
@@ -901,13 +1263,15 @@ export default function Withdraw() {
                 </span>
 
                 <span className="font-bold text-indigo-600">
-                  {Math.max(netAmount, 0).toLocaleString()} MMK
+                  {netAmount.toLocaleString()} MMK
                 </span>
               </div>
             </div>
 
             <div className="mt-2 flex justify-between text-xs">
-              <span className="text-slate-400">Total wallet deduction</span>
+              <span className="text-slate-400">
+                Total wallet deduction
+              </span>
 
               <span className="font-medium text-slate-500">
                 {totalDeduction.toLocaleString()} MMK
@@ -931,9 +1295,12 @@ export default function Withdraw() {
                 </p>
 
                 <p className="mt-1 text-xs leading-5 text-amber-700">
-                  Your first withdrawal requires manual admin approval.
-                  Processing may take up to{" "}
-                  <strong>{FIRST_WITHDRAWAL_WAIT_HOURS} hours</strong>.
+                  Your first withdrawal requires manual
+                  admin approval. Processing may take up to{" "}
+                  <strong>
+                    {FIRST_WITHDRAWAL_WAIT_HOURS} hours
+                  </strong>
+                  .
                 </p>
               </div>
             </div>
@@ -944,24 +1311,25 @@ export default function Withdraw() {
             NORMAL APPROVAL
         ==================================================== */}
 
-        {!isFirstWithdrawal && withdrawSettings.approvalRequired && (
-          <div className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
-            <div className="flex items-start gap-3">
-              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
+        {!isFirstWithdrawal &&
+          withdrawSettings.approvalRequired && (
+            <div className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+              <div className="flex items-start gap-3">
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
 
-              <div>
-                <p className="text-sm font-semibold text-indigo-800">
-                  Admin Approval Required
-                </p>
+                <div>
+                  <p className="text-sm font-semibold text-indigo-800">
+                    Admin Approval Required
+                  </p>
 
-                <p className="mt-1 text-xs leading-5 text-indigo-700">
-                  Your withdrawal request will be reviewed by admin before the
-                  payment is processed.
-                </p>
+                  <p className="mt-1 text-xs leading-5 text-indigo-700">
+                    Your withdrawal request will be reviewed
+                    by admin before the payment is processed.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* ====================================================
             ERROR
@@ -974,14 +1342,33 @@ export default function Withdraw() {
         )}
 
         {/* ====================================================
+            SUCCESS MESSAGE
+        ==================================================== */}
+
+        {successMessage && !submitted && (
+          <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+            {successMessage}
+          </div>
+        )}
+
+        {/* ====================================================
             SUBMIT
         ==================================================== */}
 
         <div className="mt-6 flex justify-end">
-          <Button type="submit" variant="success">
-            {isFirstWithdrawal
-              ? "Submit for Admin Approval"
-              : "Submit Withdrawal Request"}
+          <Button
+            type="submit"
+            variant="success"
+            disabled={
+              isSubmitting ||
+              paymentMethods.length === 0
+            }
+          >
+            {isSubmitting
+              ? "Submitting..."
+              : isFirstWithdrawal
+                ? "Submit for Admin Approval"
+                : "Submit Withdrawal Request"}
           </Button>
         </div>
       </form>

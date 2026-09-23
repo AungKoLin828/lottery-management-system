@@ -11,66 +11,92 @@ import {
 import { users } from "./users";
 import { paymentMethods } from "./paymentMethods";
 
-export const withdrawalStatusEnum = pgEnum("withdrawal_status", [
-  "PENDING",
-  "APPROVED",
-  "REJECTED",
-  "CANCELLED",
-]);
+export const withdrawalStatusEnum = pgEnum(
+  "withdrawal_status",
+  [
+    "PENDING",
+    "APPROVED",
+    "REJECTED",
+    "CANCELLED",
+  ],
+);
 
-export const withdrawals = pgTable("withdrawals", {
-  id: uuid("id").defaultRandom().primaryKey(),
+export const withdrawals = pgTable(
+  "withdrawals",
+  {
+    id: uuid("id")
+      .defaultRandom()
+      .primaryKey(),
 
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
 
-  requestedAmount: numeric("requested_amount", {
-    precision: 18,
-    scale: 2,
-  }).notNull(),
+    requestedAmount: numeric("requested_amount", {
+      precision: 18,
+      scale: 2,
+    }).notNull(),
 
-  approvedAmount: numeric("approved_amount", {
-    precision: 18,
-    scale: 2,
-  }),
+    approvedAmount: numeric("approved_amount", {
+      precision: 18,
+      scale: 2,
+    }),
 
-  fee: numeric("fee", {
-    precision: 18,
-    scale: 2,
-  })
-    .notNull()
-    .default("0"),
+    fee: numeric("fee", {
+      precision: 18,
+      scale: 2,
+    })
+      .notNull()
+      .default("0"),
 
-  paymentMethodId: uuid("payment_method_id")
-    .notNull()
-    .references(() => paymentMethods.id),
+    paymentMethodId: uuid("payment_method_id")
+      .notNull()
+      .references(() => paymentMethods.id),
 
-  transactionNumber: varchar("transaction_number", {
-    length: 150,
-  }),
+    /*
+     * Player's destination account.
+     */
+    accountName: varchar("account_name", {
+      length: 150,
+    }),
 
-  status: withdrawalStatusEnum("status").notNull().default("PENDING"),
+    accountNumber: varchar("account_number", {
+      length: 50,
+    }),
 
-  note: text("note"),
+    transactionNumber: varchar("transaction_number", {
+      length: 150,
+    }),
 
-  rejectionReason: text("rejection_reason"),
+    status: withdrawalStatusEnum("status")
+      .notNull()
+      .default("PENDING"),
 
-  approvedBy: uuid("approved_by").references(() => users.id),
+    note: text("note"),
 
-  approvedAt: timestamp("approved_at", {
-    withTimezone: true,
-  }),
+    rejectionReason: text("rejection_reason"),
 
-  createdAt: timestamp("created_at", {
-    withTimezone: true,
-  })
-    .notNull()
-    .defaultNow(),
+    approvedBy: uuid("approved_by")
+      .references(() => users.id),
 
-  updatedAt: timestamp("updated_at", {
-    withTimezone: true,
-  })
-    .notNull()
-    .defaultNow(),
-});
+    approvedAt: timestamp("approved_at", {
+      withTimezone: true,
+    }),
+
+    processedAt: timestamp("processed_at", {
+      withTimezone: true,
+    }),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+);

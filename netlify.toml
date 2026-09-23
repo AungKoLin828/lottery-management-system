@@ -94,6 +94,10 @@
   status = 200
   force = true
 
+[[redirects]]
+  from = "/api/player/withdraw-request"
+  to = "/.netlify/functions/player-withdraw-request"
+  status = 200
 
 # ============================================================
 # ADMIN USER BALANCE API
