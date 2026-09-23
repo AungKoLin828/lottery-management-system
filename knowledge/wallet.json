@@ -1,0 +1,24 @@
+[
+  {
+    "category": "wallet",
+    "title": "Wallet Balance",
+    "question": "How can I check my wallet balance?",
+    "answer": "Players can check their current wallet balance from the player dashboard.",
+    "keywords": [
+      "wallet",
+      "balance",
+      "money",
+      "account balance"
+    ]
+  },
+  {
+    "category": "wallet",
+    "title": "Wallet Updates",
+    "question": "When does my wallet balance update?",
+    "answer": "Wallet balance information is updated by the application after the corresponding transaction is processed.",
+    "keywords": [
+      "wallet update",
+      "balance update"
+    ]
+  }
+]

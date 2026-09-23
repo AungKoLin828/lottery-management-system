@@ -1,0 +1,16 @@
+[
+  {
+    "id": "2d-001",
+    "category": "2d",
+    "question": "What is 2D?",
+    "keywords": ["2d", "two digit", "lottery"],
+    "answer": "2D is a two-digit lottery game available through the application's 2D play feature."
+  },
+  {
+    "id": "2d-002",
+    "category": "2d",
+    "question": "Where can I see 2D results?",
+    "keywords": ["2d", "result", "results"],
+    "answer": "Open the Results section to view available 2D results."
+  }
+]

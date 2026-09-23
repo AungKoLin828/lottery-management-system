@@ -1,0 +1,23 @@
+[
+  {
+    "id": "deposit-001",
+    "category": "deposit",
+    "question": "How do I make a deposit?",
+    "keywords": ["deposit", "add money", "fund"],
+    "answer": "Open the Deposit section, select an available payment method, enter the required amount and submit the deposit request."
+  },
+  {
+    "id": "deposit-002",
+    "category": "deposit",
+    "question": "Why is my deposit pending?",
+    "keywords": ["deposit", "pending", "waiting"],
+    "answer": "A pending deposit means the request has not yet completed its review or processing. Check your deposit history for the current status."
+  },
+  {
+    "id": "deposit-003",
+    "category": "deposit",
+    "question": "Can AI approve my deposit?",
+    "keywords": ["approve", "deposit", "ai"],
+    "answer": "No. The AI assistant cannot approve deposits or modify wallet balances."
+  }
+]

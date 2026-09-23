@@ -1,0 +1,23 @@
+[
+  {
+    "id": "pwa-001",
+    "category": "pwa",
+    "question": "Can I install the application?",
+    "keywords": ["install", "pwa", "app"],
+    "answer": "Yes. The application supports PWA installation on supported devices and browsers."
+  },
+  {
+    "id": "pwa-002",
+    "category": "pwa",
+    "question": "How do I install it on Android?",
+    "keywords": ["android", "install", "pwa"],
+    "answer": "Open the application in a supported browser and use the browser's Install App or Add to Home Screen option when available."
+  },
+  {
+    "id": "pwa-003",
+    "category": "pwa",
+    "question": "How do I install it on iPhone?",
+    "keywords": ["iphone", "ios", "install", "pwa"],
+    "answer": "Open the application in Safari and use Share → Add to Home Screen."
+  }
+]

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "3d-001",
+    "category": "3d",
+    "question": "What is 3D?",
+    "keywords": ["3d", "three digit", "lottery"],
+    "answer": "3D is a three-digit lottery game available through the application's 3D play feature."
+  },
+  {
+    "id": "3d-002",
+    "category": "3d",
+    "question": "Where can I see 3D results?",
+    "keywords": ["3d", "result", "results"],
+    "answer": "Open the Results section to view available 3D results."
+  }
+]

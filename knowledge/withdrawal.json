@@ -1,0 +1,23 @@
+[
+  {
+    "id": "withdrawal-001",
+    "category": "withdrawal",
+    "question": "How do I withdraw?",
+    "keywords": ["withdraw", "withdrawal", "cash out"],
+    "answer": "Open the Withdrawal section, select an available payment method, enter the required information and submit your withdrawal request."
+  },
+  {
+    "id": "withdrawal-002",
+    "category": "withdrawal",
+    "question": "Why is my withdrawal pending?",
+    "keywords": ["withdrawal", "pending", "waiting"],
+    "answer": "A pending withdrawal means the request is still awaiting processing or review. You can check its current status from your withdrawal history."
+  },
+  {
+    "id": "withdrawal-003",
+    "category": "withdrawal",
+    "question": "Can AI approve my withdrawal?",
+    "keywords": ["approve", "withdrawal", "ai"],
+    "answer": "No. The AI assistant cannot approve, reject, cancel, or modify withdrawals."
+  }
+]

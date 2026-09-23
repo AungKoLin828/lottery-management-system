@@ -16,6 +16,7 @@ import {
   Bell,
   MoreHorizontal,
   Trophy,
+  MessageCircle,
 } from "lucide-react";
 
 import NotificationBell from "@/components/common/notification/NotificationBell";
@@ -73,14 +74,20 @@ const navigation = [
     path: "/admin/balance",
     icon: Wallet,
   },
-
+  
+   {
+	label: "Customer Support",
+	path: "/admin/customer-support",
+	icon: MessageCircle,
+  },
+  
   {
     label: "Reports",
     shortLabel: "Reports",
     path: "/admin/reports",
     icon: FileText,
   },
-
+  
   {
     label: "Settings",
     shortLabel: "Settings",

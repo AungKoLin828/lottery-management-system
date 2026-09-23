@@ -1,0 +1,23 @@
+[
+  {
+    "id": "account-001",
+    "category": "account",
+    "question": "How do I register?",
+    "keywords": ["register", "registration", "signup", "account"],
+    "answer": "Open the registration page, enter the required account information, and submit the registration form."
+  },
+  {
+    "id": "account-002",
+    "category": "account",
+    "question": "I cannot log in",
+    "keywords": ["login", "log in", "password", "signin"],
+    "answer": "Check that your phone number and password are correct. If the problem continues, contact support."
+  },
+  {
+    "id": "account-003",
+    "category": "account",
+    "question": "Should I share my password or OTP?",
+    "keywords": ["password", "otp", "pin", "security"],
+    "answer": "Never share your password, PIN, OTP, or payment credentials with support or the AI assistant."
+  }
+]

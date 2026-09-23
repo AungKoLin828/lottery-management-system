@@ -105,6 +105,34 @@
   status = 200
   force = true
 
+# ============================================================
+# ADMIN CUSTOMER SUPPORT
+# ============================================================
+
+[[redirects]]
+  from = "/api/admin/support/tickets"
+  to = "/.netlify/functions/admin-support-tickets"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/support/ticket"
+  to = "/.netlify/functions/admin-support-ticket"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/support/ticket/reply"
+  to = "/.netlify/functions/admin-support-ticket-reply"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/support/ticket/status"
+  to = "/.netlify/functions/admin-support-ticket-status"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/support/ticket/priority"
+  to = "/.netlify/functions/admin-support-ticket-priority"
+  status = 200
 
 # ============================================================
 # PLAYER DASHBOARD API
@@ -283,7 +311,11 @@
   to = "/.netlify/functions/player-deposit-settings"
   status = 200
   force = true
-
+  
+[[redirects]]
+  from = "/api/ai/support"
+  to = "/.netlify/functions/ai-support"
+  status = 200
 
 # ============================================================
 # REALTIME AUTHENTICATION API

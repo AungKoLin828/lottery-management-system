@@ -10,6 +10,7 @@ import PlayerWalletManagement from "@/pages/admin/PlayerWalletManagement";
 import Settings from "@/pages/admin/Settings";
 import Reports from "@/pages/admin/Reports";
 import AdminNotifications from "@/pages/admin/Notifications";
+import CustomerSupport from "@/pages/admin/CustomerSupport";
 
 import { PlayerRoutes } from "@/routes/PlayerRoutes";
 
@@ -42,6 +43,10 @@ export default function AppRoutes() {
           {/* /admin/users/wallet */}
           <Route path="wallet" element={<PlayerWalletManagement />} />
         </Route>
+		
+		<Route path="/admin/customer-support"
+		  element={<CustomerSupport />}
+		/>
 
         <Route path="/admin/settings" element={<Settings />} />
 

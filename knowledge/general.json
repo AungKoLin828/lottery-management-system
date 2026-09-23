@@ -1,0 +1,16 @@
+[
+  {
+    "id": "general-001",
+    "category": "general",
+    "question": "What is this application?",
+    "keywords": ["app", "application", "lottery"],
+    "answer": "This application provides 2D and 3D lottery services, account management, wallet services, lottery tickets, and result history."
+  },
+  {
+    "id": "general-002",
+    "category": "general",
+    "question": "How can I contact support?",
+    "keywords": ["support", "contact", "help"],
+    "answer": "If the AI assistant cannot resolve your issue, use the Contact Support option to submit a support request."
+  }
+]
