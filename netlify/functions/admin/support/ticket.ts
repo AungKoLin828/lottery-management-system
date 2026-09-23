@@ -9,9 +9,9 @@ import {
 
 import { users } from ".../../../db/schema/users";
 
-import { db } from "../utils/db";
+import { db } from "../../utils/db";
 
-import { jsonResponse } from "../utils/auth";
+import { jsonResponse } from "../../utils/auth";
 
 import { requireAdmin } from "./helpers";
 

@@ -1,6 +1,6 @@
 import type { HandlerEvent } from "@netlify/functions";
 
-import { getAuthTokenFromCookie, verifyToken } from "../utils/auth";
+import { getAuthTokenFromCookie, verifyToken } from "../../utils/auth";
 
 export interface AdminAuthResult {
   userId: string;

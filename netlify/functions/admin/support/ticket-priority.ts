@@ -4,9 +4,9 @@ import { eq } from "drizzle-orm";
 
 import { supportTickets } from ".../../../db/schema/supportTickets";
 
-import { db } from "../utils/db";
+import { db } from "../../utils/db";
 
-import { jsonResponse } from "../utils/auth";
+import { jsonResponse } from "../../utils/auth";
 
 import { requireAdmin } from "./helpers";
 
