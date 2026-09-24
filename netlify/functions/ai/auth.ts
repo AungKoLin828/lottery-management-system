@@ -1,5 +1,9 @@
 import { jwtVerify } from "jose";
 
+/* ============================================================
+   TYPES
+============================================================ */
+
 export interface AuthUser {
   id: string;
   username?: string | null;
@@ -7,15 +11,27 @@ export interface AuthUser {
   role?: string | null;
 }
 
+/* ============================================================
+   JWT SECRET
+============================================================ */
+
 function getJwtSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET;
+  const secret = process.env.JWT_SECRET?.trim();
 
   if (!secret) {
     throw new Error("JWT_SECRET is not configured");
   }
 
+  if (secret.length < 16) {
+    throw new Error("JWT_SECRET is too short");
+  }
+
   return new TextEncoder().encode(secret);
 }
+
+/* ============================================================
+   COOKIE PARSER
+============================================================ */
 
 function getCookieValue(
   cookieHeader: string | null,
@@ -35,20 +51,34 @@ function getCookieValue(
     }
 
     const key = cookie.slice(0, index).trim();
-    const value = cookie.slice(index + 1).trim();
 
-    if (key === name) {
-      return decodeURIComponent(value);
+    if (key !== name) {
+      continue;
+    }
+
+    const rawValue = cookie
+      .slice(index + 1)
+      .trim();
+
+    try {
+      return decodeURIComponent(rawValue);
+    } catch {
+      return rawValue;
     }
   }
 
   return null;
 }
 
+/* ============================================================
+   AUTHENTICATION
+============================================================ */
+
 export async function requireAuth(
   request: Request,
 ): Promise<AuthUser> {
-  const cookieHeader = request.headers.get("cookie");
+  const cookieHeader =
+    request.headers.get("cookie");
 
   const token = getCookieValue(
     cookieHeader,
@@ -60,10 +90,13 @@ export async function requireAuth(
   }
 
   try {
-    const { payload } = await jwtVerify(
-      token,
-      getJwtSecret(),
-    );
+    const secret = getJwtSecret();
+
+    const { payload } =
+      await jwtVerify(
+        token,
+        secret,
+      );
 
     const userId =
       typeof payload.userId === "string"
@@ -78,14 +111,17 @@ export async function requireAuth(
 
     return {
       id: userId,
+
       username:
         typeof payload.username === "string"
           ? payload.username
           : null,
+
       phone:
         typeof payload.phone === "string"
           ? payload.phone
           : null,
+
       role:
         typeof payload.role === "string"
           ? payload.role
