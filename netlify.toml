@@ -330,6 +330,16 @@
   to = "/.netlify/functions/realtime-token"
   status = 200
   force = true
+  
+[[redirects]]
+from = "/api/admin/ai-support/settings"
+to = "/.netlify/functions/admin-ai-support-settings"
+status = 200
+
+[[redirects]]
+  from = "/api/admin/ai-support/settings/update"
+  to = "/.netlify/functions/admin-ai-support-settings-update"
+  status = 200
 
 # ============================================================
 # REACT SPA FALLBACK
