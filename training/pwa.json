@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "language": [
+    "en",
+    "my"
+  ],
+  "description": "Training data for PWA installation and mobile application usage.",
+  "intents": [
+    {
+      "intent": "pwa_install_android",
+      "category": "pwa",
+      "keywords": [
+        "Android",
+        "install",
+        "PWA",
+        "home screen"
+      ],
+      "examples": {
+        "en": [
+          "How do I install the app on Android?",
+          "Can I install this website as an app?",
+          "Install on Android"
+        ],
+        "my": [
+          "Android မှာ App ဘယ်လို install လုပ်ရမလဲ",
+          "Website ကို App လို install လုပ်လို့ရလား",
+          "Android မှာ install လုပ်ချင်တယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Open the website in a supported mobile browser and use the browser's Add to Home screen or Install App option when it is available."
+        ],
+        "my": [
+          "Supported Mobile Browser ဖြင့် Website ကိုဖွင့်ပြီး ရရှိပါက Add to Home Screen သို့မဟုတ် Install App Option ကို အသုံးပြုနိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "pwa_install_ios",
+      "category": "pwa",
+      "keywords": [
+        "iPhone",
+        "iOS",
+        "Safari",
+        "Add to Home Screen"
+      ],
+      "examples": {
+        "en": [
+          "How do I install the app on iPhone?",
+          "How do I add the app to my iPhone home screen?",
+          "Install on iOS"
+        ],
+        "my": [
+          "iPhone မှာ App ဘယ်လိုထည့်ရမလဲ",
+          "iPhone Home Screen မှာ App ထည့်ချင်တယ်",
+          "iOS မှာ install လုပ်ချင်တယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Open the website in Safari and use the Share menu followed by Add to Home Screen when the option is available."
+        ],
+        "my": [
+          "Safari ဖြင့် Website ကိုဖွင့်ပြီး Share Menu မှ Add to Home Screen ကို ရွေးချယ်နိုင်ပါသည်။ Option မပေါ်ပါက Safari ဖြင့် ပြန်ဖွင့်စမ်းပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "pwa_not_installing",
+      "category": "pwa",
+      "keywords": [
+        "install",
+        "missing",
+        "HTTPS",
+        "မရ"
+      ],
+      "examples": {
+        "en": [
+          "The app is not installing",
+          "Why can't I install the PWA?",
+          "Install option is missing"
+        ],
+        "my": [
+          "App install မဖြစ်ဘူး",
+          "PWA install လုပ်လို့မရဘူး",
+          "Install Option မပေါ်ဘူး"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Make sure you are using a supported browser and that the website is loaded over HTTPS. On iPhone, use Safari and check Add to Home Screen from the Share menu."
+        ],
+        "my": [
+          "Supported Browser အသုံးပြုနေကြောင်းနှင့် Website ကို HTTPS ဖြင့်ဖွင့်ထားကြောင်း စစ်ဆေးပါ။ iPhone တွင် Safari ဖြင့်ဖွင့်ပြီး Share Menu မှ Add to Home Screen ကို စစ်ဆေးပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "pwa_display",
+      "category": "pwa",
+      "keywords": [
+        "layout",
+        "menu",
+        "standalone",
+        "UI"
+      ],
+      "examples": {
+        "en": [
+          "Why does the app look different after installation?",
+          "Why is the menu different in the installed app?"
+        ],
+        "my": [
+          "App install ပြီးနောက် UI ဘာလို့ကွာသွားတာလဲ",
+          "Install လုပ်ပြီး Menu ဘာလို့ပြောင်းသွားတာလဲ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "The installed PWA can use a different layout optimized for standalone mobile use. This can include mobile navigation and safe-area spacing."
+        ],
+        "my": [
+          "Install လုပ်ထားသော PWA သည် Standalone Mobile အသုံးပြုမှုအတွက် သီးခြား Layout ကို အသုံးပြုနိုင်ပါသည်။ Mobile Navigation နှင့် Safe-Area Spacing ပါဝင်နိုင်ပါသည်။"
+        ]
+      }
+    }
+  ]
+}

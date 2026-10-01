@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "language": [
+    "en",
+    "my"
+  ],
+  "description": "Training data for lottery tickets, ticket history and ticket status.",
+  "intents": [
+    {
+      "intent": "tickets_view",
+      "category": "tickets",
+      "keywords": [
+        "tickets",
+        "My Tickets",
+        "လက်မှတ်"
+      ],
+      "examples": {
+        "en": [
+          "Where can I see my tickets?",
+          "Show my tickets",
+          "How do I view my lottery tickets?"
+        ],
+        "my": [
+          "ထိုးထားတဲ့ Ticket တွေဘယ်မှာကြည့်ရမလဲ",
+          "My Tickets ကြည့်ချင်တယ်",
+          "Lottery Ticket တွေဘယ်မှာကြည့်ရမလဲ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Open My Tickets to view your submitted lottery tickets and their recorded details."
+        ],
+        "my": [
+          "တင်ထားသော Lottery Ticket များနှင့် အသေးစိတ်အချက်အလက်များကို My Tickets တွင် ကြည့်နိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "ticket_not_found",
+      "category": "tickets",
+      "keywords": [
+        "missing",
+        "not found",
+        "မတွေ့",
+        "ပျောက်"
+      ],
+      "examples": {
+        "en": [
+          "My ticket is missing",
+          "I bought a ticket but cannot see it",
+          "My ticket does not appear"
+        ],
+        "my": [
+          "ထိုးထားတဲ့ Ticket မပေါ်ဘူး",
+          "Ticket ဝယ်ပြီးပြီ မတွေ့ဘူး",
+          "Ticket ပျောက်နေတယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Check My Tickets and your transaction history. If the ticket was successfully charged but is still missing, contact human support with the relevant details."
+        ],
+        "my": [
+          "My Tickets နှင့် Transaction History ကို စစ်ဆေးပါ။ ငွေဖြတ်ပြီး Ticket မပေါ်သေးပါက သက်ဆိုင်ရာအချက်အလက်များဖြင့် Human Support သို့ ဆက်သွယ်ပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "ticket_status",
+      "category": "tickets",
+      "keywords": [
+        "status",
+        "confirmed",
+        "လက်ခံ"
+      ],
+      "examples": {
+        "en": [
+          "What is my ticket status?",
+          "Is my ticket confirmed?",
+          "How do I know if my ticket was accepted?"
+        ],
+        "my": [
+          "Ticket Status ဘယ်လိုစစ်ရမလဲ",
+          "Ticket confirm ဖြစ်ပြီလား",
+          "Ticket လက်ခံပြီးပြီလား ဘယ်လိုသိရမလဲ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Open My Tickets and check the recorded status of the ticket."
+        ],
+        "my": [
+          "My Tickets ကိုဖွင့်ပြီး Ticket ၏ မှတ်တမ်းတင်ထားသော Status ကို စစ်ဆေးပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "ticket_cancel",
+      "category": "tickets",
+      "keywords": [
+        "cancel",
+        "ဖျက်"
+      ],
+      "examples": {
+        "en": [
+          "Can I cancel my lottery ticket?",
+          "I want to cancel my ticket"
+        ],
+        "my": [
+          "Lottery Ticket cancel လုပ်လို့ရလား",
+          "Ticket ဖျက်ချင်တယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Ticket cancellation depends on the ticket and draw status. Contact human support if you need an administrator to review a specific ticket."
+        ],
+        "my": [
+          "Ticket Cancel လုပ်နိုင်မှုသည် Ticket နှင့် Draw Status ပေါ်မူတည်ပါသည်။ သတ်မှတ်ထားသော Ticket ကို Admin မှ စစ်ဆေးရန်လိုပါက Human Support သို့ ဆက်သွယ်ပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "ticket_wrong_number",
+      "category": "tickets",
+      "keywords": [
+        "wrong number",
+        "mistake",
+        "မှား",
+        "နံပါတ်မှား"
+      ],
+      "examples": {
+        "en": [
+          "I selected the wrong number",
+          "I made a mistake in my ticket"
+        ],
+        "my": [
+          "နံပါတ်မှားရွေးမိတယ်",
+          "Ticket ထိုးတုန်းက မှားသွားတယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Review your ticket before submitting. After submission, whether a correction or cancellation is possible depends on the ticket status and system rules. Contact human support for a specific request."
+        ],
+        "my": [
+          "Ticket Submit မလုပ်မီ နံပါတ်ကို ပြန်စစ်ပါ။ Submit လုပ်ပြီးနောက် ပြင်ဆင်ခြင်း သို့မဟုတ် Cancel လုပ်နိုင်မှုသည် Ticket Status နှင့် System Rule ပေါ်မူတည်ပါသည်။ သတ်မှတ်ထားသော Request အတွက် Human Support သို့ ဆက်သွယ်ပါ။"
+        ]
+      }
+    }
+  ]
+}

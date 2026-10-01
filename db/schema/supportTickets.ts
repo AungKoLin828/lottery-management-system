@@ -9,6 +9,10 @@ import {
 
 import { users } from "./users";
 
+/* ============================================================
+   SUPPORT TICKET STATUS
+============================================================ */
+
 export const supportTicketStatusEnum = pgEnum(
   "support_ticket_status",
   [
@@ -19,6 +23,10 @@ export const supportTicketStatusEnum = pgEnum(
   ],
 );
 
+/* ============================================================
+   SUPPORT TICKET PRIORITY
+============================================================ */
+
 export const supportTicketPriorityEnum = pgEnum(
   "support_ticket_priority",
   [
@@ -28,6 +36,23 @@ export const supportTicketPriorityEnum = pgEnum(
     "URGENT",
   ],
 );
+
+/* ============================================================
+   SUPPORT MESSAGE SENDER
+============================================================ */
+
+export const supportMessageSenderEnum = pgEnum(
+  "support_message_sender",
+  [
+    "PLAYER",
+    "ADMIN",
+    "AI",
+  ],
+);
+
+/* ============================================================
+   SUPPORT TICKETS
+============================================================ */
 
 export const supportTickets = pgTable(
   "support_tickets",
@@ -76,6 +101,10 @@ export const supportTickets = pgTable(
   },
 );
 
+/* ============================================================
+   SUPPORT TICKET MESSAGES
+============================================================ */
+
 export const supportTicketMessages = pgTable(
   "support_ticket_messages",
   {
@@ -92,11 +121,8 @@ export const supportTicketMessages = pgTable(
         },
       ),
 
-    senderType: varchar(
+    senderType: supportMessageSenderEnum(
       "sender_type",
-      {
-        length: 20,
-      },
     ).notNull(),
 
     message: text("message").notNull(),

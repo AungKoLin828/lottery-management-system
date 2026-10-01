@@ -1,3 +1,38 @@
+/**
+ * ============================================================
+ * CUSTOMER SUPPORT AI
+ * ============================================================
+ *
+ * Flow:
+ *
+ *                 USER
+ *                  │
+ *                  ▼
+ *             Authentication
+ *                  │
+ *                  ▼
+ *             Rate Limiting
+ *                  │
+ *                  ▼
+ *          OpenRouter Dynamic AI
+ *                  │
+ *          ┌───────┴────────┐
+ *          │                │
+ *       SUCCESS           FAILURE
+ *          │                │
+ *          ▼                ▼
+ *      AI answer      Custom Training AI
+ *                           │
+ *                     ┌─────┴─────┐
+ *                     │           │
+ *                   MATCH       NO MATCH
+ *                     │           │
+ *                     ▼           ▼
+ *                  Answer    Create ticket
+ *
+ * ============================================================
+ */
+
 import type {
   Handler,
   HandlerEvent,
@@ -6,7 +41,6 @@ import type {
 
 import {
   requireAuth,
-  type AuthUser,
 } from "./auth";
 
 import {
@@ -14,6 +48,10 @@ import {
   type OpenRouterMessage,
   type OpenRouterToolCall,
 } from "./openRouter";
+
+import {
+  generateCustomTrainingResponse,
+} from "./customTrainingAI";
 
 import {
   searchKnowledge,
@@ -39,368 +77,126 @@ import {
   getMyRecentTransactions,
 } from "./supportTools";
 
-/* ============================================================
-   CONSTANTS
-============================================================ */
+interface SupportRequestBody {
+  message?: string;
+
+  messages?: Array<{
+    role?: string;
+    content?: string;
+  }>;
+}
+
+interface AuthenticatedUser {
+  id: string;
+  userId?: string;
+  username?: string;
+  phone?: string;
+  role?: string;
+}
 
 const MAX_MESSAGE_LENGTH =
   2000;
 
-const MAX_HISTORY_MESSAGES =
+const MAX_HISTORY =
   10;
 
 const MAX_TOOL_ROUNDS =
   2;
 
-/* ============================================================
-   RESPONSE HELPERS
-============================================================ */
-
 function jsonResponse(
   statusCode: number,
-  body: Record<
-    string,
-    unknown
-  >,
-  extraHeaders: Record<
-    string,
-    string
-  > = {},
-) {
+  body: unknown
+): {
+  statusCode: number;
+  headers: Record<string, string>;
+  body: string;
+} {
   return {
     statusCode,
 
     headers: {
       "Content-Type":
-        "application/json; charset=utf-8",
+        "application/json",
 
       "Cache-Control":
         "no-store",
-
-      ...extraHeaders,
     },
 
-    body:
-      JSON.stringify(body),
+    body: JSON.stringify(body),
   };
 }
 
-/* ============================================================
-   ERROR LOGGING
-============================================================ */
+function getBooleanEnv(
+  value:
+    | string
+    | undefined
+): boolean {
+  return (
+    value === "true" ||
+    value === "1" ||
+    value === "yes" ||
+    value === "on"
+  );
+}
 
-function errorMessage(
-  error: unknown,
+function sanitizeMessage(
+  value: unknown
 ): string {
   if (
-    error instanceof Error
+    typeof value !== "string"
   ) {
-    return error.message;
+    return "";
   }
 
-  return String(error);
+  return value
+    .replace(/\0/g, "")
+    .trim();
 }
-
-/* ============================================================
-   REQUEST TYPES
-============================================================ */
-
-interface ClientHistoryMessage {
-  role:
-    | "user"
-    | "assistant";
-
-  content: string;
-}
-
-interface SupportRequestBody {
-  message?: unknown;
-
-  messages?: unknown;
-}
-
-/* ============================================================
-   TYPE GUARDS
-============================================================ */
-
-function isRecord(
-  value: unknown,
-): value is Record<
-  string,
-  unknown
-> {
-  return (
-    typeof value ===
-      "object" &&
-    value !== null
-  );
-}
-
-function isHistoryMessage(
-  value: unknown,
-): value is ClientHistoryMessage {
-  if (
-    !isRecord(value)
-  ) {
-    return false;
-  }
-
-  return (
-    (
-      value.role ===
-        "user" ||
-      value.role ===
-        "assistant"
-    ) &&
-    typeof value.content ===
-      "string"
-  );
-}
-
-/* ============================================================
-   PARSE BODY
-============================================================ */
-
-function parseRequestBody(
-  event: HandlerEvent,
-): SupportRequestBody {
-  if (
-    !event.body
-  ) {
-    return {};
-  }
-
-  try {
-    const parsed =
-      JSON.parse(
-        event.body,
-      );
-
-    return isRecord(
-      parsed,
-    )
-      ? (parsed as SupportRequestBody)
-      : {};
-  } catch {
-    throw new Error(
-      "INVALID_JSON",
-    );
-  }
-}
-
-/* ============================================================
-   SAFE HISTORY
-============================================================ */
 
 function buildHistory(
-  value: unknown,
+  body: SupportRequestBody
 ): OpenRouterMessage[] {
   if (
-    !Array.isArray(value)
+    !Array.isArray(
+      body.messages
+    )
   ) {
     return [];
   }
 
-  return value
-    .filter(
-      isHistoryMessage,
-    )
-    .slice(
-      -MAX_HISTORY_MESSAGES,
-    )
-    .map(
-      (item) => ({
-        role:
-          item.role,
+  return body.messages
+    .slice(-MAX_HISTORY)
+    .map((message) => {
+      const role =
+        message.role ===
+        "assistant"
+          ? "assistant"
+          : "user";
 
-        content:
-          item.content
-            .trim()
-            .slice(
-              0,
-              MAX_MESSAGE_LENGTH,
-            ),
-      }),
-    )
-    .filter(
-      (item) =>
-        item.content.length >
-        0,
-    );
-}
-
-/* ============================================================
-   TOOL RESULT SERIALIZATION
-============================================================ */
-
-function toolResultText(
-  value: unknown,
-): string {
-  try {
-    return JSON.stringify(
-      value,
-    );
-  } catch {
-    return JSON.stringify({
-      error:
-        "Unable to serialize tool result",
-    });
-  }
-}
-
-/* ============================================================
-   TOOL DISPATCH
-============================================================ */
-
-async function dispatchTool(
-  toolCall: OpenRouterToolCall,
-  user: AuthUser,
-): Promise<unknown> {
-  const toolName =
-    toolCall.function?.name;
-
-  let args:
-    | Record<
-        string,
-        unknown
-      >
-    | null = null;
-
-  try {
-    const rawArguments =
-      toolCall.function
-        ?.arguments;
-
-    if (
-      rawArguments &&
-      rawArguments.trim()
-    ) {
-      const parsed =
-        JSON.parse(
-          rawArguments,
+      const content =
+        sanitizeMessage(
+          message.content
         );
 
-      if (
-        isRecord(parsed)
-      ) {
-        args =
-          parsed;
-      }
-    }
-  } catch {
-    return {
-      success:
-        false,
-
-      error:
-        "INVALID_TOOL_ARGUMENTS",
-    };
-  }
-
-  /*
-   * IMPORTANT:
-   * user.id comes exclusively from JWT authentication.
-   *
-   * Never use args.userId.
-   */
-
-  switch (
-    toolName
-  ) {
-    case "getMyWallet":
-      return await getMyWallet(
-        user.id,
-      );
-
-    case "getMyLatestDeposit":
-      return await getMyLatestDeposit(
-        user.id,
-      );
-
-    case "getMyLatestWithdrawal":
-      return await getMyLatestWithdrawal(
-        user.id,
-      );
-
-    case "getMyRecentTransactions": {
-      const limit =
-        Number(
-          args?.limit ??
-            10,
-        );
-
-      return await getMyRecentTransactions(
-        user.id,
-        Number.isFinite(
-          limit,
-        )
-          ? limit
-          : 10,
-      );
-    }
-
-    default:
       return {
-        success:
-          false,
-
-        error:
-          "UNKNOWN_TOOL",
+        role,
+        content,
       };
-  }
-}
-
-/* ============================================================
-   EXTRACT ASSISTANT MESSAGE
-============================================================ */
-
-function getAssistantMessage(
-  response: Awaited<
-    ReturnType<
-      typeof callOpenRouter
-    >
-  >,
-): OpenRouterMessage {
-  const message =
-    response
-      .choices?.[0]
-      ?.message;
-
-  if (!message) {
-    throw new Error(
-      "AI_EMPTY_MESSAGE",
+    })
+    .filter(
+      (message) =>
+        Boolean(
+          message.content
+        )
     );
-  }
-
-  return {
-    role:
-      "assistant",
-
-    content:
-      typeof message.content ===
-      "string"
-        ? message.content
-        : null,
-
-    tool_calls:
-      Array.isArray(
-        message.tool_calls,
-      )
-        ? message.tool_calls
-        : undefined,
-  };
 }
 
-/* ============================================================
-   FINAL CONTENT
-============================================================ */
-
-function getFinalContent(
+function extractAssistantText(
   response: Awaited<
     ReturnType<
       typeof callOpenRouter
     >
-  >,
+  >
 ): string {
   const content =
     response
@@ -410,515 +206,616 @@ function getFinalContent(
 
   if (
     typeof content !==
-      "string" ||
-    !content.trim()
+    "string"
   ) {
-    throw new Error(
-      "AI_EMPTY_RESPONSE",
-    );
+    return "";
   }
 
   return content.trim();
 }
 
-/* ============================================================
-   AI PROCESSING
-============================================================ */
+function getToolCalls(
+  response: Awaited<
+    ReturnType<
+      typeof callOpenRouter
+    >
+  >
+): OpenRouterToolCall[] {
+  return (
+    response
+      .choices?.[0]
+      ?.message
+      ?.tool_calls ??
+    []
+  );
+}
 
-async function generateSupportResponse(
-  user: AuthUser,
-  message: string,
-  history: OpenRouterMessage[],
-): Promise<string> {
-  /*
-   * RAG is deliberately non-fatal.
-   *
-   * If a knowledge file is missing, account tools can still work.
-   */
-  let knowledgeText =
-    "";
-
+function safeJsonParse(
+  value: string
+): Record<string, unknown> {
   try {
-    const knowledge =
-      await searchKnowledge(
-        message,
-        5,
-      );
+    const parsed =
+      JSON.parse(value);
 
-    knowledgeText =
-      knowledgeToText(
-        knowledge,
-      );
-  } catch (error) {
-    console.error(
-      "[AI:RAG] Search failed:",
-      errorMessage(
-        error,
-      ),
-    );
+    if (
+      parsed &&
+      typeof parsed ===
+        "object"
+    ) {
+      return parsed as Record<
+        string,
+        unknown
+      >;
+    }
+  } catch {
+    // Ignore.
   }
 
-  const systemContent =
-    knowledgeText
-      ? `${SYSTEM_PROMPT}
+  return {};
+}
 
-============================================================
-RELEVANT KNOWLEDGE BASE
-============================================================
+async function executeTool(
+  toolCall: OpenRouterToolCall,
+  userId: string
+): Promise<unknown> {
+  const name =
+    toolCall.function.name;
 
-${knowledgeText}
+  const args =
+    safeJsonParse(
+      toolCall.function
+        .arguments
+    );
 
-Use this knowledge when relevant. If it does not answer the question,
-do not invent an answer.`
-      : SYSTEM_PROMPT;
+  /*
+   * IMPORTANT:
+   *
+   * userId always comes from JWT.
+   * It is never accepted from the AI model.
+   */
+  switch (name) {
+    case "getMyWallet":
+      return getMyWallet(
+        userId
+      );
 
-  const messages:
-    OpenRouterMessage[] = [
+    case "getMyLatestDeposit":
+      return getMyLatestDeposit(
+        userId
+      );
+
+    case "getMyLatestWithdrawal":
+      return getMyLatestWithdrawal(
+        userId
+      );
+
+    case "getMyRecentTransactions":
+      return getMyRecentTransactions(
+        userId
+      );
+
+    default:
+      return {
+        error:
+          `Unknown tool: ${name}`,
+        arguments:
+          args,
+      };
+  }
+}
+
+async function generateOpenRouterResponse(
+  user: AuthenticatedUser,
+  message: string,
+  history: OpenRouterMessage[]
+): Promise<string> {
+  /*
+   * Search local knowledge first so OpenRouter has accurate
+   * application-specific context.
+   */
+  const knowledge =
+    searchKnowledge(
+      message,
+      5
+    );
+
+  const knowledgeContext =
+    knowledgeToText(
+      knowledge
+    );
+
+  const messages: OpenRouterMessage[] =
+    [
       {
-        role:
-          "system",
-
+        role: "system",
         content:
-          systemContent,
+          SYSTEM_PROMPT,
       },
+
+      ...(knowledgeContext
+        ? [
+            {
+              role: "system" as const,
+              content: [
+                "Relevant local support knowledge:",
+                "",
+                knowledgeContext,
+                "",
+                "Use this information as the primary source for application-specific questions.",
+                "Do not invent policies, fees, limits, results, balances, or account information.",
+              ].join("\n"),
+            },
+          ]
+        : []),
 
       ...history,
 
       {
-        role:
-          "user",
-
-        content:
-          message,
+        role: "user",
+        content: message,
       },
     ];
 
-  let currentMessages =
-    messages;
+  let toolRounds = 0;
 
-  for (
-    let round = 0;
-    round < MAX_TOOL_ROUNDS;
-    round += 1
+  while (
+    toolRounds <
+    MAX_TOOL_ROUNDS
   ) {
     const response =
       await callOpenRouter(
-        currentMessages,
-        TOOL_DEFINITIONS,
-      );
+        messages,
+        {
+          tools:
+            TOOL_DEFINITIONS,
 
-    const assistantMessage =
-      getAssistantMessage(
-        response,
+          toolChoice:
+            "auto",
+
+          maxTokens:
+            700,
+
+          temperature:
+            0.2,
+        }
       );
 
     const toolCalls =
-      assistantMessage.tool_calls ??
-      [];
+      getToolCalls(
+        response
+      );
 
     /*
-     * Normal final AI response.
+     * Normal answer.
      */
     if (
       toolCalls.length ===
       0
     ) {
-      return getFinalContent(
-        response,
+      const answer =
+        extractAssistantText(
+          response
+        );
+
+      if (answer) {
+        return answer;
+      }
+
+      throw new Error(
+        "OpenRouter returned no assistant answer."
       );
     }
 
     /*
-     * Add assistant's tool-call message.
+     * Add assistant tool-call message.
      */
-    currentMessages = [
-      ...currentMessages,
+    messages.push({
+      role: "assistant",
 
-      assistantMessage,
-    ];
+      content:
+        response
+          .choices?.[0]
+          ?.message
+          ?.content ??
+        null,
 
-    /*
-     * Execute each requested tool.
-     */
-    for (
-      const toolCall of toolCalls
-    ) {
-      try {
-        const result =
-          await dispatchTool(
-            toolCall,
-            user,
-          );
+      tool_calls:
+        toolCalls,
+    });
 
-        currentMessages.push({
-          role:
-            "tool",
-
-          tool_call_id:
-            toolCall.id,
-
-          name:
-            toolCall.function
-              .name,
-
-          content:
-            toolResultText(
-              result,
-            ),
-        });
-      } catch (error) {
-        console.error(
-          `[AI:TOOL] ${toolCall.function?.name ?? "unknown"} failed:`,
-          errorMessage(
-            error,
-          ),
+    for (const toolCall of toolCalls) {
+      const toolResult =
+        await executeTool(
+          toolCall,
+          user.id
         );
 
-        currentMessages.push({
-          role:
-            "tool",
+      messages.push({
+        role: "tool",
 
-          tool_call_id:
-            toolCall.id,
+        tool_call_id:
+          toolCall.id,
 
-          name:
-            toolCall.function
-              .name,
+        name:
+          toolCall.function
+            .name,
 
-          content:
-            JSON.stringify({
-              success:
-                false,
-
-              error:
-                "Tool execution failed",
-            }),
-        });
-      }
+        content:
+          JSON.stringify(
+            toolResult
+          ),
+      });
     }
+
+    toolRounds++;
   }
 
-  /*
-   * If the model keeps requesting tools, don't loop forever.
-   */
   throw new Error(
-    "AI_TOOL_ROUND_LIMIT",
+    "OpenRouter tool execution limit reached."
   );
 }
 
-/* ============================================================
-   NETLIFY HANDLER
-============================================================ */
+function buildHumanSupportMessage(): string {
+  return [
+    "I'm unable to provide a reliable answer right now.",
+    "",
+    "Please create a support ticket and our admin support team will assist you.",
+  ].join("\n");
+}
 
-export const handler:
-  Handler = async (
-    event,
-    _context: HandlerContext,
-  ) => {
-    /* --------------------------------------------------------
-       METHOD
-    -------------------------------------------------------- */
-
-    if (
-      event.httpMethod !==
-      "POST"
-    ) {
-      return jsonResponse(
-        405,
-        {
-          success:
-            false,
-
-          message:
-            "Method not allowed.",
-        },
-        {
-          Allow:
-            "POST",
-        },
-      );
-    }
-
-    /* --------------------------------------------------------
-       FEATURE FLAG
-    -------------------------------------------------------- */
-
-    const enabled =
-      process.env.AI_SUPPORT_ENABLED
-        ?.trim()
-        .toLowerCase();
-
-    if (
-      enabled !==
-        "true" &&
-      enabled !==
-        "1"
-    ) {
-      return jsonResponse(
-        503,
-        {
-          success:
-            false,
-
-          message:
-            "AI support is currently unavailable.",
-        },
-      );
-    }
-
-    /* --------------------------------------------------------
-       AUTH
-    -------------------------------------------------------- */
-
-    let user:
-      AuthUser;
-
-    try {
-      /*
-       * Reconstruct Request from the Netlify event.
-       */
-      const request =
-        new Request(
-          getRequestUrl(
-            event,
-          ),
-          {
-            method:
-              event.httpMethod,
-
-            headers:
-              event.headers as HeadersInit,
-          },
-        );
-
-      user =
-        await requireAuth(
-          request,
-        );
-    } catch (error) {
-      const message =
-        errorMessage(
-          error,
-        );
-
-      if (
-        message ===
-        "UNAUTHORIZED"
-      ) {
-        return jsonResponse(
-          401,
-          {
-            success:
-              false,
-
-            message:
-              "Please log in to use AI support.",
-          },
-        );
+export const handler: Handler = async (
+  event: HandlerEvent,
+  _context: HandlerContext
+) => {
+  if (
+    event.httpMethod !==
+    "POST"
+  ) {
+    return jsonResponse(
+      405,
+      {
+        success: false,
+        error:
+          "Method not allowed.",
       }
+    );
+  }
 
-      console.error(
-        "[AI:AUTH] Authentication error:",
-        message,
-      );
+  /*
+   * AI mode.
+   */
+  const aiEnabled =
+    getBooleanEnv(
+      process.env
+        .AI_SUPPORT_ENABLED
+    );
 
-      return jsonResponse(
-        500,
+  if (!aiEnabled) {
+    return jsonResponse(
+      503,
+      {
+        success: false,
+        error:
+          "AI support is currently disabled.",
+      }
+    );
+  }
+
+  /*
+   * Parse request.
+   */
+  let body:
+    | SupportRequestBody
+    | null = null;
+
+  try {
+    body = event.body
+      ? JSON.parse(
+          event.body
+        )
+      : null;
+  } catch {
+    return jsonResponse(
+      400,
+      {
+        success: false,
+        error:
+          "Invalid request body.",
+      }
+    );
+  }
+
+  if (!body) {
+    return jsonResponse(
+      400,
+      {
+        success: false,
+        error:
+          "Request body is required.",
+      }
+    );
+  }
+
+  const message =
+    sanitizeMessage(
+      body.message
+    );
+
+  if (!message) {
+    return jsonResponse(
+      400,
+      {
+        success: false,
+        error:
+          "Message is required.",
+      }
+    );
+  }
+
+  if (
+    message.length >
+    MAX_MESSAGE_LENGTH
+  ) {
+    return jsonResponse(
+      400,
+      {
+        success: false,
+        error:
+          `Message must not exceed ${MAX_MESSAGE_LENGTH} characters.`,
+      }
+    );
+  }
+
+  /*
+   * Authenticate using existing JWT authentication.
+   */
+  let authUser:
+    | AuthenticatedUser
+    | null = null;
+
+  try {
+    /*
+     * Convert Netlify event headers into a Request.
+     */
+    const protocol =
+      event.headers[
+        "x-forwarded-proto"
+      ] || "https";
+
+    const host =
+      event.headers.host ||
+      "localhost";
+
+    const request =
+      new Request(
+        `${protocol}://${host}${event.path}`,
         {
-          success:
-            false,
+          method:
+            "POST",
 
-          message:
-            "AI support authentication failed.",
-        },
-      );
-    }
+          headers:
+            event.headers as HeadersInit,
 
-    /* --------------------------------------------------------
-       RATE LIMIT
-    -------------------------------------------------------- */
-
-    const rate =
-      checkRateLimitDetailed(
-        user.id,
+          body:
+            JSON.stringify(
+              body
+            ),
+        }
       );
 
-    if (!rate.allowed) {
+    authUser =
+      (await requireAuth(
+        request
+      )) as AuthenticatedUser;
+  } catch {
+    return jsonResponse(
+      401,
+      {
+        success: false,
+        error:
+          "Authentication required.",
+      }
+    );
+  }
+
+  if (
+    !authUser ||
+    !authUser.id
+  ) {
+    return jsonResponse(
+      401,
+      {
+        success: false,
+        error:
+          "Authentication required.",
+      }
+    );
+  }
+
+  /*
+   * Rate limit.
+   */
+  try {
+    const rateLimit =
+      await checkRateLimitDetailed(
+        authUser.id
+      );
+
+    if (
+      rateLimit &&
+      rateLimit.allowed ===
+        false
+    ) {
       return jsonResponse(
         429,
         {
-          success:
-            false,
+          success: false,
 
-          message:
-            "Too many AI requests. Please wait a moment and try again.",
-        },
-        {
-          "Retry-After":
-            String(
-              Math.max(
-                Math.ceil(
-                  (
-                    rate.resetAt -
-                    Date.now()
-                  ) / 1000,
-                ),
-                1,
-              ),
-            ),
-        },
+          error:
+            "Too many support requests. Please try again later.",
+
+          retryAfter:
+            rateLimit.retryAfter,
+        }
       );
     }
+  } catch {
+    /*
+     * Do not make the support system unavailable solely because
+     * the optional rate limiter failed.
+     */
+  }
 
-    /* --------------------------------------------------------
-       BODY
-    -------------------------------------------------------- */
+  const history =
+    buildHistory(body);
 
-    let body:
-      SupportRequestBody;
-
-    try {
-      body =
-        parseRequestBody(
-          event,
-        );
-    } catch {
-      return jsonResponse(
-        400,
-        {
-          success:
-            false,
-
-          message:
-            "Invalid request.",
-        },
+  /*
+   * ==========================================================
+   * PRIMARY AI
+   * ==========================================================
+   */
+  try {
+    const answer =
+      await generateOpenRouterResponse(
+        authUser,
+        message,
+        history
       );
-    }
 
-    /* --------------------------------------------------------
-       MESSAGE
-    -------------------------------------------------------- */
+    return jsonResponse(
+      200,
+      {
+        success: true,
 
-    const message =
-      typeof body.message ===
-      "string"
-        ? body.message.trim()
-        : "";
+        message:
+          answer,
 
-    if (!message) {
-      return jsonResponse(
-        400,
-        {
-          success:
-            false,
+        source:
+          "openrouter",
 
-          message:
-            "Please enter a message.",
-        },
+        fallback:
+          false,
+      }
+    );
+  } catch (openRouterError) {
+    /*
+     * OpenRouter can fail because of:
+     *
+     * - 429
+     * - unavailable model
+     * - provider outage
+     * - timeout
+     * - invalid model
+     * - network failure
+     *
+     * None of these should break customer support.
+     */
+
+    console.error(
+      "OpenRouter support failed:",
+      openRouterError
+    );
+  }
+
+  /*
+   * ==========================================================
+   * LOCAL CUSTOM TRAINING AI
+   * ==========================================================
+   */
+  try {
+    const fallback =
+      await generateCustomTrainingResponse(
+        message
       );
-    }
 
+    /*
+     * If local training found a sufficiently useful answer,
+     * return it directly.
+     */
     if (
-      message.length >
-      MAX_MESSAGE_LENGTH
+      fallback.confidence >=
+        0.55 &&
+      !fallback.message.includes(
+        "couldn't find a reliable answer"
+      )
     ) {
-      return jsonResponse(
-        400,
-        {
-          success:
-            false,
-
-          message:
-            `Message must be ${MAX_MESSAGE_LENGTH} characters or less.`,
-        },
-      );
-    }
-
-    /* --------------------------------------------------------
-       HISTORY
-    -------------------------------------------------------- */
-
-    const history =
-      buildHistory(
-        body.messages,
-      );
-
-    /* --------------------------------------------------------
-       AI
-    -------------------------------------------------------- */
-
-    try {
-      const answer =
-        await generateSupportResponse(
-          user,
-          message,
-          history,
-        );
-
       return jsonResponse(
         200,
         {
-          success:
+          success: true,
+
+          message:
+            fallback.message,
+
+          source:
+            "custom-training",
+
+          fallback:
             true,
 
-          message:
-            answer,
-        },
-      );
-    } catch (error) {
-      const internalError =
-        errorMessage(
-          error,
-        );
+          confidence:
+            fallback.confidence,
 
-      /*
-       * Log the real problem for Netlify logs.
-       *
-       * Do NOT send API keys, JWTs, SQL or stack traces to
-       * the player.
-       */
-      console.error(
-        "[AI:SUPPORT] Request failed:",
-        internalError,
-      );
-
-      return jsonResponse(
-        502,
-        {
-          success:
-            false,
-
-          message:
-            "AI support is temporarily unavailable. Please try again shortly.",
-        },
+          matchedDocuments:
+            fallback.matchedDocuments,
+        }
       );
     }
-  };
 
-/* ============================================================
-   REQUEST URL
-============================================================ */
+    /*
+     * Local training has no reliable answer.
+     * Return a support-ticket-ready response.
+     */
+    return jsonResponse(
+      200,
+      {
+        success: true,
 
-function getRequestUrl(
-  event: HandlerEvent,
-): string {
-  const proto =
-    event.headers[
-      "x-forwarded-proto"
-    ] ||
-    event.headers[
-      "X-Forwarded-Proto"
-    ] ||
-    "https";
+        message:
+          buildHumanSupportMessage(),
 
-  const host =
-    event.headers[
-      "host"
-    ] ||
-    event.headers[
-      "Host"
-    ] ||
-    "localhost";
+        source:
+          "human-support",
 
-  return `${proto}://${host}/api/ai/support`;
-}
+        fallback:
+          true,
+
+        createTicket:
+          true,
+
+        trainingMatch:
+          fallback.matchedDocuments,
+      }
+    );
+  } catch (trainingError) {
+    console.error(
+      "Custom training fallback failed:",
+      trainingError
+    );
+
+    /*
+     * Last-resort response.
+     *
+     * Still HTTP 200 because the support chat itself is
+     * functioning even though both AI layers failed.
+     */
+    return jsonResponse(
+      200,
+      {
+        success: true,
+
+        message:
+          buildHumanSupportMessage(),
+
+        source:
+          "human-support",
+
+        fallback:
+          true,
+
+        createTicket:
+          true,
+      }
+    );
+  }
+};

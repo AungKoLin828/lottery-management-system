@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "language": [
+    "en",
+    "my"
+  ],
+  "description": "Training data for 3D lottery play.",
+  "intents": [
+    {
+      "intent": "3d_how_to_play",
+      "category": "lottery-3d",
+      "keywords": [
+        "3D",
+        "play",
+        "number",
+        "ထိုး"
+      ],
+      "examples": {
+        "en": [
+          "How do I play 3D?",
+          "How can I buy a 3D number?",
+          "I want to play 3D"
+        ],
+        "my": [
+          "3D ဘယ်လိုထိုးရမလဲ",
+          "3D ဘယ်လိုကစားရမလဲ",
+          "3D နံပါတ်ဝယ်ချင်တယ်",
+          "3D ထိုးနည်းပြောပါ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Open the 3D Play page, select the available number, enter the bet amount, review the ticket and submit it."
+        ],
+        "my": [
+          "3D Play စာမျက်နှာကိုဖွင့်ပြီး ရွေးချယ်နိုင်သော နံပါတ်ကိုရွေးပါ။ Bet Amount ထည့်ပြီး Ticket ကို ပြန်စစ်ကာ Submit လုပ်ပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "3d_number",
+      "category": "lottery-3d",
+      "keywords": [
+        "three digit",
+        "number",
+        "သုံးလုံး"
+      ],
+      "examples": {
+        "en": [
+          "What numbers can I select for 3D?",
+          "Can I choose any three digit number?"
+        ],
+        "my": [
+          "3D မှာ ဘယ်နံပါတ်တွေရွေးလို့ရလဲ",
+          "သုံးလုံးနံပါတ် ဘယ်ဟာမဆိုရွေးလို့ရလား"
+        ]
+      },
+      "responses": {
+        "en": [
+          "3D uses three-digit number selections. The available numbers are presented by the 3D Play interface."
+        ],
+        "my": [
+          "3D တွင် သုံးလုံးဂဏန်းနံပါတ်များကို ရွေးချယ်ကစားနိုင်ပါသည်။ ရွေးချယ်နိုင်သော နံပါတ်များကို 3D Play Interface တွင် ပြသထားပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "3d_bet_limit",
+      "category": "lottery-3d",
+      "keywords": [
+        "limit",
+        "minimum",
+        "maximum",
+        "ထိုးငွေ"
+      ],
+      "examples": {
+        "en": [
+          "What is the minimum 3D bet?",
+          "What is the maximum 3D bet?",
+          "What is the 3D betting limit?"
+        ],
+        "my": [
+          "3D အနည်းဆုံးထိုးငွေ ဘယ်လောက်လဲ",
+          "3D အများဆုံးထိုးငွေ ဘယ်လောက်လဲ",
+          "3D ထိုးငွေ limit ဘယ်လောက်လဲ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "3D betting limits are controlled by the current lottery settings. Check the 3D Play page for the active limits."
+        ],
+        "my": [
+          "3D Betting Limit များကို လက်ရှိ Lottery Setting မှ သတ်မှတ်ထားပါသည်။ လက်ရှိ Limit ကို 3D Play စာမျက်နှာတွင် စစ်ဆေးပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "3d_ticket",
+      "category": "lottery-3d",
+      "keywords": [
+        "ticket",
+        "My Tickets",
+        "လက်မှတ်"
+      ],
+      "examples": {
+        "en": [
+          "Where can I see my 3D ticket?",
+          "How do I check my 3D ticket?"
+        ],
+        "my": [
+          "3D Ticket ကိုဘယ်မှာကြည့်ရမလဲ",
+          "3D ထိုးထားတာ ဘယ်လိုစစ်ရမလဲ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Open My Tickets to review your submitted 3D tickets and their recorded status."
+        ],
+        "my": [
+          "တင်ထားသော 3D Ticket များနှင့် ၎င်းတို့၏ Status ကို စစ်ဆေးရန် My Tickets ကိုဖွင့်ပါ။"
+        ]
+      }
+    }
+  ]
+}

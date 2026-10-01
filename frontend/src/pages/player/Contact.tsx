@@ -7,6 +7,9 @@ import {
   MapPin,
   Send as TelegramIcon,
   Bot,
+  Database,
+  Users,
+  Sparkles,
 } from "lucide-react";
 
 import AISupportChat from "@/components/ai/AISupportChat";
@@ -45,9 +48,11 @@ export default function Contact() {
           </div>
 
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-            Have a question or need help? Our AI support assistant can help with
-            common questions and your account information. Contact our support
-            team when human assistance is required.
+            Have a question or need help? Our support
+            assistant can help with common questions,
+            account information, and application support.
+            If additional assistance is required, your
+            request can be handled by our human support team.
           </p>
         </div>
 
@@ -90,25 +95,117 @@ export default function Contact() {
                   SUPPORT STATUS
               ================================================== */}
 
-              <div className="mb-5 flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <div className="mb-5 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
 
-                  <span className="text-xs font-bold text-emerald-700">
-                    AI Support Online
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                    </span>
+
+                    <span className="text-xs font-bold text-emerald-700">
+                      Support Assistant Available
+                    </span>
+                  </div>
+
+                  <span className="text-[10px] font-medium text-emerald-600">
+                    Online
                   </span>
                 </div>
 
-                <span className="text-[10px] font-medium text-emerald-600">
-                  Available
-                </span>
+                <p className="mt-2 text-[10px] leading-5 text-emerald-700/80">
+                  Support uses AI assistance with a local
+                  training and knowledge fallback when the
+                  external AI service is unavailable.
+                </p>
               </div>
 
               {/* =================================================
-                  PHONE
+                  SUPPORT FLOW
+              ================================================== */}
+
+              <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4">
+                <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                  Support Flow
+                </p>
+
+                <div className="space-y-2">
+                  {/* AI */}
+
+                  <div className="flex items-center gap-3 rounded-lg bg-violet-50 px-3 py-2.5">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
+                      <Sparkles className="h-4 w-4" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-violet-800">
+                        AI Assistant
+                      </p>
+
+                      <p className="text-[10px] leading-4 text-violet-600">
+                        Answers common support questions
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* ARROW */}
+
+                  <div className="flex justify-center">
+                    <div className="h-2 border-l border-dashed border-slate-300" />
+                  </div>
+
+                  {/* LOCAL */}
+
+                  <div className="flex items-center gap-3 rounded-lg bg-emerald-50 px-3 py-2.5">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                      <Database className="h-4 w-4" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-emerald-800">
+                        Training & Knowledge
+                      </p>
+
+                      <p className="text-[10px] leading-4 text-emerald-600">
+                        Local fallback for support information
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* ARROW */}
+
+                  <div className="flex justify-center">
+                    <div className="h-2 border-l border-dashed border-slate-300" />
+                  </div>
+
+                  {/* HUMAN */}
+
+                  <div className="flex items-center gap-3 rounded-lg bg-blue-50 px-3 py-2.5">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                      <Users className="h-4 w-4" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-blue-800">
+                        Human Support
+                      </p>
+
+                      <p className="text-[10px] leading-4 text-blue-600">
+                        Admin support when further help is required
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* =================================================
+                  CONTACT METHODS
               ================================================== */}
 
               <div className="space-y-3">
+                {/* PHONE */}
+
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-start gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
@@ -127,9 +224,7 @@ export default function Contact() {
                   </div>
                 </div>
 
-                {/* =================================================
-                    TELEGRAM
-                ================================================== */}
+                {/* TELEGRAM */}
 
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-start gap-3">
@@ -149,9 +244,7 @@ export default function Contact() {
                   </div>
                 </div>
 
-                {/* =================================================
-                    ADDRESS
-                ================================================== */}
+                {/* ADDRESS */}
 
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-start gap-3">
@@ -186,9 +279,17 @@ export default function Contact() {
                     </p>
 
                     <p className="mt-1 text-[11px] leading-5 text-violet-600">
-                      Ask about your wallet, deposits, withdrawals,
-                      transactions, 2D/3D results, account help, PWA
-                      installation, and general application support.
+                      Ask about your wallet, deposits,
+                      withdrawals, transactions, 2D/3D
+                      results, account help, PWA installation,
+                      and general application support.
+                    </p>
+
+                    <p className="mt-2 text-[10px] leading-4 text-violet-500">
+                      If the external AI service is temporarily
+                      unavailable, the assistant can use the
+                      application's local training and knowledge
+                      data instead.
                     </p>
                   </div>
                 </div>
@@ -208,8 +309,9 @@ export default function Contact() {
                     </p>
 
                     <p className="mt-1 text-[11px] leading-5 text-indigo-600">
-                      Never share your password, OTP, PIN, or payment
-                      credentials with support or the AI assistant.
+                      Never share your password, OTP, PIN,
+                      or payment credentials with support or
+                      the AI assistant.
                     </p>
                   </div>
                 </div>
@@ -244,8 +346,9 @@ export default function Contact() {
           <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
 
           <p className="text-center text-[10px] font-medium text-slate-400">
-            AI support provides general assistance. Contact the human support
-            team when account or transaction action is required.
+            Support assistance may use external AI,
+            local training data, or human support depending
+            on availability and the type of request.
           </p>
         </div>
       </div>

@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "language": [
+    "en",
+    "my"
+  ],
+  "description": "Training data for the player withdrawal request and administrator approval flow.",
+  "intents": [
+    {
+      "intent": "withdrawal_how_to",
+      "category": "withdrawal",
+      "keywords": [
+        "withdraw",
+        "cash out",
+        "ငွေထုတ်"
+      ],
+      "examples": {
+        "en": [
+          "How do I withdraw?",
+          "How can I withdraw money?",
+          "I want to withdraw",
+          "How can I cash out?"
+        ],
+        "my": [
+          "ငွေဘယ်လိုထုတ်ရမလဲ",
+          "ငွေထုတ်ချင်တယ်",
+          "Wallet ထဲက ငွေဘယ်လိုထုတ်ရမလဲ",
+          "ငွေထုတ်နည်းပြောပါ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Open the Withdraw page, enter the requested amount, select an available withdrawal method, provide the required information, and submit the withdrawal request. The request is then reviewed by an administrator."
+        ],
+        "my": [
+          "Withdraw စာမျက်နှာကိုဖွင့်ပြီး ထုတ်ယူလိုသော Amount ထည့်ပါ။ ရရှိနိုင်သော Withdrawal Method ကိုရွေးပြီး လိုအပ်သောအချက်အလက်များ ဖြည့်ကာ Withdrawal Request တင်ပါ။ ထို့နောက် Admin မှ စစ်ဆေးအတည်ပြုပါမည်။"
+        ]
+      }
+    },
+    {
+      "intent": "withdrawal_pending",
+      "category": "withdrawal",
+      "keywords": [
+        "pending",
+        "waiting",
+        "စောင့်",
+        "approve"
+      ],
+      "examples": {
+        "en": [
+          "My withdrawal is pending",
+          "Why is my withdrawal still pending?",
+          "Withdrawal request is waiting",
+          "When will my withdrawal be approved?"
+        ],
+        "my": [
+          "ငွေထုတ်ထားတာ pending ဖြစ်နေတယ်",
+          "Withdrawal ဘာလို့ pending ဖြစ်နေတာလဲ",
+          "ငွေထုတ် Request စောင့်နေရတယ်",
+          "ငွေထုတ်တာ ဘယ်တော့ approve ဖြစ်မလဲ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "A withdrawal request remains pending while it is waiting for administrator review. The exact status can be checked from your account or by human support."
+        ],
+        "my": [
+          "Withdrawal Request သည် Admin စစ်ဆေးမှုကို စောင့်နေစဉ် Pending အခြေအနေတွင် ရှိနိုင်ပါသည်။ အခြေအနေအတိအကျကို Account မှ သို့မဟုတ် Human Support မှ စစ်ဆေးပေးနိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "withdrawal_approved",
+      "category": "withdrawal",
+      "keywords": [
+        "approved",
+        "approve",
+        "အတည်ပြု"
+      ],
+      "examples": {
+        "en": [
+          "My withdrawal was approved",
+          "What happens after withdrawal approval?",
+          "Withdrawal approved but what next?"
+        ],
+        "my": [
+          "Withdrawal approve ဖြစ်ပြီးနောက် ဘာဖြစ်မလဲ",
+          "ငွေထုတ်တာ approve ဖြစ်ပြီ",
+          "Withdrawal အတည်ပြုပြီးပြီ ဘာဆက်လုပ်ရမလဲ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "After approval, the withdrawal is processed according to the selected payment method. For the exact transaction status, check your withdrawal record or contact human support."
+        ],
+        "my": [
+          "Withdrawal Approve ဖြစ်ပြီးနောက် ရွေးချယ်ထားသော Payment Method အတိုင်း ဆက်လက်လုပ်ဆောင်ပါမည်။ Transaction အခြေအနေအတိအကျကို Withdrawal Record သို့မဟုတ် Human Support မှ စစ်ဆေးနိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "withdrawal_rejected",
+      "category": "withdrawal",
+      "keywords": [
+        "rejected",
+        "failed",
+        "reject",
+        "ပယ်ချ"
+      ],
+      "examples": {
+        "en": [
+          "My withdrawal was rejected",
+          "Why was my withdrawal rejected?",
+          "Withdrawal failed"
+        ],
+        "my": [
+          "Withdrawal reject ဖြစ်တယ်",
+          "ငွေထုတ်တာ ဘာလို့ပယ်ချခံရတာလဲ",
+          "ငွေထုတ်တာ မအောင်မြင်ဘူး"
+        ]
+      },
+      "responses": {
+        "en": [
+          "A rejected withdrawal should be reviewed using the reason recorded for the request. Contact human support if you need the specific reason or further assistance."
+        ],
+        "my": [
+          "Reject ဖြစ်သော Withdrawal Request ၏ မှတ်တမ်းတင်ထားသော အကြောင်းရင်းကို စစ်ဆေးရပါမည်။ အကြောင်းရင်းအတိအကျ သို့မဟုတ် အကူအညီလိုပါက Human Support သို့ ဆက်သွယ်ပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "withdrawal_not_received",
+      "category": "withdrawal",
+      "keywords": [
+        "not received",
+        "money missing",
+        "မရ",
+        "မဝင်"
+      ],
+      "examples": {
+        "en": [
+          "My withdrawal was approved but I did not receive the money",
+          "I have not received my withdrawal"
+        ],
+        "my": [
+          "Withdrawal approve ဖြစ်ပြီ ဒါပေမယ့် ငွေမရသေးဘူး",
+          "ငွေထုတ် approve ဖြစ်ပြီး ငွေမဝင်သေးဘူး"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Keep your withdrawal reference and payment details. Contact human support so the administrator can check the withdrawal transaction and payment status."
+        ],
+        "my": [
+          "Withdrawal Reference နှင့် Payment အချက်အလက်များကို သိမ်းထားပါ။ Withdrawal Transaction နှင့် Payment Status ကို Admin မှ စစ်ဆေးနိုင်ရန် Human Support သို့ ဆက်သွယ်ပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "withdrawal_cancel",
+      "category": "withdrawal",
+      "keywords": [
+        "cancel",
+        "cancellation",
+        "ဖျက်",
+        "cancel လုပ်"
+      ],
+      "examples": {
+        "en": [
+          "Can I cancel my withdrawal?",
+          "I want to cancel a withdrawal request"
+        ],
+        "my": [
+          "Withdrawal cancel လုပ်လို့ရလား",
+          "ငွေထုတ် Request ကို cancel လုပ်ချင်တယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Cancellation depends on the current withdrawal status. Contact human support with the withdrawal reference so an administrator can check whether cancellation is possible."
+        ],
+        "my": [
+          "Withdrawal ၏ လက်ရှိ Status ပေါ်မူတည်၍ Cancel လုပ်နိုင်မှု ကွာခြားနိုင်ပါသည်။ Withdrawal Reference ဖြင့် Human Support သို့ ဆက်သွယ်ပြီး စစ်ဆေးပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "withdrawal_minimum",
+      "category": "withdrawal",
+      "keywords": [
+        "minimum",
+        "limit",
+        "အနည်းဆုံး",
+        "limit"
+      ],
+      "examples": {
+        "en": [
+          "What is the minimum withdrawal amount?",
+          "Is there a minimum withdrawal?"
+        ],
+        "my": [
+          "အနည်းဆုံး ငွေထုတ်ပမာဏ ဘယ်လောက်လဲ",
+          "Withdrawal minimum ရှိလား"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Withdrawal limits are controlled by the application settings. Check the Withdraw page for the currently configured limits."
+        ],
+        "my": [
+          "Withdrawal Limit များကို Application Setting မှ စီမံထားပါသည်။ လက်ရှိသတ်မှတ်ထားသော Limit ကို Withdraw စာမျက်နှာတွင် စစ်ဆေးပါ။"
+        ]
+      }
+    }
+  ]
+}

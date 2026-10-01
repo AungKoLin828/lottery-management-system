@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "language": [
+    "en",
+    "my"
+  ],
+  "description": "Training data for lottery results and result history.",
+  "intents": [
+    {
+      "intent": "results_today",
+      "category": "results",
+      "keywords": [
+        "result",
+        "latest",
+        "today",
+        "ရလဒ်",
+        "ဒီနေ့"
+      ],
+      "examples": {
+        "en": [
+          "What are today's results?",
+          "Show today's lottery result",
+          "Where can I see the latest result?"
+        ],
+        "my": [
+          "ဒီနေ့ရလဒ် ဘာလဲ",
+          "ဒီနေ့ Lottery Result ကြည့်ချင်တယ်",
+          "နောက်ဆုံးရလဒ် ဘယ်မှာကြည့်ရမလဲ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Open the Results page to see the latest published lottery results. Results are displayed after they are published by the system administrator."
+        ],
+        "my": [
+          "နောက်ဆုံးထုတ်ပြန်ထားသော Lottery Result များကို Results စာမျက်နှာတွင် ကြည့်နိုင်ပါသည်။ Admin မှ Result ထုတ်ပြန်ပြီးနောက် စနစ်တွင် ပြသပါမည်။"
+        ]
+      }
+    },
+    {
+      "intent": "results_history",
+      "category": "results",
+      "keywords": [
+        "history",
+        "previous",
+        "အရင်",
+        "မှတ်တမ်း"
+      ],
+      "examples": {
+        "en": [
+          "Where can I see result history?",
+          "Show previous lottery results",
+          "Can I see old results?"
+        ],
+        "my": [
+          "Result History ဘယ်မှာကြည့်ရမလဲ",
+          "အရင် Lottery Result တွေကြည့်ချင်တယ်",
+          "အဟောင်း Result တွေကြည့်လို့ရလား"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Open Results History to review previously published lottery results."
+        ],
+        "my": [
+          "ယခင်ထုတ်ပြန်ထားသော Lottery Result များကို Results History တွင် ကြည့်နိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "results_2d",
+      "category": "results",
+      "keywords": [
+        "2D result",
+        "2D ရလဒ်"
+      ],
+      "examples": {
+        "en": [
+          "What was the 2D result?",
+          "Show the 2D result"
+        ],
+        "my": [
+          "2D Result ဘာထွက်လဲ",
+          "2D ရလဒ်ပြပါ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Open the Results page and select the relevant 2D draw session to see the published result."
+        ],
+        "my": [
+          "Results စာမျက်နှာကိုဖွင့်ပြီး သက်ဆိုင်ရာ 2D Draw Session ကိုရွေးကာ ထုတ်ပြန်ထားသော Result ကို ကြည့်နိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "results_3d",
+      "category": "results",
+      "keywords": [
+        "3D result",
+        "3D ရလဒ်"
+      ],
+      "examples": {
+        "en": [
+          "What was the 3D result?",
+          "Show the 3D result"
+        ],
+        "my": [
+          "3D Result ဘာထွက်လဲ",
+          "3D ရလဒ်ပြပါ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Open the Results page to see the latest published 3D result."
+        ],
+        "my": [
+          "နောက်ဆုံးထုတ်ပြန်ထားသော 3D Result ကို Results စာမျက်နှာတွင် ကြည့်နိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "results_not_published",
+      "category": "results",
+      "keywords": [
+        "not showing",
+        "not published",
+        "မပေါ်",
+        "မထွက်"
+      ],
+      "examples": {
+        "en": [
+          "Why is the result not showing?",
+          "The result has not been published",
+          "I cannot see the result"
+        ],
+        "my": [
+          "Result မပေါ်သေးဘူး",
+          "ရလဒ်မထွက်သေးဘူး",
+          "Result ကြည့်လို့မရဘူး"
+        ]
+      },
+      "responses": {
+        "en": [
+          "The result may not have been published yet. If the expected result time has passed and it is still unavailable, contact human support."
+        ],
+        "my": [
+          "Result မထုတ်ပြန်ရသေးခြင်း ဖြစ်နိုင်ပါသည်။ မျှော်မှန်းထားသောအချိန်ကျော်ပြီးလည်း မရရှိသေးပါက Human Support သို့ ဆက်သွယ်ပါ။"
+        ]
+      }
+    }
+  ]
+}

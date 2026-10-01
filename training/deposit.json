@@ -1,0 +1,195 @@
+{
+  "version": 1,
+  "language": [
+    "en",
+    "my"
+  ],
+  "description": "Training data for deposits. Exact deposit status must be checked from the database.",
+  "intents": [
+    {
+      "intent": "deposit_how_to",
+      "category": "deposit",
+      "keywords": [
+        "deposit",
+        "top up",
+        "ငွေသွင်း",
+        "ငွေဖြည့်"
+      ],
+      "examples": {
+        "en": [
+          "How do I deposit?",
+          "How can I add money?",
+          "I want to deposit money",
+          "How can I top up my wallet?"
+        ],
+        "my": [
+          "ငွေဘယ်လိုသွင်းရမလဲ",
+          "Wallet ထဲ ငွေဘယ်လိုထည့်ရမလဲ",
+          "ငွေသွင်းချင်တယ်",
+          "ငွေဖြည့်ချင်တယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Open the Deposit page, select an available payment method, follow the displayed payment instructions, enter the required transaction information, and submit the deposit request."
+        ],
+        "my": [
+          "Deposit စာမျက်နှာကိုဖွင့်ပြီး ရရှိနိုင်သော Payment Method ကိုရွေးပါ။ ပြသထားသော ငွေပေးချေမှုညွှန်ကြားချက်အတိုင်း လုပ်ဆောင်ပြီး လိုအပ်သော Transaction အချက်အလက်များ ဖြည့်ကာ Deposit Request တင်ပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "deposit_pending",
+      "category": "deposit",
+      "keywords": [
+        "deposit pending",
+        "pending",
+        "စောင့်",
+        "အတည်မပြု"
+      ],
+      "examples": {
+        "en": [
+          "My deposit is pending",
+          "Why is my deposit still pending?",
+          "Deposit pending",
+          "I deposited but it is not approved"
+        ],
+        "my": [
+          "ငွေသွင်းတာ pending ဖြစ်နေတယ်",
+          "Deposit ဘာလို့ pending ဖြစ်နေတာလဲ",
+          "ငွေသွင်းထားတာ approve မဖြစ်သေးဘူး",
+          "Deposit အတည်မပြုသေးဘူး"
+        ]
+      },
+      "responses": {
+        "en": [
+          "A pending deposit is waiting for review. The exact status of your deposit can be checked from your account or by human support."
+        ],
+        "my": [
+          "Pending Deposit သည် စစ်ဆေးမှုကို စောင့်နေခြင်းဖြစ်ပါသည်။ သင့် Deposit အခြေအနေအတိအကျကို Account မှ စစ်ဆေးနိုင်ပြီး Human Support မှလည်း စစ်ဆေးပေးနိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "deposit_failed",
+      "category": "deposit",
+      "keywords": [
+        "failed",
+        "rejected",
+        "မအောင်မြင်",
+        "ပယ်ချ"
+      ],
+      "examples": {
+        "en": [
+          "My deposit failed",
+          "Deposit was rejected",
+          "Why was my deposit rejected?",
+          "My deposit did not work"
+        ],
+        "my": [
+          "Deposit မအောင်မြင်ဘူး",
+          "ငွေသွင်းတာ reject ဖြစ်တယ်",
+          "Deposit ဘာလို့ပယ်ချခံရတာလဲ",
+          "ငွေသွင်းလို့မရဘူး"
+        ]
+      },
+      "responses": {
+        "en": [
+          "If a deposit failed or was rejected, check the transaction information and payment method details. Human support can review the specific deposit request."
+        ],
+        "my": [
+          "Deposit မအောင်မြင်ခြင်း သို့မဟုတ် Reject ဖြစ်ခြင်းရှိပါက Transaction အချက်အလက်နှင့် Payment Method အချက်အလက်များကို စစ်ဆေးပါ။ သတ်မှတ်ထားသော Deposit Request ကို Human Support မှ စစ်ဆေးပေးနိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "deposit_not_received",
+      "category": "deposit",
+      "keywords": [
+        "not credited",
+        "not received",
+        "မဝင်",
+        "မရောက်"
+      ],
+      "examples": {
+        "en": [
+          "I paid but my wallet was not credited",
+          "I deposited money but balance did not increase",
+          "Deposit money is missing"
+        ],
+        "my": [
+          "ငွေပေးပြီးပြီ Wallet ထဲမဝင်သေးဘူး",
+          "Deposit လုပ်ပြီး Balance မတက်ဘူး",
+          "ငွေသွင်းထားတာ Wallet ထဲမရောက်ဘူး"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Do not submit the same deposit repeatedly. Keep your payment receipt or transaction reference and contact human support for verification."
+        ],
+        "my": [
+          "Deposit တစ်ခုတည်းကို ထပ်ခါထပ်ခါ မတင်ပါနှင့်။ Payment Receipt သို့မဟုတ် Transaction Reference ကို သိမ်းထားပြီး Human Support သို့ ဆက်သွယ်ကာ စစ်ဆေးပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "deposit_receipt",
+      "category": "deposit",
+      "keywords": [
+        "receipt",
+        "screenshot",
+        "reference",
+        "ဘောင်ချာ",
+        "screenshot"
+      ],
+      "examples": {
+        "en": [
+          "Do I need a payment receipt?",
+          "Where do I enter the transaction reference?",
+          "I have a payment screenshot"
+        ],
+        "my": [
+          "Payment Receipt လိုလား",
+          "Transaction Reference ဘယ်မှာထည့်ရမလဲ",
+          "Payment Screenshot ရှိတယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Keep your payment receipt or transaction reference. It may be needed when an administrator verifies the deposit."
+        ],
+        "my": [
+          "Payment Receipt သို့မဟုတ် Transaction Reference ကို သိမ်းထားပါ။ Admin မှ Deposit ကို စစ်ဆေးအတည်ပြုရာတွင် လိုအပ်နိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "deposit_duplicate",
+      "category": "deposit",
+      "keywords": [
+        "duplicate",
+        "twice",
+        "နှစ်ခါ",
+        "ထပ်တင်"
+      ],
+      "examples": {
+        "en": [
+          "I submitted the same deposit twice",
+          "I accidentally made a duplicate deposit request"
+        ],
+        "my": [
+          "Deposit နှစ်ခါတင်မိတယ်",
+          "Deposit Request ထပ်တင်မိတယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Do not submit additional requests. Contact human support and provide the related transaction references so the duplicate requests can be reviewed."
+        ],
+        "my": [
+          "Request ထပ်မတင်ပါနှင့်။ Duplicate Request များကို စစ်ဆေးနိုင်ရန် Transaction Reference များဖြင့် Human Support သို့ ဆက်သွယ်ပါ။"
+        ]
+      }
+    }
+  ]
+}

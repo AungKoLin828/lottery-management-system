@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "language": [
+    "en",
+    "my"
+  ],
+  "description": "Training data for wallet balance and wallet transaction questions.",
+  "intents": [
+    {
+      "intent": "wallet_balance",
+      "category": "wallet",
+      "keywords": [
+        "balance",
+        "wallet",
+        "လက်ကျန်",
+        "ပိုက်ဆံ"
+      ],
+      "examples": {
+        "en": [
+          "What is my wallet balance?",
+          "How much money do I have?",
+          "Show my balance",
+          "Check my balance"
+        ],
+        "my": [
+          "လက်ကျန်ငွေဘယ်လောက်ရှိလဲ",
+          "Wallet balance ကြည့်ချင်တယ်",
+          "ပိုက်ဆံဘယ်လောက်ကျန်လဲ",
+          "လက်ကျန်ငွေစစ်ချင်တယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Your current wallet balance can be checked from the Wallet page. For your exact balance, the system reads your account wallet directly."
+        ],
+        "my": [
+          "သင့်လက်ရှိ Wallet Balance ကို Wallet စာမျက်နှာတွင် စစ်ဆေးနိုင်ပါသည်။ လက်ကျန်ငွေအတိအကျကို သင့်အကောင့် Wallet မှ စစ်ဆေးရပါမည်။"
+        ]
+      }
+    },
+    {
+      "intent": "wallet_missing_balance",
+      "category": "wallet",
+      "keywords": [
+        "wrong balance",
+        "missing money",
+        "လက်ကျန်မှား",
+        "ငွေပျောက်"
+      ],
+      "examples": {
+        "en": [
+          "My balance is wrong",
+          "My wallet balance changed unexpectedly",
+          "Money is missing from my wallet"
+        ],
+        "my": [
+          "Wallet လက်ကျန်မှားနေတယ်",
+          "Wallet ထဲက ငွေမမှန်ဘူး",
+          "Wallet ထဲက ပိုက်ဆံပျောက်နေတယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Please do not make another transaction while the balance is being checked. Contact human support so an administrator can review your wallet transactions."
+        ],
+        "my": [
+          "Balance ကို စစ်ဆေးနေစဉ် အခြား Transaction အသစ် မပြုလုပ်ပါနှင့်။ Wallet Transaction များကို Admin မှ စစ်ဆေးနိုင်ရန် Human Support သို့ ဆက်သွယ်ပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "wallet_transaction_history",
+      "category": "wallet",
+      "keywords": [
+        "transaction history",
+        "history",
+        "မှတ်တမ်း"
+      ],
+      "examples": {
+        "en": [
+          "How can I see my wallet transactions?",
+          "Show my transaction history",
+          "Where can I see wallet history?"
+        ],
+        "my": [
+          "Wallet transaction history ဘယ်မှာကြည့်ရမလဲ",
+          "ငွေလွှဲမှတ်တမ်းကြည့်ချင်တယ်",
+          "Transaction history ကြည့်ချင်တယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Open the Wallet or transaction-history section to review your recorded wallet transactions."
+        ],
+        "my": [
+          "Wallet သို့မဟုတ် Transaction History အပိုင်းကို ဖွင့်ပြီး မှတ်တမ်းတင်ထားသော Wallet Transaction များကို ကြည့်နိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "wallet_debit_credit",
+      "category": "wallet",
+      "keywords": [
+        "deducted",
+        "added",
+        "credit",
+        "debit",
+        "နုတ်",
+        "ဝင်"
+      ],
+      "examples": {
+        "en": [
+          "Why was money added to my wallet?",
+          "Why was money deducted from my wallet?",
+          "Why did my balance change?"
+        ],
+        "my": [
+          "Wallet ထဲ ငွေဘာလို့ဝင်လာတာလဲ",
+          "Wallet ထဲက ငွေဘာလို့နုတ်သွားတာလဲ",
+          "Balance ဘာလို့ပြောင်းသွားတာလဲ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Wallet changes are recorded as transactions. For an exact explanation of a specific change, human support can review the related transaction."
+        ],
+        "my": [
+          "Wallet Balance ပြောင်းလဲမှုများကို Transaction အဖြစ် မှတ်တမ်းတင်ထားပါသည်။ သတ်မှတ်ထားသော ပြောင်းလဲမှုအတွက် အကြောင်းရင်းအတိအကျကို Human Support မှ Transaction ကို စစ်ဆေးပေးနိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "wallet_payment_methods",
+      "category": "wallet",
+      "keywords": [
+        "payment method",
+        "KBZPay",
+        "WavePay",
+        "AYA",
+        "bank",
+        "ငွေပေးချေ"
+      ],
+      "examples": {
+        "en": [
+          "What payment methods are available?",
+          "Which methods can I use to deposit?",
+          "How can I pay?"
+        ],
+        "my": [
+          "ဘယ် Payment Method တွေသုံးလို့ရလဲ",
+          "ငွေသွင်းဖို့ ဘယ်နည်းလမ်းတွေရှိလဲ",
+          "ဘယ်လိုငွေပေးချေရမလဲ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Available payment methods are shown in the Deposit page. The available methods can be managed by the administrator."
+        ],
+        "my": [
+          "ရရှိနိုင်သော Payment Method များကို Deposit စာမျက်နှာတွင် ပြသထားပါသည်။ Payment Method များကို Admin မှ စီမံနိုင်ပါသည်။"
+        ]
+      }
+    }
+  ]
+}

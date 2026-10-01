@@ -1,0 +1,196 @@
+{
+  "version": 1,
+  "language": [
+    "en",
+    "my"
+  ],
+  "description": "Training data for player account, login, profile, password, phone and account status questions.",
+  "intents": [
+    {
+      "intent": "account_login",
+      "category": "account",
+      "keywords": [
+        "login",
+        "sign in",
+        "ဝင်",
+        "အကောင့်"
+      ],
+      "examples": {
+        "en": [
+          "How do I login?",
+          "I cannot login",
+          "Why can't I sign in?",
+          "Login is not working",
+          "How can I access my account?"
+        ],
+        "my": [
+          "ဘယ်လို login ဝင်ရမလဲ",
+          "login ဝင်လို့မရဘူး",
+          "အကောင့်ထဲ ဝင်လို့မရပါဘူး",
+          "ဘာလို့ sign in ဝင်မရတာလဲ",
+          "အကောင့်ထဲ ဘယ်လိုဝင်ရမလဲ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Use the phone number registered to your account to sign in. If login still fails, please contact human support so an administrator can check your account."
+        ],
+        "my": [
+          "သင့်အကောင့်တွင် မှတ်ပုံတင်ထားသော ဖုန်းနံပါတ်ဖြင့် Login ဝင်နိုင်ပါသည်။ Login မရသေးပါက Human Support သို့ ဆက်သွယ်ပြီး Admin မှ အကောင့်ကို စစ်ဆေးပေးနိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "account_registration",
+      "category": "account",
+      "keywords": [
+        "register",
+        "registration",
+        "signup",
+        "အကောင့်ဖွင့်"
+      ],
+      "examples": {
+        "en": [
+          "How do I create an account?",
+          "How can I register?",
+          "I want to register",
+          "Can I create a new account?"
+        ],
+        "my": [
+          "အကောင့်ဘယ်လိုဖွင့်ရမလဲ",
+          "အကောင့်အသစ်ဖွင့်ချင်တယ်",
+          "ဘယ်လို register လုပ်ရမလဲ",
+          "အကောင့်အသစ်လုပ်ချင်ပါတယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Register using the registration form and provide the required account information. Use a valid phone number that you can access."
+        ],
+        "my": [
+          "Registration Form မှတစ်ဆင့် လိုအပ်သောအချက်အလက်များ ဖြည့်ပြီး အကောင့်ဖွင့်နိုင်ပါသည်။ သင်အသုံးပြုနိုင်သော မှန်ကန်သည့် ဖုန်းနံပါတ်ကို အသုံးပြုပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "account_phone",
+      "category": "account",
+      "keywords": [
+        "phone",
+        "mobile",
+        "ဖုန်းနံပါတ်"
+      ],
+      "examples": {
+        "en": [
+          "I want to change my phone number",
+          "How can I change my phone number?",
+          "My phone number changed"
+        ],
+        "my": [
+          "ဖုန်းနံပါတ်ပြောင်းချင်တယ်",
+          "ဖုန်းနံပါတ်အသစ်ပြောင်းလို့ရလား",
+          "မှတ်ပုံတင်ထားတဲ့ ဖုန်းနံပါတ်ပြောင်းသွားပြီ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Phone-number changes may require administrator verification. Please contact human support with the new number and your account details."
+        ],
+        "my": [
+          "ဖုန်းနံပါတ်ပြောင်းလဲခြင်းအတွက် Admin အတည်ပြုချက် လိုအပ်နိုင်ပါသည်။ ဖုန်းနံပါတ်အသစ်နှင့် အကောင့်အချက်အလက်များဖြင့် Human Support သို့ ဆက်သွယ်ပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "account_status",
+      "category": "account",
+      "keywords": [
+        "active",
+        "inactive",
+        "suspended",
+        "status",
+        "ပိတ်",
+        "suspend"
+      ],
+      "examples": {
+        "en": [
+          "Is my account active?",
+          "Why is my account inactive?",
+          "My account is suspended",
+          "My account is disabled"
+        ],
+        "my": [
+          "ကျွန်တော့်အကောင့် active ဖြစ်လား",
+          "အကောင့် inactive ဖြစ်နေတယ်",
+          "အကောင့် suspend ဖြစ်နေတယ်",
+          "အကောင့်ပိတ်ထားတယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Your account status is stored in the system. If you need the exact reason for an inactive or suspended account, human support can review your account."
+        ],
+        "my": [
+          "အကောင့်အခြေအနေကို စနစ်တွင် သိမ်းဆည်းထားပါသည်။ Inactive သို့မဟုတ် Suspended ဖြစ်နေပါက အကြောင်းရင်းအတိအကျကို Human Support မှ စစ်ဆေးပေးနိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "account_profile",
+      "category": "account",
+      "keywords": [
+        "profile",
+        "account information",
+        "အချက်အလက်"
+      ],
+      "examples": {
+        "en": [
+          "How do I update my profile?",
+          "I want to change my profile information"
+        ],
+        "my": [
+          "Profile အချက်အလက်ပြောင်းချင်တယ်",
+          "အကောင့်အချက်အလက်ပြင်ချင်တယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Some profile information can be updated through your account. If the field cannot be changed, contact human support."
+        ],
+        "my": [
+          "Profile အချက်အလက်အချို့ကို အကောင့်မှ ပြင်ဆင်နိုင်ပါသည်။ ပြင်ဆင်၍မရသောအချက်အလက်များအတွက် Human Support သို့ ဆက်သွယ်ပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "account_security",
+      "category": "account",
+      "keywords": [
+        "security",
+        "hacked",
+        "unauthorized",
+        "လုံခြုံရေး"
+      ],
+      "examples": {
+        "en": [
+          "I think someone accessed my account",
+          "My account may be compromised",
+          "Someone used my account"
+        ],
+        "my": [
+          "တစ်ယောက်ယောက်က အကောင့်သုံးထားသလိုပဲ",
+          "အကောင့်လုံခြုံရေးပြဿနာရှိတယ်",
+          "အကောင့်ကို တခြားသူသုံးနေတယ်ထင်တယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Do not share your login information with anyone. Please contact human support immediately so an administrator can review the account."
+        ],
+        "my": [
+          "Login အချက်အလက်များကို မည်သူ့ကိုမျှ မမျှဝေပါနှင့်။ အကောင့်ကို Admin မှ စစ်ဆေးနိုင်ရန် Human Support သို့ ချက်ချင်း ဆက်သွယ်ပါ။"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "language": [
+    "en",
+    "my"
+  ],
+  "description": "Training data for escalation from automated support to persistent human support.",
+  "intents": [
+    {
+      "intent": "human_support_request",
+      "category": "human-support",
+      "keywords": [
+        "human",
+        "admin",
+        "support",
+        "လူ",
+        "admin နဲ့ပြော"
+      ],
+      "examples": {
+        "en": [
+          "I want to talk to an admin",
+          "I need human support",
+          "Can a person help me?",
+          "Connect me to support"
+        ],
+        "my": [
+          "Admin နဲ့ပြောချင်တယ်",
+          "လူနဲ့အကူအညီလိုတယ်",
+          "Human Support လိုချင်တယ်",
+          "Support နဲ့ ဆက်သွယ်ပေးပါ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "I can send your conversation to human support. Please describe your issue and include any relevant transaction or ticket reference."
+        ],
+        "my": [
+          "သင့် Conversation ကို Human Support သို့ ပို့ပေးနိုင်ပါသည်။ ပြဿနာအကြောင်းနှင့် သက်ဆိုင်ရာ Transaction သို့မဟုတ် Ticket Reference ရှိပါက ထည့်ပေးပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "human_support_unresolved",
+      "category": "human-support",
+      "keywords": [
+        "not solved",
+        "not help",
+        "still problem",
+        "မဖြေရှင်း"
+      ],
+      "examples": {
+        "en": [
+          "The answer did not solve my problem",
+          "That did not help",
+          "I still have a problem",
+          "I need someone to check this"
+        ],
+        "my": [
+          "အဖြေက ပြဿနာမဖြေရှင်းပေးဘူး",
+          "အဆင်မပြေသေးဘူး",
+          "ပြဿနာရှိနေသေးတယ်",
+          "တစ်ယောက်ယောက်က စစ်ပေးစေချင်တယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "I will keep this as a human-support conversation. An administrator can review your message and reply from the support inbox."
+        ],
+        "my": [
+          "ဒီပြဿနာကို Human Support Conversation အဖြစ် ဆက်လက်ထားပါမည်။ Admin မှ Support Inbox မှတစ်ဆင့် သင့် Message ကို စစ်ဆေးပြီး ပြန်လည်ဖြေကြားနိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "human_support_transaction",
+      "category": "human-support",
+      "keywords": [
+        "check transaction",
+        "verify",
+        "စစ်ပေး",
+        "transaction"
+      ],
+      "examples": {
+        "en": [
+          "Please check my transaction",
+          "Admin please check my payment",
+          "Can someone verify my deposit?"
+        ],
+        "my": [
+          "Transaction စစ်ပေးပါ",
+          "Admin က Payment စစ်ပေးပါ",
+          "Deposit ကို စစ်ပေးပါ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Please provide the relevant transaction reference if available. Human support can review the recorded transaction."
+        ],
+        "my": [
+          "ရှိပါက သက်ဆိုင်ရာ Transaction Reference ကို ပေးပါ။ Human Support မှ မှတ်တမ်းတင်ထားသော Transaction ကို စစ်ဆေးပေးနိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "human_support_response_time",
+      "category": "human-support",
+      "keywords": [
+        "reply",
+        "response time",
+        "ဘယ်တော့",
+        "ကြာ"
+      ],
+      "examples": {
+        "en": [
+          "When will an admin reply?",
+          "How long does human support take?",
+          "When can I expect a reply?"
+        ],
+        "my": [
+          "Admin ဘယ်တော့ပြန်ဖြေမလဲ",
+          "Human Support ဘယ်လောက်ကြာလဲ",
+          "ဘယ်တော့ Reply ရမလဲ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Your message remains in the support conversation until an administrator replies. Response time depends on administrator availability."
+        ],
+        "my": [
+          "သင့် Message သည် Admin မှ Reply ပြန်သည်အထိ Support Conversation တွင် ဆက်လက်ရှိပါမည်။ Reply အချိန်သည် Admin ရရှိနိုင်မှုအပေါ် မူတည်ပါသည်။"
+        ]
+      }
+    }
+  ]
+}

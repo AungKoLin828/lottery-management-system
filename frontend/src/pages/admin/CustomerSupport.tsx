@@ -1,15 +1,22 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import {
-  ArrowLeft,
   Bot,
   CheckCircle2,
+  ChevronLeft,
+  Clock3,
+  Loader2,
   MessageCircle,
   RefreshCw,
   Search,
   Send,
   User,
-  X,
+  XCircle,
 } from "lucide-react";
 
 import {
@@ -24,355 +31,689 @@ import {
   type SupportTicketStatus,
 } from "../../services/adminSupportService";
 
-const STATUS_OPTIONS: SupportTicketStatus[] = [
-  "OPEN",
-  "IN_PROGRESS",
-  "RESOLVED",
-  "CLOSED",
-];
+/*
+ * ============================================================
+ * HELPERS
+ * ============================================================
+ */
 
-const PRIORITY_OPTIONS: SupportTicketPriority[] = [
-  "LOW",
-  "NORMAL",
-  "HIGH",
-  "URGENT",
-];
+function formatDateTime(
+  value?: string | Date | null,
+): string {
+  if (!value) {
+    return "";
+  }
 
-function formatDate(value: string): string {
-  const date = new Date(value);
+  const date =
+    value instanceof Date
+      ? value
+      : new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "-";
+    return String(value);
   }
 
   return date.toLocaleString();
 }
 
-function getInitials(name?: string | null): string {
-  if (!name) {
-    return "PL";
+function getStatusLabel(
+  status?: SupportTicketStatus | null,
+): string {
+  switch (status) {
+    case "OPEN":
+      return "Open";
+
+    case "IN_PROGRESS":
+      return "In Progress";
+
+    case "RESOLVED":
+      return "Resolved";
+
+    case "CLOSED":
+      return "Closed";
+
+    default:
+      return "Unknown";
+  }
+}
+
+function getPriorityLabel(
+  priority?: SupportTicketPriority | null,
+): string {
+  switch (priority) {
+    case "LOW":
+      return "Low";
+
+    case "NORMAL":
+      return "Normal";
+
+    case "HIGH":
+      return "High";
+
+    case "URGENT":
+      return "Urgent";
+
+    default:
+      return "Normal";
+  }
+}
+
+function getStatusClassName(
+  status?: SupportTicketStatus | null,
+): string {
+  switch (status) {
+    case "OPEN":
+      return "bg-blue-50 text-blue-700 ring-blue-600/20";
+
+    case "IN_PROGRESS":
+      return "bg-amber-50 text-amber-700 ring-amber-600/20";
+
+    case "RESOLVED":
+      return "bg-emerald-50 text-emerald-700 ring-emerald-600/20";
+
+    case "CLOSED":
+      return "bg-slate-100 text-slate-600 ring-slate-500/20";
+
+    default:
+      return "bg-slate-100 text-slate-600 ring-slate-500/20";
+  }
+}
+
+function getPriorityClassName(
+  priority?: SupportTicketPriority | null,
+): string {
+  switch (priority) {
+    case "URGENT":
+      return "bg-red-50 text-red-700 ring-red-600/20";
+
+    case "HIGH":
+      return "bg-orange-50 text-orange-700 ring-orange-600/20";
+
+    case "NORMAL":
+      return "bg-blue-50 text-blue-700 ring-blue-600/20";
+
+    case "LOW":
+      return "bg-slate-100 text-slate-600 ring-slate-500/20";
+
+    default:
+      return "bg-slate-100 text-slate-600 ring-slate-500/20";
+  }
+}
+
+/*
+ * Ticket subject comes directly from AdminSupportTicket.subject.
+ */
+function getTicketTitle(
+  ticket: AdminSupportTicket,
+): string {
+  return ticket.subject?.trim() || "Support Request";
+}
+
+/*
+ * Ticket list does not have a top-level "message" property.
+ *
+ * The latest message is taken from ticket.messages.
+ */
+function getTicketPreview(
+  ticket: AdminSupportTicket,
+): string {
+  const messages =
+    ticket.messages ?? [];
+
+  if (messages.length === 0) {
+    return "No message";
   }
 
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
-}
-
-function statusLabel(status: SupportTicketStatus): string {
-  return status
-    .replace("_", " ")
-    .replace(/\b\w/g, (value) => value.toUpperCase());
-}
-
-function priorityLabel(priority: SupportTicketPriority): string {
-  return priority.charAt(0) + priority.slice(1).toLowerCase();
-}
-
-function StatusBadge({ status }: { status: SupportTicketStatus }) {
-  const classes: Record<SupportTicketStatus, string> = {
-    OPEN: "bg-blue-50 text-blue-700 border-blue-200",
-    IN_PROGRESS: "bg-amber-50 text-amber-700 border-amber-200",
-    RESOLVED: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    CLOSED: "bg-slate-100 text-slate-600 border-slate-200",
-  };
+  const latestMessage =
+    messages[messages.length - 1];
 
   return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${classes[status]}`}
-    >
-      {statusLabel(status)}
-    </span>
+    latestMessage?.message?.trim() ||
+    "No message"
   );
 }
 
-function PriorityBadge({ priority }: { priority: SupportTicketPriority }) {
-  const classes: Record<SupportTicketPriority, string> = {
-    LOW: "bg-slate-50 text-slate-600 border-slate-200",
-    NORMAL: "bg-blue-50 text-blue-600 border-blue-200",
-    HIGH: "bg-orange-50 text-orange-700 border-orange-200",
-    URGENT: "bg-red-50 text-red-700 border-red-200",
-  };
+/*
+ * ============================================================
+ * MESSAGE BUBBLE
+ * ============================================================
+ */
+
+type MessageBubbleProps = {
+  message: AdminSupportMessage;
+};
+
+function MessageBubble({
+  message,
+}: MessageBubbleProps) {
+  const isAdmin =
+    message.senderType === "ADMIN";
+
+  const isAI =
+    message.senderType === "AI";
+
+  const senderName = isAdmin
+    ? "Admin"
+    : isAI
+      ? "AI Assistant"
+      : "Player";
+
+  const SenderIcon = isAdmin
+    ? CheckCircle2
+    : isAI
+      ? Bot
+      : User;
 
   return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${classes[priority]}`}
+    <div
+      className={`flex w-full ${
+        isAdmin
+          ? "justify-end"
+          : "justify-start"
+      }`}
     >
-      {priorityLabel(priority)}
-    </span>
-  );
-}
+      <div
+        className={`flex max-w-[92%] flex-col sm:max-w-[78%] ${
+          isAdmin
+            ? "items-end"
+            : "items-start"
+        }`}
+      >
+        <div className="mb-1 flex items-center gap-1.5 px-1 text-xs font-medium text-slate-500">
+          <SenderIcon className="h-3.5 w-3.5" />
 
-function MessageBubble({ message }: { message: AdminSupportMessage }) {
-  const sender = message.senderType.toUpperCase();
-
-  const isAdmin = sender === "ADMIN";
-
-  const isAI = sender === "AI";
-
-  const isPlayer = sender === "PLAYER";
-
-  return (
-    <div className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}>
-      <div className={`max-w-[85%] sm:max-w-[75%]`}>
-        <div
-          className={`mb-1 flex items-center gap-2 text-[11px] text-slate-500 ${
-            isAdmin ? "justify-end" : "justify-start"
-          }`}
-        >
-          {isAI ? (
-            <>
-              <Bot size={13} />
-              <span>AI Assistant</span>
-            </>
-          ) : isAdmin ? (
-            <>
-              <span>Admin</span>
-            </>
-          ) : isPlayer ? (
-            <>
-              <User size={13} />
-              <span>Player</span>
-            </>
-          ) : (
-            <span>{message.senderType}</span>
-          )}
+          <span>
+            {senderName}
+          </span>
         </div>
 
         <div
-          className={[
-            "rounded-2xl border px-4 py-3",
-            "text-sm leading-6",
-            "whitespace-pre-wrap break-words",
+          className={`rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
             isAdmin
-              ? "rounded-br-md border-blue-200 bg-blue-600 text-white"
+              ? "rounded-br-md bg-blue-600 text-white"
               : isAI
-                ? "rounded-bl-md border-violet-200 bg-violet-50 text-violet-950"
-                : "rounded-bl-md border-slate-200 bg-white text-slate-800",
-          ].join(" ")}
-        >
-          {message.message}
-        </div>
-
-        <div
-          className={`mt-1 text-[10px] text-slate-400 ${
-            isAdmin ? "text-right" : "text-left"
+                ? "rounded-bl-md border border-violet-200 bg-violet-50 text-slate-800"
+                : "rounded-bl-md border border-slate-200 bg-white text-slate-800"
           }`}
         >
-          {formatDate(message.createdAt)}
+          <p className="whitespace-pre-wrap break-words">
+            {message.message}
+          </p>
         </div>
+
+        <span className="mt-1 px-1 text-[11px] text-slate-400">
+          {formatDateTime(
+            message.createdAt,
+          )}
+        </span>
       </div>
     </div>
   );
 }
 
+/*
+ * ============================================================
+ * MAIN PAGE
+ * ============================================================
+ */
+
 export default function CustomerSupport() {
-  const [tickets, setTickets] = useState<AdminSupportTicket[]>([]);
-
-  const [selectedTicket, setSelectedTicket] =
-    useState<AdminSupportTicket | null>(null);
-
-  const [loading, setLoading] = useState(true);
-
-  const [detailLoading, setDetailLoading] = useState(false);
-
-  const [replyLoading, setReplyLoading] = useState(false);
-
-  const [actionLoading, setActionLoading] = useState(false);
-
-  const [error, setError] = useState("");
-
-  const [search, setSearch] = useState("");
-
-  const [statusFilter, setStatusFilter] = useState<SupportTicketStatus | "">(
-    "",
+  const [
+    tickets,
+    setTickets,
+  ] = useState<AdminSupportTicket[]>(
+    [],
   );
 
-  const [priorityFilter, setPriorityFilter] = useState<
-    SupportTicketPriority | ""
-  >("");
+  const [
+    selectedTicket,
+    setSelectedTicket,
+  ] =
+    useState<AdminSupportTicket | null>(
+      null,
+    );
 
-  const [reply, setReply] = useState("");
+  const [
+    statusFilter,
+    setStatusFilter,
+  ] = useState<
+    SupportTicketStatus | "ALL"
+  >("ALL");
 
-  const loadTickets = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError("");
+  const [
+    priorityFilter,
+    setPriorityFilter,
+  ] = useState<
+    SupportTicketPriority | "ALL"
+  >("ALL");
 
-      const response = await getAdminSupportTickets({
-        status: statusFilter || undefined,
-        priority: priorityFilter || undefined,
-        search,
-      });
+  const [
+    search,
+    setSearch,
+  ] = useState("");
 
-      if (!response.success) {
-        throw new Error(response.message || "Unable to load tickets.");
+  const [
+    replyMessage,
+    setReplyMessage,
+  ] = useState("");
+
+  const [
+    loadingTickets,
+    setLoadingTickets,
+  ] = useState(false);
+
+  const [
+    loadingTicket,
+    setLoadingTicket,
+  ] = useState(false);
+
+  const [
+    sendingReply,
+    setSendingReply,
+  ] = useState(false);
+
+  const [
+    updatingStatus,
+    setUpdatingStatus,
+  ] = useState(false);
+
+  const [
+    updatingPriority,
+    setUpdatingPriority,
+  ] = useState(false);
+
+  const [
+    error,
+    setError,
+  ] = useState<string | null>(
+    null,
+  );
+
+  const [
+    mobileShowDetail,
+    setMobileShowDetail,
+  ] = useState(false);
+
+  /*
+   * ==========================================================
+   * LOAD TICKETS
+   * ==========================================================
+   */
+
+  const loadTickets =
+    useCallback(async () => {
+      try {
+        setLoadingTickets(true);
+        setError(null);
+
+        const params: {
+          status?: SupportTicketStatus;
+          priority?: SupportTicketPriority;
+          search?: string;
+        } = {};
+
+        if (
+          statusFilter !== "ALL"
+        ) {
+          params.status =
+            statusFilter;
+        }
+
+        if (
+          priorityFilter !== "ALL"
+        ) {
+          params.priority =
+            priorityFilter;
+        }
+
+        const trimmedSearch =
+          search.trim();
+
+        if (trimmedSearch) {
+          params.search =
+            trimmedSearch;
+        }
+
+        const response =
+          await getAdminSupportTickets(
+            params,
+          );
+
+        /*
+         * AdminSupportTicketListResponse:
+         *
+         * {
+         *   success: boolean;
+         *   tickets: AdminSupportTicket[];
+         *   total?: number;
+         *   message?: string;
+         * }
+         */
+        setTickets(
+          response.tickets ?? [],
+        );
+      } catch (err) {
+        console.error(
+          "Failed to load support tickets:",
+          err,
+        );
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load support tickets.",
+        );
+      } finally {
+        setLoadingTickets(false);
       }
+    }, [
+      statusFilter,
+      priorityFilter,
+      search,
+    ]);
 
-      setTickets(response.tickets ?? []);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Unable to load support tickets.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [priorityFilter, search, statusFilter]);
+  /*
+   * ==========================================================
+   * LOAD SINGLE TICKET
+   * ==========================================================
+   */
 
-  const loadTicket = useCallback(async (ticketId: string) => {
-    try {
-      setDetailLoading(true);
-      setError("");
+  const loadTicket =
+    useCallback(
+      async (ticketId: string) => {
+        try {
+          setLoadingTicket(true);
+          setError(null);
 
-      const response = await getAdminSupportTicket(ticketId);
+          const response =
+            await getAdminSupportTicket(
+              ticketId,
+            );
 
-      if (!response.success || !response.ticket) {
-        throw new Error(response.message || "Unable to load ticket.");
-      }
+          /*
+           * AdminSupportTicketResponse:
+           *
+           * {
+           *   success: boolean;
+           *   ticket?: AdminSupportTicket;
+           *   message?: string;
+           * }
+           */
+          setSelectedTicket(
+            response.ticket ?? null,
+          );
+        } catch (err) {
+          console.error(
+            "Failed to load support ticket:",
+            err,
+          );
 
-      setSelectedTicket(response.ticket);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load ticket.");
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to load support ticket.",
+          );
+        } finally {
+          setLoadingTicket(false);
+        }
+      },
+      [],
+    );
+
+  /*
+   * ==========================================================
+   * INITIAL / FILTER LOAD
+   * ==========================================================
+   */
 
   useEffect(() => {
     void loadTickets();
   }, [loadTickets]);
 
-  async function handleSelectTicket(ticket: AdminSupportTicket) {
-    await loadTicket(ticket.id);
-  }
+  /*
+   * ==========================================================
+   * SELECT TICKET
+   * ==========================================================
+   */
 
-  async function handleRefresh() {
-    await loadTickets();
+  const handleSelectTicket =
+    async (
+      ticket: AdminSupportTicket,
+    ) => {
+      setMobileShowDetail(true);
 
-    if (selectedTicket) {
-      await loadTicket(selectedTicket.id);
-    }
-  }
+      /*
+       * AdminSupportTicket.id is already string.
+       */
+      await loadTicket(
+        ticket.id,
+      );
+    };
 
-  async function handleReply() {
-    const message = reply.trim();
+  /*
+   * ==========================================================
+   * REFRESH
+   * ==========================================================
+   */
 
-    if (!message) {
-      return;
-    }
+  const handleRefresh =
+    async () => {
+      await loadTickets();
 
-    if (!selectedTicket) {
-      return;
-    }
+      if (selectedTicket?.id) {
+        await loadTicket(
+          selectedTicket.id,
+        );
+      }
+    };
 
-    if (selectedTicket.status === "CLOSED") {
-      return;
-    }
+  /*
+   * ==========================================================
+   * ADMIN REPLY
+   * ==========================================================
+   */
 
-    try {
-      setReplyLoading(true);
-      setError("");
-
-      const response = await replyToSupportTicket(selectedTicket.id, message);
-
-      if (!response.success) {
-        throw new Error(response.message || "Unable to send reply.");
+  const handleReply =
+    async () => {
+      if (!selectedTicket?.id) {
+        return;
       }
 
-      setReply("");
+      const message =
+        replyMessage.trim();
 
-      await loadTicket(selectedTicket.id);
-
-      await loadTickets();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to send reply.");
-    } finally {
-      setReplyLoading(false);
-    }
-  }
-
-  async function handleStatusChange(status: SupportTicketStatus) {
-    if (!selectedTicket) {
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      setError("");
-
-      const response = await updateSupportTicketStatus(
-        selectedTicket.id,
-        status,
-      );
-
-      if (!response.success) {
-        throw new Error(response.message || "Unable to update status.");
+      if (!message) {
+        return;
       }
 
-      await loadTicket(selectedTicket.id);
+      try {
+        setSendingReply(true);
+        setError(null);
 
-      await loadTickets();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update status.");
-    } finally {
-      setActionLoading(false);
-    }
-  }
+        await replyToSupportTicket(
+          selectedTicket.id,
+          message,
+        );
 
-  async function handlePriorityChange(priority: SupportTicketPriority) {
-    if (!selectedTicket) {
-      return;
-    }
+        setReplyMessage("");
 
-    try {
-      setActionLoading(true);
-      setError("");
+        await loadTicket(
+          selectedTicket.id,
+        );
 
-      const response = await updateSupportTicketPriority(
-        selectedTicket.id,
-        priority,
-      );
+        await loadTickets();
+      } catch (err) {
+        console.error(
+          "Failed to send support reply:",
+          err,
+        );
 
-      if (!response.success) {
-        throw new Error(response.message || "Unable to update priority.");
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to send support reply.",
+        );
+      } finally {
+        setSendingReply(false);
+      }
+    };
+
+  /*
+   * ==========================================================
+   * STATUS
+   * ==========================================================
+   */
+
+  const handleStatusChange =
+    async (
+      status: SupportTicketStatus,
+    ) => {
+      if (!selectedTicket?.id) {
+        return;
       }
 
-      await loadTicket(selectedTicket.id);
+      try {
+        setUpdatingStatus(true);
+        setError(null);
 
-      await loadTickets();
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Unable to update priority.",
-      );
-    } finally {
-      setActionLoading(false);
-    }
-  }
+        await updateSupportTicketStatus(
+          selectedTicket.id,
+          status,
+        );
 
-  const ticketCountText = useMemo(() => {
-    return `${tickets.length} ${tickets.length === 1 ? "ticket" : "tickets"}`;
-  }, [tickets.length]);
+        await loadTicket(
+          selectedTicket.id,
+        );
+
+        await loadTickets();
+      } catch (err) {
+        console.error(
+          "Failed to update support ticket status:",
+          err,
+        );
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to update ticket status.",
+        );
+      } finally {
+        setUpdatingStatus(false);
+      }
+    };
+
+  /*
+   * ==========================================================
+   * PRIORITY
+   * ==========================================================
+   */
+
+  const handlePriorityChange =
+    async (
+      priority: SupportTicketPriority,
+    ) => {
+      if (!selectedTicket?.id) {
+        return;
+      }
+
+      try {
+        setUpdatingPriority(true);
+        setError(null);
+
+        await updateSupportTicketPriority(
+          selectedTicket.id,
+          priority,
+        );
+
+        await loadTicket(
+          selectedTicket.id,
+        );
+
+        await loadTickets();
+      } catch (err) {
+        console.error(
+          "Failed to update support ticket priority:",
+          err,
+        );
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to update ticket priority.",
+        );
+      } finally {
+        setUpdatingPriority(false);
+      }
+    };
+
+  /*
+   * ==========================================================
+   * COUNTS
+   * ==========================================================
+   */
+
+  const counts = useMemo(() => {
+    return {
+      total: tickets.length,
+
+      open: tickets.filter(
+        (ticket) =>
+          ticket.status ===
+          "OPEN",
+      ).length,
+
+      inProgress: tickets.filter(
+        (ticket) =>
+          ticket.status ===
+          "IN_PROGRESS",
+      ).length,
+
+      resolved: tickets.filter(
+        (ticket) =>
+          ticket.status ===
+          "RESOLVED",
+      ).length,
+    };
+  }, [tickets]);
+
+  /*
+   * ==========================================================
+   * CURRENT MESSAGES
+   * ==========================================================
+   */
+
+  const messages =
+    selectedTicket?.messages ?? [];
+
+  /*
+   * ==========================================================
+   * RENDER
+   * ==========================================================
+   */
 
   return (
-    <div className="min-h-full bg-slate-50">
-      <div className="mx-auto flex h-full max-w-[1600px] flex-col p-3 sm:p-5">
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-5 lg:px-6">
+        {/* ================================================== */}
         {/* HEADER */}
-        <div className="mb-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        {/* ================================================== */}
+
+        <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white">
-                <MessageCircle size={18} />
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+                <MessageCircle className="h-5 w-5" />
               </div>
 
               <div>
-                <h1 className="text-base font-semibold text-slate-900">
+                <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
                   Customer Support
                 </h1>
 
-                <p className="text-xs text-slate-500">
-                  Manage player and AI support conversations
+                <p className="text-sm text-slate-500">
+                  Manage player, automated AI,
+                  and human support
+                  conversations.
                 </p>
               </div>
             </div>
@@ -380,381 +721,697 @@ export default function CustomerSupport() {
 
           <button
             type="button"
-            onClick={() => void handleRefresh()}
-            disabled={loading || detailLoading}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() =>
+              void handleRefresh()
+            }
+            disabled={
+              loadingTickets ||
+              loadingTicket
+            }
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+            <RefreshCw
+              className={`h-4 w-4 ${
+                loadingTickets ||
+                loadingTicket
+                  ? "animate-spin"
+                  : ""
+              }`}
+            />
+
             Refresh
           </button>
         </div>
 
+        {/* ================================================== */}
+        {/* SUMMARY */}
+        {/* ================================================== */}
+
+        <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Total
+            </p>
+
+            <p className="mt-1 text-2xl font-bold text-slate-900">
+              {counts.total}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Open
+            </p>
+
+            <p className="mt-1 text-2xl font-bold text-blue-600">
+              {counts.open}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              In Progress
+            </p>
+
+            <p className="mt-1 text-2xl font-bold text-amber-600">
+              {counts.inProgress}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Resolved
+            </p>
+
+            <p className="mt-1 text-2xl font-bold text-emerald-600">
+              {counts.resolved}
+            </p>
+          </div>
+        </div>
+
+        {/* ================================================== */}
+        {/* ERROR */}
+        {/* ================================================== */}
+
         {error && (
-          <div className="mb-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            <div className="flex-1">{error}</div>
+          <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <XCircle className="mt-0.5 h-5 w-5 shrink-0" />
+
+            <div className="flex-1">
+              <p className="font-medium">
+                Support operation failed
+              </p>
+
+              <p className="mt-0.5">
+                {error}
+              </p>
+            </div>
 
             <button
               type="button"
-              onClick={() => setError("")}
-              className="shrink-0"
+              onClick={() =>
+                setError(null)
+              }
+              className="text-red-500 hover:text-red-700"
+              aria-label="Dismiss error"
             >
-              <X size={16} />
+              <XCircle className="h-4 w-4" />
             </button>
           </div>
         )}
 
-        {/* FILTERS */}
-        <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_180px_180px]">
-            <div className="relative">
-              <Search
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search subject, username, name, phone..."
-                className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-
-            <select
-              value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(event.target.value as SupportTicketStatus | "")
-              }
-              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="">All Status</option>
-
-              {STATUS_OPTIONS.map((status) => (
-                <option key={status} value={status}>
-                  {statusLabel(status)}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={priorityFilter}
-              onChange={(event) =>
-                setPriorityFilter(
-                  event.target.value as SupportTicketPriority | "",
-                )
-              }
-              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="">All Priority</option>
-
-              {PRIORITY_OPTIONS.map((priority) => (
-                <option key={priority} value={priority}>
-                  {priorityLabel(priority)}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
+        {/* ================================================== */}
         {/* MAIN */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
-          {/* TICKET LIST */}
-          <div
-            className={`min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm ${
-              selectedTicket ? "hidden lg:flex" : "flex"
-            } flex-col`}
-          >
-            <div className="border-b border-slate-200 px-4 py-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-slate-800">
-                  Tickets
-                </span>
+        {/* ================================================== */}
 
-                <span className="text-xs text-slate-400">
-                  {ticketCountText}
-                </span>
-              </div>
-            </div>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="grid min-h-[650px] grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)]">
+            {/* ============================================== */}
+            {/* TICKET LIST */}
+            {/* ============================================== */}
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              {loading ? (
-                <div className="space-y-2 p-3">
-                  {Array.from({
-                    length: 6,
-                  }).map((_, index) => (
-                    <div
-                      key={index}
-                      className="animate-pulse rounded-lg border border-slate-100 p-3"
-                    >
-                      <div className="mb-2 h-3 w-3/4 rounded bg-slate-100" />
-                      <div className="mb-3 h-2 w-1/2 rounded bg-slate-100" />
-                      <div className="h-2 w-1/3 rounded bg-slate-100" />
-                    </div>
-                  ))}
-                </div>
-              ) : tickets.length === 0 ? (
-                <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-                  <MessageCircle size={30} className="mb-3 text-slate-300" />
+            <aside
+              className={`border-slate-200 lg:border-r ${
+                mobileShowDetail
+                  ? "hidden lg:block"
+                  : "block"
+              }`}
+            >
+              <div className="border-b border-slate-200 p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="font-semibold text-slate-900">
+                    Support Tickets
+                  </h2>
 
-                  <p className="text-sm font-medium text-slate-600">
-                    No support tickets
-                  </p>
-
-                  <p className="mt-1 text-xs text-slate-400">
-                    Tickets will appear here when players contact support.
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {tickets.map((ticket) => {
-                    const active = selectedTicket?.id === ticket.id;
-
-                    return (
-                      <button
-                        type="button"
-                        key={ticket.id}
-                        onClick={() => void handleSelectTicket(ticket)}
-                        className={`w-full px-4 py-3 text-left transition ${
-                          active ? "bg-blue-50" : "hover:bg-slate-50"
-                        }`}
-                      >
-                        <div className="mb-1 flex items-start justify-between gap-2">
-                          <span className="line-clamp-1 text-sm font-medium text-slate-800">
-                            {ticket.subject}
-                          </span>
-
-                          <span className="shrink-0 text-[10px] text-slate-400">
-                            {formatDate(ticket.updatedAt)}
-                          </span>
-                        </div>
-
-                        <div className="mb-2 text-xs text-slate-500">
-                          {ticket.user?.fullName ||
-                            ticket.user?.username ||
-                            ticket.user?.phone ||
-                            "Unknown player"}
-                        </div>
-
-                        <div className="flex flex-wrap gap-1.5">
-                          <StatusBadge status={ticket.status} />
-
-                          <PriorityBadge priority={ticket.priority} />
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* DETAIL */}
-          <div
-            className={`min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm ${
-              selectedTicket ? "flex" : "hidden lg:flex"
-            } flex-col`}
-          >
-            {!selectedTicket ? (
-              <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-                <MessageCircle size={42} className="mb-4 text-slate-300" />
-
-                <h2 className="text-sm font-semibold text-slate-700">
-                  Select a support ticket
-                </h2>
-
-                <p className="mt-1 max-w-sm text-xs leading-5 text-slate-400">
-                  Select a ticket from the list to view the conversation and
-                  manage the support request.
-                </p>
-              </div>
-            ) : detailLoading ? (
-              <div className="flex h-full items-center justify-center">
-                <RefreshCw size={24} className="animate-spin text-blue-500" />
-              </div>
-            ) : (
-              <>
-                {/* DETAIL HEADER */}
-                <div className="border-b border-slate-200 bg-white px-4 py-3">
-                  <div className="flex items-start gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTicket(null)}
-                      className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 lg:hidden"
-                    >
-                      <ArrowLeft size={16} />
-                    </button>
-
-                    <div className="flex min-w-0 flex-1 items-start gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
-                        {getInitials(
-                          selectedTicket.user?.fullName ||
-                            selectedTicket.user?.username,
-                        )}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="truncate text-sm font-semibold text-slate-900">
-                            {selectedTicket.subject}
-                          </h2>
-
-                          <StatusBadge status={selectedTicket.status} />
-
-                          <PriorityBadge priority={selectedTicket.priority} />
-                        </div>
-
-                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-                          <span>
-                            {selectedTicket.user?.fullName || "Unknown player"}
-                          </span>
-
-                          {selectedTicket.user?.username && (
-                            <span>@{selectedTicket.user.username}</span>
-                          )}
-
-                          {selectedTicket.user?.phone && (
-                            <span>{selectedTicket.user.phone}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    <div>
-                      <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                        Status
-                      </label>
-
-                      <select
-                        value={selectedTicket.status}
-                        disabled={actionLoading}
-                        onChange={(event) =>
-                          void handleStatusChange(
-                            event.target.value as SupportTicketStatus,
-                          )
-                        }
-                        className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-blue-400"
-                      >
-                        {STATUS_OPTIONS.map((status) => (
-                          <option key={status} value={status}>
-                            {statusLabel(status)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                        Priority
-                      </label>
-
-                      <select
-                        value={selectedTicket.priority}
-                        disabled={actionLoading}
-                        onChange={(event) =>
-                          void handlePriorityChange(
-                            event.target.value as SupportTicketPriority,
-                          )
-                        }
-                        className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-blue-400"
-                      >
-                        {PRIORITY_OPTIONS.map((priority) => (
-                          <option key={priority} value={priority}>
-                            {priorityLabel(priority)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wide text-slate-400">
-                        Created
-                      </div>
-
-                      <div className="mt-0.5 truncate text-xs font-medium text-slate-700">
-                        {formatDate(selectedTicket.createdAt)}
-                      </div>
-                    </div>
-
-                    <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wide text-slate-400">
-                        Updated
-                      </div>
-
-                      <div className="mt-0.5 truncate text-xs font-medium text-slate-700">
-                        {formatDate(selectedTicket.updatedAt)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* CONVERSATION */}
-                <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 px-4 py-5">
-                  {selectedTicket.messages &&
-                  selectedTicket.messages.length > 0 ? (
-                    <div className="space-y-5">
-                      {selectedTicket.messages.map((message) => (
-                        <MessageBubble key={message.id} message={message} />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-sm text-slate-400">
-                      No messages found.
-                    </div>
+                  {loadingTickets && (
+                    <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
                   )}
                 </div>
 
-                {/* REPLY */}
-                {selectedTicket.status === "CLOSED" ? (
-                  <div className="border-t border-slate-200 bg-slate-50 px-4 py-3">
-                    <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
-                      <CheckCircle2 size={15} />
-                      This ticket is closed.
+                {/* SEARCH */}
+
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+                  <input
+                    value={search}
+                    onChange={(event) =>
+                      setSearch(
+                        event.target.value,
+                      )
+                    }
+                    placeholder="Search tickets..."
+                    className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
+                  />
+                </div>
+
+                {/* FILTERS */}
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <select
+                    value={
+                      statusFilter
+                    }
+                    onChange={(event) =>
+                      setStatusFilter(
+                        event.target
+                          .value as
+                          | SupportTicketStatus
+                          | "ALL",
+                      )
+                    }
+                    className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-blue-500"
+                  >
+                    <option value="ALL">
+                      All Status
+                    </option>
+
+                    <option value="OPEN">
+                      Open
+                    </option>
+
+                    <option value="IN_PROGRESS">
+                      In Progress
+                    </option>
+
+                    <option value="RESOLVED">
+                      Resolved
+                    </option>
+
+                    <option value="CLOSED">
+                      Closed
+                    </option>
+                  </select>
+
+                  <select
+                    value={
+                      priorityFilter
+                    }
+                    onChange={(event) =>
+                      setPriorityFilter(
+                        event.target
+                          .value as
+                          | SupportTicketPriority
+                          | "ALL",
+                      )
+                    }
+                    className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-blue-500"
+                  >
+                    <option value="ALL">
+                      All Priority
+                    </option>
+
+                    <option value="LOW">
+                      Low
+                    </option>
+
+                    <option value="NORMAL">
+                      Normal
+                    </option>
+
+                    <option value="HIGH">
+                      High
+                    </option>
+
+                    <option value="URGENT">
+                      Urgent
+                    </option>
+                  </select>
+                </div>
+              </div>
+
+              {/* TICKETS */}
+
+              <div className="max-h-[590px] overflow-y-auto">
+                {loadingTickets &&
+                tickets.length === 0 ? (
+                  <div className="flex min-h-[300px] items-center justify-center">
+                    <div className="flex flex-col items-center gap-2 text-sm text-slate-500">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+
+                      <span>
+                        Loading support
+                        tickets...
+                      </span>
                     </div>
                   </div>
+                ) : tickets.length ===
+                  0 ? (
+                  <div className="flex min-h-[300px] flex-col items-center justify-center px-6 text-center">
+                    <MessageCircle className="mb-3 h-10 w-10 text-slate-300" />
+
+                    <p className="font-medium text-slate-700">
+                      No support
+                      tickets
+                    </p>
+
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      Tickets created from
+                      unresolved automated
+                      support conversations
+                      will appear here.
+                    </p>
+                  </div>
                 ) : (
-                  <div className="border-t border-slate-200 bg-white p-3">
+                  tickets.map(
+                    (ticket) => {
+                      const selected =
+                        selectedTicket?.id ===
+                        ticket.id;
+
+                      return (
+                        <button
+                          key={
+                            ticket.id
+                          }
+                          type="button"
+                          onClick={() =>
+                            void handleSelectTicket(
+                              ticket,
+                            )
+                          }
+                          className={`w-full border-b border-slate-100 px-4 py-4 text-left transition ${
+                            selected
+                              ? "bg-blue-50"
+                              : "bg-white hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-semibold text-slate-900">
+                                {getTicketTitle(
+                                  ticket,
+                                )}
+                              </p>
+
+                              <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
+                                {getTicketPreview(
+                                  ticket,
+                                )}
+                              </p>
+                            </div>
+
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ring-inset ${getStatusClassName(
+                                ticket.status,
+                              )}`}
+                            >
+                              {getStatusLabel(
+                                ticket.status,
+                              )}
+                            </span>
+                          </div>
+
+                          <div className="mt-3 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ring-inset ${getPriorityClassName(
+                                  ticket.priority,
+                                )}`}
+                              >
+                                {getPriorityLabel(
+                                  ticket.priority,
+                                )}
+                              </span>
+
+                              {ticket.messages &&
+                                ticket
+                                  .messages
+                                  .length >
+                                  0 && (
+                                  <span className="text-[11px] text-slate-400">
+                                    {
+                                      ticket
+                                        .messages
+                                        .length
+                                    }{" "}
+                                    {ticket
+                                      .messages
+                                      .length ===
+                                    1
+                                      ? "message"
+                                      : "messages"}
+                                  </span>
+                                )}
+                            </div>
+
+                            <span className="text-[11px] text-slate-400">
+                              {formatDateTime(
+                                ticket.createdAt,
+                              )}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    },
+                  )
+                )}
+              </div>
+            </aside>
+
+            {/* ============================================== */}
+            {/* DETAIL */}
+            {/* ============================================== */}
+
+            <section
+              className={`min-w-0 ${
+                mobileShowDetail
+                  ? "block"
+                  : "hidden lg:block"
+              }`}
+            >
+              {!selectedTicket ? (
+                <div className="flex min-h-[650px] items-center justify-center px-6">
+                  <div className="max-w-md text-center">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
+                      <MessageCircle className="h-8 w-8 text-slate-400" />
+                    </div>
+
+                    <h3 className="mt-4 text-lg font-semibold text-slate-900">
+                      Select a support
+                      ticket
+                    </h3>
+
+                    <p className="mt-2 text-sm leading-6 text-slate-500">
+                      Select a ticket from
+                      the list to view the
+                      conversation and
+                      respond to the player.
+                    </p>
+
+                    <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4 text-left">
+                      <div className="flex items-start gap-3">
+                        <Bot className="mt-0.5 h-5 w-5 shrink-0 text-violet-600" />
+
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">
+                            Automated
+                            support
+                          </p>
+
+                          <p className="mt-1 text-xs leading-5 text-slate-500">
+                            AI Assistant
+                            messages can come
+                            from automated AI
+                            support or the
+                            built-in support
+                            knowledge fallback.
+                            Unresolved
+                            conversations can be
+                            handled by an
+                            administrator here.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex h-full min-h-[650px] flex-col">
+                  {/* DETAIL HEADER */}
+
+                  <div className="border-b border-slate-200 px-4 py-4 sm:px-6">
+                    <div className="flex items-start gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMobileShowDetail(
+                            false,
+                          )
+                        }
+                        className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 lg:hidden"
+                        aria-label="Back to support tickets"
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="truncate text-base font-semibold text-slate-900 sm:text-lg">
+                            {getTicketTitle(
+                              selectedTicket,
+                            )}
+                          </h2>
+
+                          <span
+                            className={`rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ring-inset ${getStatusClassName(
+                              selectedTicket.status,
+                            )}`}
+                          >
+                            {getStatusLabel(
+                              selectedTicket.status,
+                            )}
+                          </span>
+
+                          <span
+                            className={`rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ring-inset ${getPriorityClassName(
+                              selectedTicket.priority,
+                            )}`}
+                          >
+                            {getPriorityLabel(
+                              selectedTicket.priority,
+                            )}
+                          </span>
+                        </div>
+
+                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                          <span>
+                            Ticket #
+                            {
+                              selectedTicket.id
+                            }
+                          </span>
+
+                          {selectedTicket.user && (
+                            <>
+                              <span>
+                                Player:{" "}
+                                {selectedTicket
+                                  .user
+                                  .fullName ||
+                                  selectedTicket
+                                    .user
+                                    .username ||
+                                  selectedTicket
+                                    .user
+                                    .phone ||
+                                  selectedTicket
+                                    .user
+                                    .id}
+                              </span>
+                            </>
+                          )}
+
+                          <span>
+                            Created{" "}
+                            {formatDateTime(
+                              selectedTicket.createdAt,
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* CONTROLS */}
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <select
+                        value={
+                          selectedTicket.status
+                        }
+                        disabled={
+                          updatingStatus
+                        }
+                        onChange={(event) =>
+                          void handleStatusChange(
+                            event.target
+                              .value as SupportTicketStatus,
+                          )
+                        }
+                        className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-blue-500 disabled:opacity-60"
+                      >
+                        <option value="OPEN">
+                          Open
+                        </option>
+
+                        <option value="IN_PROGRESS">
+                          In Progress
+                        </option>
+
+                        <option value="RESOLVED">
+                          Resolved
+                        </option>
+
+                        <option value="CLOSED">
+                          Closed
+                        </option>
+                      </select>
+
+                      <select
+                        value={
+                          selectedTicket.priority
+                        }
+                        disabled={
+                          updatingPriority
+                        }
+                        onChange={(event) =>
+                          void handlePriorityChange(
+                            event.target
+                              .value as SupportTicketPriority,
+                          )
+                        }
+                        className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-blue-500 disabled:opacity-60"
+                      >
+                        <option value="LOW">
+                          Low
+                        </option>
+
+                        <option value="NORMAL">
+                          Normal
+                        </option>
+
+                        <option value="HIGH">
+                          High
+                        </option>
+
+                        <option value="URGENT">
+                          Urgent
+                        </option>
+                      </select>
+
+                      {updatingStatus ||
+                      updatingPriority ? (
+                        <div className="inline-flex h-9 items-center gap-2 px-2 text-xs text-slate-400">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+
+                          Updating...
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {/* MESSAGES */}
+
+                  <div className="flex-1 overflow-y-auto bg-slate-50/70 px-4 py-5 sm:px-6">
+                    {loadingTicket ? (
+                      <div className="flex min-h-[300px] items-center justify-center">
+                        <div className="flex items-center gap-2 text-sm text-slate-500">
+                          <Loader2 className="h-5 w-5 animate-spin" />
+
+                          Loading conversation...
+                        </div>
+                      </div>
+                    ) : messages.length ===
+                      0 ? (
+                      <div className="flex min-h-[300px] items-center justify-center">
+                        <div className="text-center">
+                          <Clock3 className="mx-auto h-8 w-8 text-slate-300" />
+
+                          <p className="mt-3 text-sm font-medium text-slate-600">
+                            No messages yet
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-5">
+                        {messages.map(
+                          (message) => (
+                            <MessageBubble
+                              key={
+                                message.id
+                              }
+                              message={
+                                message
+                              }
+                            />
+                          ),
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* REPLY */}
+
+                  <div className="border-t border-slate-200 bg-white p-4 sm:p-5">
+                    <div className="mb-2 flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-blue-600" />
+
+                      <span className="text-xs font-semibold text-slate-700">
+                        Admin Reply
+                      </span>
+                    </div>
+
                     <div className="flex items-end gap-2">
                       <textarea
-                        value={reply}
-                        onChange={(event) => setReply(event.target.value)}
+                        value={
+                          replyMessage
+                        }
+                        onChange={(event) =>
+                          setReplyMessage(
+                            event.target
+                              .value,
+                          )
+                        }
                         onKeyDown={(event) => {
-                          if (event.key === "Enter" && !event.shiftKey) {
+                          if (
+                            event.key ===
+                              "Enter" &&
+                            !event.shiftKey
+                          ) {
                             event.preventDefault();
 
-                            void handleReply();
+                            if (
+                              replyMessage.trim() &&
+                              !sendingReply
+                            ) {
+                              void handleReply();
+                            }
                           }
                         }}
-                        maxLength={5000}
-                        rows={2}
-                        placeholder="Write a reply to the player..."
-                        className="min-h-[64px] flex-1 resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                        rows={3}
+                        maxLength={2000}
+                        placeholder="Type your response..."
+                        className="min-h-[80px] flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm leading-6 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
                       />
 
                       <button
                         type="button"
-                        onClick={() => void handleReply()}
-                        disabled={replyLoading || !reply.trim()}
-                        className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-3 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() =>
+                          void handleReply()
+                        }
+                        disabled={
+                          sendingReply ||
+                          !replyMessage.trim()
+                        }
+                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Send reply"
                       >
-                        <Send size={15} />
-
-                        <span className="hidden sm:inline">
-                          {replyLoading ? "Sending..." : "Send"}
-                        </span>
+                        {sendingReply ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <Send className="h-5 w-5" />
+                        )}
                       </button>
                     </div>
 
-                    <div className="mt-1 flex items-center justify-between px-1 text-[10px] text-slate-400">
-                      <span>Enter to send · Shift+Enter for new line</span>
+                    <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
+                      <span>
+                        Press Enter to send ·
+                        Shift + Enter for a
+                        new line
+                      </span>
 
-                      <span>{reply.length}/5000</span>
+                      <span>
+                        {
+                          replyMessage.length
+                        }
+                        /2000
+                      </span>
                     </div>
                   </div>
-                )}
-              </>
-            )}
+                </div>
+              )}
+            </section>
           </div>
         </div>
       </div>

@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "language": [
+    "en",
+    "my"
+  ],
+  "description": "General support training data, greetings, thanks, help requests and unknown questions.",
+  "intents": [
+    {
+      "intent": "greeting",
+      "category": "general",
+      "keywords": [
+        "hello",
+        "hi",
+        "hey",
+        "မင်္ဂလာပါ"
+      ],
+      "examples": {
+        "en": [
+          "Hello",
+          "Hi",
+          "Hey",
+          "Good morning",
+          "Good evening"
+        ],
+        "my": [
+          "မင်္ဂလာပါ",
+          "ဟယ်လို",
+          "နေကောင်းလား",
+          "မင်္ဂလာနံနက်ခင်းပါ",
+          "မင်္ဂလာညနေခင်းပါ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Hello! How can I help you today? You can ask about your account, wallet, deposit, withdrawal, 2D, 3D, results, tickets, or app installation."
+        ],
+        "my": [
+          "မင်္ဂလာပါ။ ဒီနေ့ ဘာကူညီပေးရမလဲ။ Account, Wallet, Deposit, Withdrawal, 2D, 3D, Results, Tickets သို့မဟုတ် App Installation အကြောင်း မေးနိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "thanks",
+      "category": "general",
+      "keywords": [
+        "thanks",
+        "thank you",
+        "ကျေးဇူး"
+      ],
+      "examples": {
+        "en": [
+          "Thank you",
+          "Thanks",
+          "Thank you for helping me"
+        ],
+        "my": [
+          "ကျေးဇူးတင်ပါတယ်",
+          "ကျေးဇူးပါ",
+          "ကူညီပေးလို့ ကျေးဇူးတင်ပါတယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "You're welcome. If you need anything else, feel free to ask."
+        ],
+        "my": [
+          "ရပါတယ်။ အခြားအကူအညီလိုပါက ထပ်မေးနိုင်ပါတယ်။"
+        ]
+      }
+    },
+    {
+      "intent": "help",
+      "category": "general",
+      "keywords": [
+        "help",
+        "what can you do",
+        "အကူအညီ"
+      ],
+      "examples": {
+        "en": [
+          "What can you help me with?",
+          "What can I ask?",
+          "I need help"
+        ],
+        "my": [
+          "ဘာတွေကူညီပေးနိုင်လဲ",
+          "ဘာမေးလို့ရလဲ",
+          "အကူအညီလိုတယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "I can help with common questions about accounts, wallets, deposits, withdrawals, 2D, 3D, results, tickets, PWA installation and human support."
+        ],
+        "my": [
+          "Account, Wallet, Deposit, Withdrawal, 2D, 3D, Results, Ticket, PWA Installation နှင့် Human Support အကြောင်းများကို ကူညီပေးနိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "fees",
+      "category": "general",
+      "keywords": [
+        "fee",
+        "charge",
+        "အခ",
+        "ကြေး"
+      ],
+      "examples": {
+        "en": [
+          "Are there any fees?",
+          "Is there a transaction fee?",
+          "Do I have to pay a fee?"
+        ],
+        "my": [
+          "Fee ရှိလား",
+          "Transaction Fee ရှိလား",
+          "အခကြေးငွေပေးရလား"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Any applicable fees are determined by the current application settings and payment method. Check the relevant transaction page or contact human support for a specific transaction."
+        ],
+        "my": [
+          "သက်ဆိုင်သော Fee များသည် လက်ရှိ Application Setting နှင့် Payment Method ပေါ်မူတည်ပါသည်။ သတ်မှတ်ထားသော Transaction အတွက် သက်ဆိုင်ရာစာမျက်နှာ သို့မဟုတ် Human Support ကို စစ်ဆေးပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "unknown",
+      "category": "general",
+      "keywords": [
+        "other",
+        "different",
+        "တခြား",
+        "အခြား"
+      ],
+      "examples": {
+        "en": [
+          "I have another question",
+          "Something else",
+          "I have a different problem"
+        ],
+        "my": [
+          "တခြားမေးစရာရှိတယ်",
+          "အခြားကိစ္စရှိတယ်",
+          "တခြားပြဿနာရှိတယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Please describe your issue in more detail. If the automated support cannot identify the issue, your conversation can be sent to human support."
+        ],
+        "my": [
+          "သင့်ပြဿနာကို အသေးစိတ်ဖော်ပြပေးပါ။ Automated Support မှ ပြဿနာကို မသိရှိနိုင်ပါက Human Support သို့ Conversation ကို ပို့ပေးနိုင်ပါသည်။"
+        ]
+      }
+    }
+  ]
+}

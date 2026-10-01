@@ -1,363 +1,174 @@
-import fs from "node:fs/promises";
-import path from "node:path";
+/**
+ * ============================================================
+ * LOCAL RAG
+ * ============================================================
+ *
+ * Searches:
+ *
+ *   /training/*.json
+ *   /knowledge/*.json
+ *
+ * No data is duplicated into netlify/functions/ai.
+ */
 
-/* ============================================================
-   TYPES
-============================================================ */
+import {
+  loadTrainingDocuments,
+  type TrainingDocument,
+} from "./trainingLoader";
 
-export interface KnowledgeItem {
-  title?: string;
-  question?: string;
-  answer?: string;
-  content?: string;
-  keywords?: string[];
-  category?: string;
+export interface KnowledgeResult {
+  id: string;
+  source: "training" | "knowledge";
+  fileName: string;
+  category: string;
+  score: number;
+  text: string;
+  data: unknown;
 }
 
-/* ============================================================
-   KNOWLEDGE FILES
-============================================================ */
-
-const KNOWLEDGE_FILES = [
-  "account.json",
-  "wallet.json",
-  "deposit.json",
-  "withdrawal.json",
-  "lottery-2d.json",
-  "lottery-3d.json",
-  "results.json",
-  "pwa.json",
-  "general.json",
-];
-
-/* ============================================================
-   CACHE
-============================================================ */
-
-let cache:
-  | KnowledgeItem[]
-  | null = null;
-
-/* ============================================================
-   LOAD KNOWLEDGE
-============================================================ */
-
-async function loadKnowledge(): Promise<
-  KnowledgeItem[]
-> {
-  if (cache) {
-    return cache;
-  }
-
-  /*
-   * process.cwd() normally points at the project root when
-   * running Netlify Functions.
-   */
-  const root =
-    process.cwd();
-
-  const items:
-    KnowledgeItem[] = [];
-
-  for (
-    const file of KNOWLEDGE_FILES
-  ) {
-    const filePath =
-      path.join(
-        root,
-        "knowledge",
-        file,
-      );
-
-    try {
-      const raw =
-        await fs.readFile(
-          filePath,
-          "utf8",
-        );
-
-      const parsed:
-        | unknown =
-        JSON.parse(raw);
-
-      if (
-        Array.isArray(parsed)
-      ) {
-        items.push(
-          ...parsed.filter(
-            isKnowledgeItem,
-          ),
-        );
-
-        continue;
-      }
-
-      if (
-        isRecord(parsed) &&
-        Array.isArray(
-          parsed.items,
-        )
-      ) {
-        items.push(
-          ...parsed.items.filter(
-            isKnowledgeItem,
-          ),
-        );
-      }
-    } catch (error) {
-      console.error(
-        `[AI:RAG] Unable to load knowledge file: ${file}`,
-        error instanceof Error
-          ? error.message
-          : String(error),
-      );
-    }
-  }
-
-  cache =
-    items;
-
-  return items;
-}
-
-/* ============================================================
-   TYPE GUARDS
-============================================================ */
-
-function isRecord(
-  value: unknown,
-): value is Record<
-  string,
-  unknown
-> {
-  return (
-    typeof value ===
-      "object" &&
-    value !== null
-  );
-}
-
-function isKnowledgeItem(
-  value: unknown,
-): value is KnowledgeItem {
-  if (
-    !isRecord(value)
-  ) {
-    return false;
-  }
-
-  return true;
-}
-
-/* ============================================================
-   NORMALIZE
-============================================================ */
-
-function normalize(
-  value: string,
-): string {
+function normalizeText(value: string): string {
   return value
+    .normalize("NFKC")
     .toLowerCase()
-    .replace(
-      /[^\p{L}\p{N}\s]/gu,
-      " ",
-    )
-    .replace(
-      /\s+/g,
-      " ",
-    )
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
-/* ============================================================
-   SCORE
-============================================================ */
+function tokenize(value: string): string[] {
+  return normalizeText(value)
+    .split(/\s+/)
+    .filter(Boolean);
+}
 
-function score(
+function unique<T>(items: T[]): T[] {
+  return [...new Set(items)];
+}
+
+function calculateScore(
   query: string,
-  item: KnowledgeItem,
+  document: TrainingDocument
 ): number {
-  const q =
-    normalize(query);
+  const queryTokens = unique(tokenize(query));
 
-  const searchable =
-    normalize(
-      [
-        item.title,
-        item.question,
-        item.answer,
-        item.content,
-        ...(item.keywords ??
-          []),
-      ]
-        .filter(
-          (
-            value,
-          ) =>
-            typeof value ===
-            "string",
-        )
-        .join(" "),
-    );
-
-  if (
-    !q ||
-    !searchable
-  ) {
+  if (queryTokens.length === 0) {
     return 0;
   }
 
-  const words =
-    q.split(" ");
+  const documentText = normalizeText(
+    document.text
+  );
 
-  let result =
-    0;
+  const categoryText = normalizeText(
+    `${document.category} ${document.fileName}`
+  );
 
-  for (
-    const word of words
-  ) {
-    if (
-      word.length < 2
-    ) {
-      continue;
+  let score = 0;
+
+  for (const token of queryTokens) {
+    if (documentText.includes(token)) {
+      score += 1;
     }
 
-    if (
-      searchable.includes(
-        word,
-      )
-    ) {
-      result += 1;
+    if (categoryText.includes(token)) {
+      score += 2;
     }
   }
 
-  const normalizedQuestion =
-    item.question
-      ? normalize(
-          item.question,
-        )
-      : "";
+  /*
+   * Exact phrase match gets additional weight.
+   */
+  const normalizedQuery = normalizeText(query);
 
   if (
-    normalizedQuestion &&
-    normalizedQuestion.includes(
-      q,
-    )
+    normalizedQuery.length > 3 &&
+    documentText.includes(normalizedQuery)
   ) {
-    result += 5;
+    score += 10;
   }
 
-  const normalizedTitle =
-    item.title
-      ? normalize(
-          item.title,
-        )
-      : "";
+  /*
+   * Strong keyword/category hints.
+   */
+  const category = normalizeText(
+    `${document.category} ${document.fileName}`
+  );
 
-  if (
-    normalizedTitle &&
-    normalizedTitle.includes(
-      q,
-    )
-  ) {
-    result += 3;
+  const importantGroups = [
+    ["wallet", "balance"],
+    ["deposit", "topup", "top up"],
+    ["withdrawal", "withdraw"],
+    ["2d", "two digit"],
+    ["3d", "three digit"],
+    ["result", "results"],
+    ["account", "login", "phone"],
+    ["pwa", "install"],
+  ];
+
+  for (const group of importantGroups) {
+    const queryHasGroup = group.some((word) =>
+      normalizedQuery.includes(word)
+    );
+
+    const documentHasGroup = group.some((word) =>
+      category.includes(word)
+    );
+
+    if (queryHasGroup && documentHasGroup) {
+      score += 8;
+    }
   }
 
-  return result;
+  return score;
 }
 
-/* ============================================================
-   SEARCH
-============================================================ */
-
-export async function searchKnowledge(
+export function searchKnowledge(
   query: string,
-  limit = 5,
-): Promise<KnowledgeItem[]> {
-  const safeQuery =
-    query.trim();
+  limit = 5
+): KnowledgeResult[] {
+  const { documents } =
+    loadTrainingDocuments();
 
-  if (!safeQuery) {
+  if (!query.trim()) {
     return [];
   }
 
-  const safeLimit =
-    Math.min(
-      Math.max(
-        Number(limit) || 5,
-        1,
+  return documents
+    .map((document) => ({
+      id: document.id,
+      source: document.source,
+      fileName: document.fileName,
+      category: document.category,
+      score: calculateScore(
+        query,
+        document
       ),
-      10,
-    );
-
-  const items =
-    await loadKnowledge();
-
-  return items
-    .map(
-      (item) => ({
-        item,
-        score:
-          score(
-            safeQuery,
-            item,
-          ),
-      }),
-    )
-    .filter(
-      (entry) =>
-        entry.score > 0,
-    )
-    .sort(
-      (a, b) =>
-        b.score -
-        a.score,
-    )
-    .slice(
-      0,
-      safeLimit,
-    )
-    .map(
-      (entry) =>
-        entry.item,
-    );
+      text: document.text,
+      data: document.data,
+    }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
 }
 
-/* ============================================================
-   CONVERT TO PROMPT TEXT
-============================================================ */
-
 export function knowledgeToText(
-  items: KnowledgeItem[],
+  results: KnowledgeResult[]
 ): string {
-  return items
-    .map(
-      (item) =>
-        [
-          item.title
-            ? `Title: ${item.title}`
-            : "",
+  if (!results.length) {
+    return "";
+  }
 
-          item.category
-            ? `Category: ${item.category}`
-            : "",
-
-          item.question
-            ? `Question: ${item.question}`
-            : "",
-
-          item.answer
-            ? `Answer: ${item.answer}`
-            : "",
-
-          item.content
-            ? `Content: ${item.content}`
-            : "",
-        ]
-          .filter(Boolean)
-          .join("\n"),
-    )
-    .join(
-      "\n\n---\n\n",
-    );
+  return results
+    .map((item, index) => {
+      return [
+        `SOURCE ${index + 1}`,
+        `Type: ${item.source}`,
+        `File: ${item.fileName}`,
+        `Category: ${item.category}`,
+        `Score: ${item.score}`,
+        "Content:",
+        item.text,
+      ].join("\n");
+    })
+    .join("\n\n-------------------------\n\n");
 }

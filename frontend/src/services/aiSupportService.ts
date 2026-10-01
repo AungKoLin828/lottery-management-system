@@ -1,232 +1,162 @@
 /* ============================================================
    AI SUPPORT SERVICE
-
-   Frontend
-      ↓
-   /api/ai/support
-      ↓
-   Netlify Function
-      ↓
-   OpenRouter
-
-   IMPORTANT:
-   - Never place OPENROUTER_API_KEY here.
-   - Never access the database here.
-   - Authentication uses the existing lottery_auth cookie.
-============================================================ */
-
-/* ============================================================
-   TYPES
 ============================================================ */
 
 export interface AISupportHistoryMessage {
-  role:
-    | "user"
-    | "assistant";
-
+  role: "user" | "assistant";
   content: string;
 }
+
+export type AISupportSource =
+  | "OPENROUTER"
+  | "TRAINING"
+  | "HUMAN";
 
 export interface AISupportResponse {
   success: boolean;
 
   message: string;
-}
 
-interface AISupportApiResponse {
-  success?: boolean;
+  source: AISupportSource;
 
-  message?: string;
+  mode:
+    | "AI"
+    | "HUMAN";
 
-  error?: string;
+  confidence?: number;
 
-  code?: string;
+  intent?: string | null;
+
+  category?: string | null;
+
+  fallbackUsed?: boolean;
+
+  fallbackReason?: string;
 }
 
 /* ============================================================
-   CONSTANTS
+   API URL
 ============================================================ */
 
 const API_URL =
   "/api/ai/support";
 
-const MAX_MESSAGE_LENGTH =
-  2000;
+/* ============================================================
+   REQUEST TIMEOUT
+============================================================ */
 
-const MAX_HISTORY_MESSAGES =
-  10;
+const REQUEST_TIMEOUT = 30_000;
 
 /* ============================================================
-   ASK AI SUPPORT
+   FETCH WITH TIMEOUT
+============================================================ */
+
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeout = REQUEST_TIMEOUT,
+): Promise<Response> {
+  const controller =
+    new AbortController();
+
+  const timer = window.setTimeout(
+    () => controller.abort(),
+    timeout,
+  );
+
+  try {
+    return await fetch(
+      url,
+      {
+        ...options,
+
+        credentials: "include",
+
+        signal:
+          controller.signal,
+      },
+    );
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+/* ============================================================
+   ASK SUPPORT
 ============================================================ */
 
 export async function askAISupport(
   message: string,
   history: AISupportHistoryMessage[] = [],
 ): Promise<AISupportResponse> {
-  const trimmedMessage =
-    message.trim();
+  const trimmed =
+    String(message || "").trim();
 
-  if (!trimmedMessage) {
+  if (!trimmed) {
     throw new Error(
-      "Please enter a message.",
+      "Message is required.",
     );
   }
 
-  if (
-    trimmedMessage.length >
-    MAX_MESSAGE_LENGTH
-  ) {
+  if (trimmed.length > 1000) {
     throw new Error(
-      `Message must be ${MAX_MESSAGE_LENGTH} characters or less.`,
+      "Message must be 1000 characters or less.",
     );
   }
 
-  const safeHistory =
-    Array.isArray(history)
-      ? history
-          .slice(
-            -MAX_HISTORY_MESSAGES,
-          )
-          .filter(
-            (item) =>
-              item &&
-              (
-                item.role ===
-                  "user" ||
-                item.role ===
-                  "assistant"
-              ) &&
-              typeof item.content ===
-                "string" &&
-              item.content.trim()
-                .length > 0,
-          )
-          .map(
-            (item) => ({
-              role:
-                item.role,
+  const response =
+    await fetchWithTimeout(
+      API_URL,
+      {
+        method: "POST",
 
-              content:
-                item.content
-                  .trim()
-                  .slice(
-                    0,
-                    MAX_MESSAGE_LENGTH,
-                  ),
-            }),
-          )
-      : [];
-
-  let response: Response;
-
-  try {
-    response =
-      await fetch(
-        API_URL,
-        {
-          method:
-            "POST",
-
-          credentials:
-            "include",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-
-            Accept:
-              "application/json",
-          },
-
-          body:
-            JSON.stringify({
-              message:
-                trimmedMessage,
-
-              messages:
-                safeHistory,
-            }),
+        headers: {
+          "Content-Type":
+            "application/json",
         },
-      );
-  } catch (error) {
-    console.error(
-      "[AI Support] Network error:",
-      error,
+
+        body: JSON.stringify({
+          message: trimmed,
+
+          history:
+            Array.isArray(history)
+              ? history.slice(-8)
+              : [],
+        }),
+      },
     );
 
-    throw new Error(
-      "Unable to connect to AI support. Please check your internet connection and try again.",
-    );
-  }
-
-  let data:
-    AISupportApiResponse =
-      {};
+  let data: AISupportResponse | null =
+    null;
 
   try {
-    data =
-      (await response.json()) as
-        AISupportApiResponse;
+    data = await response.json();
   } catch {
-    data = {};
+    data = null;
   }
 
-  if (
-    response.status ===
-    401
-  ) {
+  /*
+   * Normally the backend itself should handle
+   * OpenRouter failure and return a training response.
+   *
+   * This error is therefore only a genuine
+   * backend/network failure.
+   */
+  if (!response.ok) {
     throw new Error(
-      "Please log in to use AI support.",
+      data?.message ||
+        `Support request failed (${response.status}).`,
     );
   }
 
-  if (
-    response.status ===
-    429
-  ) {
+  if (!data?.success) {
     throw new Error(
-      "Too many AI requests. Please wait a moment and try again.",
+      data?.message ||
+        "Support service is unavailable.",
     );
   }
 
-  if (
-    !response.ok
-  ) {
-    /*
-     * Do not expose backend stack traces to players.
-     */
-    throw new Error(
-      data.message ||
-        "AI support is temporarily unavailable.",
-    );
-  }
-
-  if (
-    data.success !==
-    true
-  ) {
-    throw new Error(
-      data.message ||
-        "AI support could not process your request.",
-    );
-  }
-
-  if (
-    typeof data.message !==
-      "string" ||
-    !data.message.trim()
-  ) {
-    throw new Error(
-      "AI support returned an empty response.",
-    );
-  }
-
-  return {
-    success:
-      true,
-
-    message:
-      data.message.trim(),
-  };
+  return data;
 }
+
+export default askAISupport;

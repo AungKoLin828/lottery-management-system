@@ -1,162 +1,79 @@
-const OPENROUTER_MODELS_URL =
+/**
+ * ============================================================
+ * OPENROUTER MODEL DISCOVERY
+ * ============================================================
+ */
+
+import {
+  OpenRouterModel,
+} from "./openRouter";
+
+const MODELS_URL =
   "https://openrouter.ai/api/v1/models";
 
-const MODEL_CACHE_TTL_MS =
-  10 * 60 * 1000; // 10 minutes
+const CACHE_TTL_MS =
+  10 * 60 * 1000;
 
-interface OpenRouterModel {
-  id?: string;
-
-  name?: string;
-
-  pricing?: {
-    prompt?: string | number;
-    completion?: string | number;
-  };
-
-  architecture?: {
-    modality?: string;
-
-    input_modalities?: string[];
-
-    output_modalities?: string[];
-  };
-
-  context_length?: number;
-}
-
-interface ModelsResponse {
-  data?: OpenRouterModel[];
-
-  error?: {
-    message?: string;
-  };
-}
-
-let cachedModels:
+let modelCache:
   | OpenRouterModel[]
   | null = null;
 
-let cacheTimestamp = 0;
+let modelCacheAt = 0;
 
-/* ============================================================
-   FETCH WITH TIMEOUT
-============================================================ */
-
-async function fetchWithTimeout(
-  url: string,
-  options: RequestInit = {},
-  timeout = 10_000,
-): Promise<Response> {
-  const controller =
-    new AbortController();
-
-  const timeoutId =
-    setTimeout(
-      () => controller.abort(),
-      timeout,
-    );
-
-  try {
-    return await fetch(
-      url,
-      {
-        ...options,
-        signal:
-          controller.signal,
-      },
-    );
-  } finally {
-    clearTimeout(
-      timeoutId,
-    );
-  }
-}
-
-/* ============================================================
-   GET AVAILABLE MODELS
-============================================================ */
-
-export async function getAvailableModels(
-  apiKey: string,
-): Promise<OpenRouterModel[]> {
-  const now =
-    Date.now();
+export async function getAvailableModels(): Promise<
+  OpenRouterModel[]
+> {
+  const now = Date.now();
 
   if (
-    cachedModels &&
-    now - cacheTimestamp <
-      MODEL_CACHE_TTL_MS
+    modelCache &&
+    now - modelCacheAt <
+      CACHE_TTL_MS
   ) {
-    return cachedModels;
+    return modelCache;
   }
 
   const response =
-    await fetchWithTimeout(
-      OPENROUTER_MODELS_URL,
-      {
-        method: "GET",
+    await fetch(MODELS_URL, {
+      method: "GET",
 
-        headers: {
-          Authorization:
-            `Bearer ${apiKey}`,
+      headers: {
+        Accept:
+          "application/json",
 
-          Accept:
-            "application/json",
-        },
+        ...(process.env
+          .OPENROUTER_API_KEY
+          ? {
+              Authorization:
+                `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            }
+          : {}),
       },
-      10_000,
-    );
-
-  const raw =
-    await response.text();
-
-  let data:
-    | ModelsResponse
-    | null = null;
-
-  try {
-    data =
-      JSON.parse(
-        raw,
-      ) as ModelsResponse;
-  } catch {
-    data = null;
-  }
+    });
 
   if (!response.ok) {
     throw new Error(
-      data?.error?.message ||
-        `OpenRouter model discovery failed (${response.status})`,
+      `Failed to discover OpenRouter models: HTTP ${response.status}`
     );
   }
 
-  if (
-    !data ||
-    !Array.isArray(data.data)
-  ) {
-    throw new Error(
-      "OpenRouter returned an invalid model list",
-    );
-  }
+  const json =
+    (await response.json()) as {
+      data?: OpenRouterModel[];
+    };
 
-  cachedModels =
-    data.data;
+  const models =
+    Array.isArray(json.data)
+      ? json.data
+      : [];
 
-  cacheTimestamp =
-    now;
+  modelCache = models;
+  modelCacheAt = now;
 
-  return cachedModels;
+  return models;
 }
 
-/* ============================================================
-   CLEAR MODEL CACHE
-============================================================ */
-
 export function clearModelCache(): void {
-  cachedModels =
-    null;
-
-  cacheTimestamp =
-    0;
+  modelCache = null;
+  modelCacheAt = 0;
 }

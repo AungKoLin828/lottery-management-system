@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "language": [
+    "en",
+    "my"
+  ],
+  "description": "Training data for 2D lottery play, AM/PM, numbers, limits and selections.",
+  "intents": [
+    {
+      "intent": "2d_how_to_play",
+      "category": "lottery-2d",
+      "keywords": [
+        "2D",
+        "play",
+        "number",
+        "ထိုး",
+        "ကစား"
+      ],
+      "examples": {
+        "en": [
+          "How do I play 2D?",
+          "How can I buy a 2D number?",
+          "I want to play 2D"
+        ],
+        "my": [
+          "2D ဘယ်လိုထိုးရမလဲ",
+          "2D ဘယ်လိုကစားရမလဲ",
+          "2D နံပါတ်ဝယ်ချင်တယ်",
+          "2D ထိုးနည်းပြောပါ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Open the 2D Play page, choose the draw session, select your number and enter the bet amount. Review the selection and submit the ticket."
+        ],
+        "my": [
+          "2D Play စာမျက်နှာကိုဖွင့်ပြီး Draw Session ကိုရွေးပါ။ နံပါတ်ရွေးပြီး Bet Amount ထည့်ပါ။ Selection ကို ပြန်စစ်ပြီး Ticket တင်နိုင်ပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "2d_am_pm",
+      "category": "lottery-2d",
+      "keywords": [
+        "AM",
+        "PM",
+        "session",
+        "မနက်",
+        "ညနေ"
+      ],
+      "examples": {
+        "en": [
+          "What are AM and PM 2D?",
+          "What is the difference between AM and PM?",
+          "Can I play both AM and PM?"
+        ],
+        "my": [
+          "2D AM နဲ့ PM ဘာကွာလဲ",
+          "AM PM 2D ဆိုတာဘာလဲ",
+          "AM နဲ့ PM နှစ်ခုလုံးထိုးလို့ရလား"
+        ]
+      },
+      "responses": {
+        "en": [
+          "2D has separate AM and PM draw sessions. Select the session you want to play before submitting your ticket."
+        ],
+        "my": [
+          "2D တွင် AM နှင့် PM Draw Session သီးခြားရှိပါသည်။ Ticket မတင်မီ ကစားလိုသော Session ကို ရွေးချယ်ပါ။"
+        ]
+      }
+    },
+    {
+      "intent": "2d_number",
+      "category": "lottery-2d",
+      "keywords": [
+        "two digit",
+        "number",
+        "နှစ်လုံး",
+        "နံပါတ်"
+      ],
+      "examples": {
+        "en": [
+          "How many numbers are there in 2D?",
+          "Can I choose any two digit number?",
+          "What numbers can I select?"
+        ],
+        "my": [
+          "2D မှာ ဘယ်နံပါတ်တွေရှိလဲ",
+          "နှစ်လုံးနံပါတ် ဘယ်ဟာမဆိုရွေးလို့ရလား",
+          "2D နံပါတ်ရွေးချင်တယ်"
+        ]
+      },
+      "responses": {
+        "en": [
+          "2D uses two-digit number selections. The available number buttons are displayed on the 2D Play page."
+        ],
+        "my": [
+          "2D တွင် နှစ်လုံးဂဏန်းနံပါတ်များကို ရွေးချယ်ကစားနိုင်ပါသည်။ ရွေးချယ်နိုင်သော နံပါတ်များကို 2D Play စာမျက်နှာတွင် ပြသထားပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "2d_bet_limit",
+      "category": "lottery-2d",
+      "keywords": [
+        "minimum bet",
+        "maximum bet",
+        "limit",
+        "ထိုးငွေ"
+      ],
+      "examples": {
+        "en": [
+          "What is the minimum 2D bet?",
+          "What is the maximum 2D bet?",
+          "Why can't I enter this amount?"
+        ],
+        "my": [
+          "2D အနည်းဆုံးထိုးငွေ ဘယ်လောက်လဲ",
+          "2D အများဆုံးထိုးငွေ ဘယ်လောက်လဲ",
+          "ဒီ Amount ထည့်လို့မရဘူး"
+        ]
+      },
+      "responses": {
+        "en": [
+          "Bet limits are controlled by the current lottery settings. The Play page displays the applicable minimum and maximum amounts."
+        ],
+        "my": [
+          "Bet Limit များကို လက်ရှိ Lottery Setting မှ သတ်မှတ်ထားပါသည်။ Play စာမျက်နှာတွင် သက်ဆိုင်ရာ Minimum နှင့် Maximum Amount များကို ပြသထားပါသည်။"
+        ]
+      }
+    },
+    {
+      "intent": "2d_multiple_selection",
+      "category": "lottery-2d",
+      "keywords": [
+        "multiple",
+        "selection",
+        "ရွေးချယ်",
+        "အများကြီး"
+      ],
+      "examples": {
+        "en": [
+          "How many 2D numbers can I select?",
+          "Can I select multiple 2D numbers?"
+        ],
+        "my": [
+          "2D နံပါတ်အများကြီးရွေးလို့ရလား",
+          "2D နံပါတ်ဘယ်နှစ်ခုရွေးလို့ရလဲ"
+        ]
+      },
+      "responses": {
+        "en": [
+          "The number of selections is controlled by the current lottery settings. The Play page prevents selections beyond the configured limit."
+        ],
+        "my": [
+          "ရွေးချယ်နိုင်သော 2D နံပါတ်အရေအတွက်ကို လက်ရှိ Lottery Setting မှ သတ်မှတ်ထားပါသည်။ သတ်မှတ်ထားသော Limit ထက်ကျော်လွန်၍ ရွေးချယ်၍မရပါ။"
+        ]
+      }
+    }
+  ]
+}
