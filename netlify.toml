@@ -331,12 +331,6 @@
   status = 200
   force = true
 
-[functions]
-  included_files = [
-    "training/**/*.json",
-    "knowledge/**/*.json"
-  ]
-
 # ============================================================
 # REACT SPA FALLBACK
 #
