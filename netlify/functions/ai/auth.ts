@@ -1,42 +1,103 @@
-import type { HandlerEvent } from "@netlify/functions";
-import { jwtVerify, type JWTPayload } from "jose";
+import {
+  jwtVerify,
+  type JWTPayload,
+} from "jose";
 
-/* ============================================================
-   TYPES
-============================================================ */
-
-export interface AIAuthPayload extends JWTPayload {
-  userId?: string;
-  username?: string;
-  phone?: string;
-  role?: string;
-}
+/*
+ * ============================================================
+ * AUTH TYPES
+ * ============================================================
+ */
 
 export interface AuthenticatedUser {
+  /**
+   * Normalized user ID.
+   *
+   * The existing application may store this in either:
+   *
+   *   payload.userId
+   *
+   * or:
+   *
+   *   payload.sub
+   *
+   * We normalize both to id/userId.
+   */
   id: string;
+
   userId: string;
+
   username?: string;
+
   phone?: string;
+
   role?: string;
 }
 
-/* ============================================================
-   CONSTANTS
-============================================================ */
+/*
+ * ============================================================
+ * AUTH ERROR
+ * ============================================================
+ *
+ * Existing AI/admin functions import AuthError from this file.
+ *
+ * Example:
+ *
+ *   import {
+ *     AuthError,
+ *     verifyAdminAuth,
+ *   } from "./ai/auth";
+ *
+ * AuthError therefore MUST remain a named export.
+ * ============================================================
+ */
 
-const AUTH_COOKIE_NAME = "lottery_auth";
+export class AuthError extends Error {
+  public readonly statusCode: number;
 
-/* ============================================================
-   JWT SECRET
-============================================================ */
+  public readonly code: string;
+
+  constructor(
+    message = "Authentication required.",
+    statusCode = 401,
+    code = "UNAUTHORIZED",
+  ) {
+    super(message);
+
+    this.name = "AuthError";
+
+    this.statusCode =
+      statusCode;
+
+    this.code =
+      code;
+
+    /*
+     * Required when extending Error in some
+     * JavaScript/TypeScript runtimes.
+     */
+    Object.setPrototypeOf(
+      this,
+      AuthError.prototype,
+    );
+  }
+}
+
+/*
+ * ============================================================
+ * JWT SECRET
+ * ============================================================
+ */
 
 function getJWTSecret(): Uint8Array {
   const secret =
     process.env.JWT_SECRET?.trim();
 
   if (!secret) {
-    throw new Error(
+    throw new AuthError(
       "JWT_SECRET is not configured.",
+      500,
+      "SERVER_CONFIGURATION_ERROR",
     );
   }
 
@@ -45,77 +106,120 @@ function getJWTSecret(): Uint8Array {
   );
 }
 
-/* ============================================================
-   COOKIE PARSER
-============================================================ */
+/*
+ * ============================================================
+ * COOKIE PARSER
+ * ============================================================
+ */
 
 function parseCookies(
-  cookieHeader?: string,
+  cookieHeader?: string | null,
 ): Record<string, string> {
+  if (
+    !cookieHeader ||
+    !cookieHeader.trim()
+  ) {
+    return {};
+  }
+
   const cookies: Record<
     string,
     string
   > = {};
 
-  if (!cookieHeader) {
-    return cookies;
-  }
-
-  for (
-    const part of cookieHeader.split(";")
-  ) {
-    const separator =
+  for (const part of cookieHeader.split(
+    ";",
+  )) {
+    const separatorIndex =
       part.indexOf("=");
 
-    if (separator < 0) {
+    if (separatorIndex < 0) {
       continue;
     }
 
-    const name =
+    const rawName =
       part
-        .slice(0, separator)
+        .slice(0, separatorIndex)
         .trim();
 
-    const value =
+    const rawValue =
       part
-        .slice(separator + 1)
+        .slice(separatorIndex + 1)
         .trim();
 
-    if (!name) {
+    if (!rawName) {
       continue;
     }
 
     try {
-      cookies[name] =
-        decodeURIComponent(value);
+      cookies[rawName] =
+        decodeURIComponent(
+          rawValue,
+        );
     } catch {
-      cookies[name] = value;
+      /*
+       * If a cookie contains malformed
+       * URI encoding, keep the raw value.
+       */
+      cookies[rawName] =
+        rawValue;
     }
   }
 
   return cookies;
 }
 
-/* ============================================================
-   GET AUTH TOKEN
-============================================================ */
+/*
+ * ============================================================
+ * AUTH COOKIE NAME
+ * ============================================================
+ *
+ * The existing application uses:
+ *
+ *   lottery_auth
+ *
+ * for the JWT authentication cookie.
+ * ============================================================
+ */
+
+export const AUTH_COOKIE_NAME =
+  "lottery_auth";
+
+/*
+ * ============================================================
+ * GET AUTH TOKEN FROM COOKIE
+ * ============================================================
+ */
 
 export function getAuthTokenFromCookie(
-  event: HandlerEvent,
+  event: {
+    headers?: Record<
+      string,
+      string | undefined
+    >;
+  },
 ): string | null {
-  const cookieHeader =
-    event.headers?.cookie ??
-    event.headers?.Cookie;
+  const headers =
+    event.headers ?? {};
 
-  if (!cookieHeader) {
-    return null;
-  }
+  /*
+   * Netlify normally exposes headers
+   * in lowercase, but supporting the
+   * capitalized version makes this helper
+   * safer.
+   */
+  const cookieHeader =
+    headers.cookie ??
+    headers.Cookie ??
+    null;
 
   const cookies =
     parseCookies(cookieHeader);
 
   const token =
-    cookies[AUTH_COOKIE_NAME];
+    cookies[
+      AUTH_COOKIE_NAME
+    ];
 
   if (
     typeof token !== "string" ||
@@ -127,77 +231,65 @@ export function getAuthTokenFromCookie(
   return token.trim();
 }
 
-/* ============================================================
-   VERIFY TOKEN
-============================================================ */
+/*
+ * ============================================================
+ * JWT CLAIM HELPERS
+ * ============================================================
+ */
 
-export async function verifyToken(
-  token: string,
-): Promise<AIAuthPayload> {
-  if (!token?.trim()) {
-    throw new Error(
-      "Authentication token is missing.",
-    );
-  }
+function getStringClaim(
+  payload: JWTPayload,
+  key: string,
+): string | undefined {
+  const value =
+    payload[key];
 
-  try {
-    const result =
-      await jwtVerify<AIAuthPayload>(
-        token,
-        getJWTSecret(),
-        {
-          algorithms: ["HS256"],
-        },
-      );
-
-    return result.payload;
-  } catch (error) {
-    console.error(
-      "AI JWT verification failed:",
-      error,
-    );
-
-    throw new Error(
-      "Invalid or expired authentication token.",
-    );
-  }
+  return typeof value ===
+    "string"
+    ? value
+    : undefined;
 }
 
-/* ============================================================
-   REQUIRE AUTH
-   ------------------------------------------------------------
-   IMPORTANT:
-   Existing ai/support.ts already imports this function.
-   Keep this API for compatibility.
-============================================================ */
+/*
+ * ============================================================
+ * NORMALIZE JWT USER
+ * ============================================================
+ */
 
-export async function requireAuth(
-  event: HandlerEvent,
-): Promise<AuthenticatedUser> {
-  const token =
-    getAuthTokenFromCookie(event);
-
-  if (!token) {
-    throw new Error(
-      "Authentication required.",
-    );
-  }
-
-  const payload =
-    await verifyToken(token);
+function normalizeAuthenticatedUser(
+  payload: JWTPayload,
+): AuthenticatedUser {
+  /*
+   * Existing tokens may contain:
+   *
+   *   userId
+   *
+   * while standard JWT implementations
+   * commonly use:
+   *
+   *   sub
+   *
+   * Support both.
+   */
 
   const userId =
-    typeof payload.userId ===
-    "string"
-      ? payload.userId
-      : typeof payload.sub ===
-          "string"
-        ? payload.sub
-        : "";
+    getStringClaim(
+      payload,
+      "userId",
+    ) ??
+    getStringClaim(
+      payload,
+      "sub",
+    );
 
-  if (!userId) {
-    throw new Error(
-      "Invalid authentication token.",
+  if (
+    !userId ||
+    !userId.trim()
+  ) {
+    throw new AuthError(
+      "Authentication token does not contain a valid user ID.",
+      401,
+      "INVALID_AUTH_TOKEN",
     );
   }
 
@@ -206,105 +298,336 @@ export async function requireAuth(
     userId,
 
     username:
-      typeof payload.username ===
-      "string"
-        ? payload.username
-        : undefined,
+      getStringClaim(
+        payload,
+        "username",
+      ),
 
     phone:
-      typeof payload.phone ===
-      "string"
-        ? payload.phone
-        : undefined,
+      getStringClaim(
+        payload,
+        "phone",
+      ),
 
     role:
-      typeof payload.role ===
-      "string"
-        ? payload.role
-        : undefined,
+      getStringClaim(
+        payload,
+        "role",
+      ),
   };
 }
 
-/* ============================================================
-   VERIFY ADMIN AUTH
-   ------------------------------------------------------------
-   Used by admin AI settings endpoints.
-============================================================ */
+/*
+ * ============================================================
+ * VERIFY TOKEN
+ * ============================================================
+ */
+
+export async function verifyToken(
+  token: string,
+): Promise<AuthenticatedUser> {
+  if (
+    typeof token !== "string" ||
+    !token.trim()
+  ) {
+    throw new AuthError(
+      "Authentication token is missing.",
+      401,
+      "MISSING_AUTH_TOKEN",
+    );
+  }
+
+  try {
+    const secret =
+      getJWTSecret();
+
+    const result =
+      await jwtVerify(
+        token,
+        secret,
+      );
+
+    return normalizeAuthenticatedUser(
+      result.payload,
+    );
+  } catch (error) {
+    /*
+     * Do not expose internal JWT details
+     * to the client.
+     */
+
+    if (
+      error instanceof AuthError
+    ) {
+      throw error;
+    }
+
+    console.error(
+      "JWT verification failed:",
+      error,
+    );
+
+    throw new AuthError(
+      "Your session is invalid or has expired. Please log in again.",
+      401,
+      "INVALID_AUTH_TOKEN",
+    );
+  }
+}
+
+/*
+ * ============================================================
+ * REQUIRE AUTHENTICATED USER
+ * ============================================================
+ *
+ * Used by:
+ *
+ *   netlify/functions/ai/support.ts
+ *
+ * Example:
+ *
+ *   const user =
+ *     await requireAuth(event);
+ *
+ * ============================================================
+ */
+
+export async function requireAuth(
+  event: {
+    headers?: Record<
+      string,
+      string | undefined
+    >;
+  },
+): Promise<AuthenticatedUser> {
+  const token =
+    getAuthTokenFromCookie(
+      event,
+    );
+
+  if (!token) {
+    throw new AuthError(
+      "Authentication required. Please log in.",
+      401,
+      "MISSING_AUTH_TOKEN",
+    );
+  }
+
+  return verifyToken(token);
+}
+
+/*
+ * ============================================================
+ * VERIFY ADMIN AUTH
+ * ============================================================
+ *
+ * Used by:
+ *
+ *   admin-ai-support-settings.ts
+ *   admin-ai-support-settings-update.ts
+ *
+ * It first authenticates the JWT and then
+ * checks the role.
+ *
+ * Accepted admin role:
+ *
+ *   ADMIN
+ *
+ * ============================================================
+ */
 
 export async function verifyAdminAuth(
-  event: HandlerEvent,
+  event: {
+    headers?: Record<
+      string,
+      string | undefined
+    >;
+  },
 ): Promise<AuthenticatedUser> {
   const user =
     await requireAuth(event);
 
-  if (
-    user.role?.toUpperCase() !==
-    "ADMIN"
-  ) {
-    throw new Error(
-      "Admin access required.",
+  const role =
+    user.role
+      ?.trim()
+      .toUpperCase();
+
+  if (role !== "ADMIN") {
+    throw new AuthError(
+      "Administrator access is required.",
+      403,
+      "FORBIDDEN",
     );
   }
 
   return user;
 }
 
-/* ============================================================
-   REQUIRE ADMIN
-   ------------------------------------------------------------
-   Alias for future compatibility.
-============================================================ */
+/*
+ * ============================================================
+ * REQUIRE ADMIN
+ * ============================================================
+ *
+ * Alias/helper for code that uses
+ * requireAdmin() instead of verifyAdminAuth().
+ *
+ * Keeping both avoids breaking existing
+ * functions as the application grows.
+ * ============================================================
+ */
 
 export async function requireAdmin(
-  event: HandlerEvent,
+  event: {
+    headers?: Record<
+      string,
+      string | undefined
+    >;
+  },
 ): Promise<AuthenticatedUser> {
   return verifyAdminAuth(event);
 }
 
-/* ============================================================
-   JSON RESPONSE
-============================================================ */
+/*
+ * ============================================================
+ * JSON RESPONSE
+ * ============================================================
+ *
+ * Shared helper for AI/admin functions.
+ *
+ * Example:
+ *
+ *   return jsonResponse(
+ *     { success: true },
+ *     200,
+ *   );
+ * ============================================================
+ */
 
 export function jsonResponse(
-  statusCode: number,
-  body: unknown,
-  headers?: Record<string, string>,
-) {
-  return {
-    statusCode,
+  data: unknown,
+  status = 200,
+  extraHeaders?: Record<
+    string,
+    string
+  >,
+): Response {
+  return new Response(
+    JSON.stringify(data),
+    {
+      status,
 
-    headers: {
-      "Content-Type":
-        "application/json; charset=utf-8",
+      headers: {
+        "Content-Type":
+          "application/json; charset=utf-8",
 
-      "Cache-Control":
-        "no-store",
+        "Cache-Control":
+          "no-store",
 
-      ...headers,
+        ...extraHeaders,
+      },
     },
-
-    body: JSON.stringify(body),
-  };
+  );
 }
 
-/* ============================================================
-   PARSE BODY
-============================================================ */
+/*
+ * ============================================================
+ * AUTH ERROR RESPONSE
+ * ============================================================
+ *
+ * Converts AuthError into the JSON response
+ * expected by frontend/API callers.
+ * ============================================================
+ */
 
-export function parseBody<T>(
-  event: HandlerEvent,
-): T {
-  if (!event.body) {
+export function authErrorResponse(
+  error: unknown,
+): Response {
+  if (
+    error instanceof AuthError
+  ) {
+    return jsonResponse(
+      {
+        success: false,
+        error: error.code,
+        message: error.message,
+      },
+      error.statusCode,
+    );
+  }
+
+  console.error(
+    "Unexpected authentication error:",
+    error,
+  );
+
+  return jsonResponse(
+    {
+      success: false,
+      error: "AUTHENTICATION_ERROR",
+      message:
+        "Authentication failed.",
+    },
+    500,
+  );
+}
+
+/*
+ * ============================================================
+ * PARSE JSON BODY
+ * ============================================================
+ *
+ * This helper is kept here because some of
+ * the AI/admin functions use the same auth
+ * utility module.
+ * ============================================================
+ */
+
+export async function parseBody<T = unknown>(
+  event: {
+    body?: string | null;
+    isBase64Encoded?: boolean;
+  },
+): Promise<T> {
+  if (
+    !event.body ||
+    !event.body.trim()
+  ) {
     return {} as T;
+  }
+
+  let body =
+    event.body;
+
+  /*
+   * Netlify can provide a base64 encoded
+   * request body.
+   */
+  if (
+    event.isBase64Encoded
+  ) {
+    try {
+      body = Buffer.from(
+        body,
+        "base64",
+      ).toString("utf8");
+    } catch {
+      throw new AuthError(
+        "Invalid request body encoding.",
+        400,
+        "INVALID_REQUEST_BODY",
+      );
+    }
   }
 
   try {
     return JSON.parse(
-      event.body,
+      body,
     ) as T;
   } catch {
-    throw new Error(
+    throw new AuthError(
       "Invalid JSON request body.",
+      400,
+      "INVALID_JSON",
     );
   }
 }
