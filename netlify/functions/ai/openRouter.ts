@@ -8,36 +8,41 @@
  * Features:
  *
  * 1. Dynamic OpenRouter model discovery
- * 2. No hard-coded AI model environment variables required
+ * 2. No hard-coded AI model environment variables
  * 3. Free-model filtering
  * 4. Preferred-model scoring
- * 5. Maximum 3 models per OpenRouter request
- * 6. openrouter/free universal fallback
- * 7. Model-list caching
- * 8. Cache refresh after model failure
- * 9. Request timeout
- * 10. 429 / provider failure handling
- * 11. Tool/function calling support
- * 12. Backward-compatible callOpenRouter()
- * 13. generateOpenRouterResponse() export used by support.ts
+ * 5. Tool-capability filtering
+ * 6. Maximum 3 models per request
+ * 7. OpenRouter model fallback chain
+ * 8. openrouter/free universal fallback
+ * 9. Model-list caching
+ * 10. Cache refresh after model failure
+ * 11. Request timeout
+ * 12. 429 / provider / 5xx handling
+ * 13. Tool/function calling support
+ * 14. Backward-compatible callOpenRouter()
+ * 15. generateOpenRouterResponse()
+ * 16. generateOpenRouterText()
  *
  * IMPORTANT:
  *
- * This file is for Netlify/server-side execution only.
+ * This file runs on Netlify/server-side only.
  *
- * Do NOT use:
+ * NEVER use:
+ *
  *   window
  *   localStorage
  *   import.meta.env
  *   VITE_OPENROUTER_API_KEY
  *
- * The API key must remain in:
+ * The API key must be:
  *
  *   OPENROUTER_API_KEY
  *
- * Netlify environment variables.
+ * in Netlify environment variables.
  * ============================================================
  */
+
 
 /* ============================================================
    CONSTANTS
@@ -52,54 +57,68 @@ const OPENROUTER_CHAT_URL =
 /*
  * OpenRouter's universal free router.
  *
- * This is intentionally kept as the final fallback.
+ * This is the final safety fallback.
+ *
+ * OpenRouter/free dynamically selects an available free
+ * model and can route according to the capabilities required
+ * by the request.
  */
 export const UNIVERSAL_FREE_MODEL =
   "openrouter/free";
 
 /*
- * Maximum number of models sent in a single request.
+ * Maximum number of model candidates sent in one request.
  *
- * We use:
+ * IMPORTANT:
  *
- *   1 primary model
- *   2 fallback models
+ * These are TOTAL model candidates, not:
  *
- * Total = 3
+ *   1 primary + 3 fallbacks.
+ *
+ * Maximum:
+ *
+ *   model A
+ *   model B
+ *   model C
+ *
+ * = 3 total.
  */
 export const MAX_MODELS_PER_REQUEST = 3;
 
 /*
- * OpenRouter request timeout.
- *
- * 20 seconds is suitable for Netlify serverless execution
- * while preventing a permanently hanging request.
+ * Server-side request timeout.
  */
-export const OPENROUTER_TIMEOUT_MS = 20_000;
+export const OPENROUTER_TIMEOUT_MS =
+  20_000;
 
 /*
  * Model discovery cache lifetime.
- *
- * 10 minutes.
  */
 const MODEL_CACHE_TTL_MS =
   10 * 60 * 1000;
 
 /*
- * Maximum number of history messages accepted by this layer.
+ * Maximum number of messages forwarded to OpenRouter.
  */
 const MAX_MESSAGES = 20;
 
 /*
- * Maximum content length sent to OpenRouter for one message.
+ * Maximum content size of an individual message.
  */
 const MAX_MESSAGE_CONTENT_LENGTH =
   8_000;
+
 
 /* ============================================================
    PREFERRED MODEL FAMILIES
 ============================================================ */
 
+/*
+ * These are prefixes, NOT hard-coded model IDs.
+ *
+ * If a particular model disappears, another current model
+ * from the same family can still be selected.
+ */
 const PREFERRED_MODEL_PREFIXES = [
   "google/gemma",
   "google/gemini",
@@ -109,6 +128,7 @@ const PREFERRED_MODEL_PREFIXES = [
   "deepseek/",
   "nvidia/",
 ];
+
 
 /* ============================================================
    TYPES
@@ -123,9 +143,7 @@ export type OpenRouterRole =
 export interface OpenRouterMessage {
   role: OpenRouterRole;
 
-  content?:
-    | string
-    | null;
+  content?: string | null;
 
   name?: string;
 
@@ -206,17 +224,23 @@ interface OpenRouterErrorResponse {
     metadata?: unknown;
   };
 
+  message?: string;
+
   [key: string]: unknown;
 }
 
 interface OpenRouterChoiceMessage {
   role?: string;
 
-  content?:
-    | string
-    | null;
+  content?: string | null;
 
   tool_calls?: OpenRouterToolCall[];
+
+  /*
+   * Some provider responses may include an error
+   * attached to the message/choice.
+   */
+  refusal?: string | null;
 }
 
 interface OpenRouterChoice {
@@ -225,6 +249,12 @@ interface OpenRouterChoice {
   message?: OpenRouterChoiceMessage;
 
   finish_reason?: string | null;
+
+  error?: {
+    message?: string;
+    code?: number | string;
+    metadata?: unknown;
+  };
 }
 
 interface OpenRouterChatResponse {
@@ -243,9 +273,11 @@ interface OpenRouterChatResponse {
   [key: string]: unknown;
 }
 
-/*
- * Public result returned to support.ts.
- */
+
+/* ============================================================
+   PUBLIC RESPONSE
+============================================================ */
+
 export interface OpenRouterResponse {
   content: string;
 
@@ -256,9 +288,11 @@ export interface OpenRouterResponse {
   finishReason: string | null;
 }
 
-/*
- * Optional configuration accepted by the public function.
- */
+
+/* ============================================================
+   PUBLIC REQUEST OPTIONS
+============================================================ */
+
 export interface OpenRouterRequestOptions {
   messages: OpenRouterMessage[];
 
@@ -269,27 +303,23 @@ export interface OpenRouterRequestOptions {
   maxTokens?: number;
 }
 
+
 /*
- * Flexible input accepted by generateOpenRouterResponse().
- *
- * This allows compatibility with either:
+ * Supports:
  *
  * generateOpenRouterResponse(messages)
  *
- * or:
- *
  * generateOpenRouterResponse(messages, tools)
- *
- * or:
  *
  * generateOpenRouterResponse({
  *   messages,
- *   tools
+ *   tools,
  * })
  */
 export type GenerateOpenRouterInput =
   | OpenRouterMessage[]
   | OpenRouterRequestOptions;
+
 
 /* ============================================================
    MODEL CACHE
@@ -299,16 +329,21 @@ let modelCache:
   | OpenRouterModel[]
   | null = null;
 
-let modelCacheTimestamp = 0;
+let modelCacheTimestamp =
+  0;
+
 
 /* ============================================================
    ERROR CLASS
 ============================================================ */
 
 export class OpenRouterError extends Error {
-  public readonly statusCode: number | null;
+  public readonly statusCode:
+    | number
+    | null;
 
-  public readonly retryable: boolean;
+  public readonly retryable:
+    boolean;
 
   public readonly code:
     | string
@@ -349,6 +384,7 @@ export class OpenRouterError extends Error {
   }
 }
 
+
 /* ============================================================
    API KEY
 ============================================================ */
@@ -371,6 +407,7 @@ function getOpenRouterApiKey(): string {
   return apiKey;
 }
 
+
 /* ============================================================
    PUBLIC SITE URL
 ============================================================ */
@@ -383,8 +420,11 @@ function getPublicSiteUrl(): string {
     return configured;
   }
 
-  return "https://lottery-play-testing.netlify.app";
+  return (
+    "https://lottery-play-testing.netlify.app"
+  );
 }
+
 
 /* ============================================================
    FETCH WITH TIMEOUT
@@ -393,7 +433,8 @@ function getPublicSiteUrl(): string {
 async function fetchWithTimeout(
   url: string,
   options: RequestInit,
-  timeoutMs = OPENROUTER_TIMEOUT_MS,
+  timeoutMs =
+    OPENROUTER_TIMEOUT_MS,
 ): Promise<Response> {
   const controller =
     new AbortController();
@@ -427,14 +468,30 @@ async function fetchWithTimeout(
       );
     }
 
-    throw error;
+    if (
+      error instanceof OpenRouterError
+    ) {
+      throw error;
+    }
+
+    throw new OpenRouterError(
+      error instanceof Error
+        ? error.message
+        : "OpenRouter network request failed.",
+      {
+        statusCode: null,
+        retryable: true,
+        code: "NETWORK_ERROR",
+      },
+    );
   } finally {
     clearTimeout(timeout);
   }
 }
 
+
 /* ============================================================
-   RESPONSE JSON
+   SAFE JSON
 ============================================================ */
 
 async function readJsonSafe(
@@ -447,23 +504,27 @@ async function readJsonSafe(
   }
 }
 
+
 /* ============================================================
-   MODEL FREE CHECK
+   FREE MODEL CHECK
 ============================================================ */
 
 function isFreeModel(
   model: OpenRouterModel,
 ): boolean {
+  const id =
+    model.id
+      .trim()
+      .toLowerCase();
+
   /*
-   * OpenRouter model pricing is normally represented
-   * as strings.
-   *
-   * Free models generally expose:
-   *
-   *   "0"
-   *
-   * for prompt/completion pricing.
+   * Explicit :free model variant.
    */
+  if (
+    id.endsWith(":free")
+  ) {
+    return true;
+  }
 
   const promptPrice =
     model.pricing?.prompt;
@@ -471,6 +532,10 @@ function isFreeModel(
   const completionPrice =
     model.pricing?.completion;
 
+  /*
+   * OpenRouter commonly represents free pricing
+   * using "0".
+   */
   if (
     promptPrice === "0" &&
     completionPrice === "0"
@@ -478,32 +543,81 @@ function isFreeModel(
     return true;
   }
 
-  /*
-   * Some OpenRouter responses represent free models
-   * directly using :free.
-   */
+  return false;
+}
 
+
+/* ============================================================
+   TEXT OUTPUT CHECK
+============================================================ */
+
+function supportsTextOutput(
+  model: OpenRouterModel,
+): boolean {
+  const outputModalities =
+    model.architecture
+      ?.output_modalities;
+
+  /*
+   * If OpenRouter does not expose modalities,
+   * don't reject the model solely because metadata
+   * is incomplete.
+   */
   if (
-    model.id
-      .toLowerCase()
-      .endsWith(":free")
+    !Array.isArray(
+      outputModalities,
+    ) ||
+    outputModalities.length === 0
   ) {
     return true;
   }
 
-  /*
-   * Do not assume an arbitrary missing pricing
-   * object is free.
-   */
-  return false;
+  return outputModalities.some(
+    (value) =>
+      value
+        .toLowerCase()
+        .includes("text"),
+  );
 }
 
+
 /* ============================================================
-   MODEL SCORING
+   TOOL SUPPORT CHECK
+============================================================ */
+
+function supportsTools(
+  model: OpenRouterModel,
+): boolean {
+  const supported =
+    model.supported_parameters;
+
+  if (
+    !Array.isArray(
+      supported,
+    )
+  ) {
+    /*
+     * Missing metadata should not automatically reject
+     * the model. The universal free router remains available
+     * as the capability-aware fallback.
+     */
+    return true;
+  }
+
+  return (
+    supported.includes("tools") ||
+    supported.includes("tool_choice")
+  );
+}
+
+
+/* ============================================================
+   MODEL SCORE
 ============================================================ */
 
 function scoreModel(
   model: OpenRouterModel,
+  requireTools: boolean,
 ): number {
   let score = 0;
 
@@ -511,7 +625,7 @@ function scoreModel(
     model.id.toLowerCase();
 
   /*
-   * Strong preference for known families.
+   * Preferred model families.
    */
   for (
     let index = 0;
@@ -522,7 +636,9 @@ function scoreModel(
     const prefix =
       PREFERRED_MODEL_PREFIXES[index];
 
-    if (id.startsWith(prefix)) {
+    if (
+      id.startsWith(prefix)
+    ) {
       score +=
         100 -
         index * 8;
@@ -532,7 +648,7 @@ function scoreModel(
   }
 
   /*
-   * Prefer explicit :free models.
+   * Explicit free variant.
    */
   if (
     id.endsWith(":free")
@@ -541,43 +657,41 @@ function scoreModel(
   }
 
   /*
-   * Prefer larger context windows.
+   * Context length.
    */
   const contextLength =
     Number(
-      model.context_length ??
-        0,
+      model.context_length ?? 0,
     );
 
   if (
-    contextLength >=
-    32_768
+    contextLength >= 32768
   ) {
     score += 30;
   } else if (
-    contextLength >=
-    16_384
+    contextLength >= 16384
   ) {
     score += 20;
   } else if (
-    contextLength >=
-    8_192
+    contextLength >= 8192
   ) {
     score += 10;
   }
 
   /*
-   * Prefer models that advertise tool support.
+   * Tool support.
    */
-  const supportedParameters =
-    Array.isArray(
-      model.supported_parameters,
-    )
-      ? model.supported_parameters
-      : [];
+  if (
+    supportsTools(model)
+  ) {
+    score += 20;
+  }
 
   if (
-    supportedParameters.includes(
+    Array.isArray(
+      model.supported_parameters,
+    ) &&
+    model.supported_parameters.includes(
       "tools",
     )
   ) {
@@ -585,7 +699,10 @@ function scoreModel(
   }
 
   if (
-    supportedParameters.includes(
+    Array.isArray(
+      model.supported_parameters,
+    ) &&
+    model.supported_parameters.includes(
       "tool_choice",
     )
   ) {
@@ -593,11 +710,22 @@ function scoreModel(
   }
 
   /*
-   * Penalize suspicious/very small context models.
+   * When tools are actually required, models that explicitly
+   * advertise tools get a significant preference.
+   */
+  if (
+    requireTools &&
+    supportsTools(model)
+  ) {
+    score += 40;
+  }
+
+  /*
+   * Penalize tiny context models.
    */
   if (
     contextLength > 0 &&
-    contextLength < 4_096
+    contextLength < 4096
   ) {
     score -= 20;
   }
@@ -605,8 +733,9 @@ function scoreModel(
   return score;
 }
 
+
 /* ============================================================
-   DEDUPLICATE
+   DEDUPLICATE MODELS
 ============================================================ */
 
 function deduplicateModels(
@@ -634,7 +763,9 @@ function deduplicateModels(
       continue;
     }
 
-    if (seen.has(id)) {
+    if (
+      seen.has(id)
+    ) {
       continue;
     }
 
@@ -648,6 +779,7 @@ function deduplicateModels(
 
   return result;
 }
+
 
 /* ============================================================
    FETCH AVAILABLE MODELS
@@ -685,10 +817,13 @@ async function fetchAvailableModels(
 
   if (!response.ok) {
     const data =
-      raw as OpenRouterErrorResponse | null;
+      raw as
+        | OpenRouterErrorResponse
+        | null;
 
     const message =
       data?.error?.message ||
+      data?.message ||
       `OpenRouter model discovery failed with status ${response.status}.`;
 
     throw new OpenRouterError(
@@ -698,10 +833,9 @@ async function fetchAvailableModels(
           response.status,
 
         retryable:
-          response.status ===
-            429 ||
-          response.status >=
-            500,
+          response.status === 408 ||
+          response.status === 429 ||
+          response.status >= 500,
 
         code:
           data?.error?.code ??
@@ -711,7 +845,9 @@ async function fetchAvailableModels(
   }
 
   const data =
-    raw as OpenRouterModelsResponse | null;
+    raw as
+      | OpenRouterModelsResponse
+      | null;
 
   if (
     !Array.isArray(
@@ -726,8 +862,9 @@ async function fetchAvailableModels(
   );
 }
 
+
 /* ============================================================
-   DISCOVER FREE MODELS
+   GET AVAILABLE FREE MODELS
 ============================================================ */
 
 export async function getAvailableModels(
@@ -761,11 +898,17 @@ export async function getAvailableModels(
       isFreeModel,
     );
 
+  /*
+   * Keep all discovered free models in cache.
+   *
+   * Tool filtering is performed later because some requests
+   * may not contain tools.
+   */
   const sorted =
     freeModels.sort(
       (a, b) =>
-        scoreModel(b) -
-        scoreModel(a),
+        scoreModel(b, false) -
+        scoreModel(a, false),
     );
 
   modelCache =
@@ -779,6 +922,7 @@ export async function getAvailableModels(
   ];
 }
 
+
 /* ============================================================
    CLEAR MODEL CACHE
 ============================================================ */
@@ -789,13 +933,99 @@ export function clearModelCache(): void {
   modelCacheTimestamp = 0;
 }
 
+
 /* ============================================================
    BUILD REQUEST MODEL LIST
 ============================================================ */
 
+/*
+ * IMPORTANT:
+ *
+ * The returned array represents the COMPLETE model fallback
+ * chain.
+ *
+ * Example:
+ *
+ * [
+ *   "google/gemma-...",
+ *   "qwen/...",
+ *   "openrouter/free"
+ * ]
+ *
+ * OpenRouter can then move through this list if a model
+ * cannot serve the request.
+ */
 function buildRequestModels(
   models: OpenRouterModel[],
+  requireTools: boolean,
 ): OpenRouterModel[] {
+  const uniqueModels =
+    deduplicateModels(
+      models,
+    );
+
+  /*
+   * Filter to models that can produce text.
+   */
+  const textModels =
+    uniqueModels.filter(
+      supportsTextOutput,
+    );
+
+  /*
+   * When tools are required, strongly prefer explicit tool
+   * support.
+   *
+   * We don't completely discard unknown metadata models
+   * because OpenRouter model metadata can change.
+   */
+  const toolCapableModels =
+    requireTools
+      ? textModels.filter(
+          supportsTools,
+        )
+      : textModels;
+
+  const candidates =
+    toolCapableModels.length > 0
+      ? toolCapableModels
+      : textModels;
+
+  /*
+   * Sort dynamically.
+   */
+  const sorted =
+    [...candidates].sort(
+      (a, b) => {
+        const scoreDifference =
+          scoreModel(
+            b,
+            requireTools,
+          ) -
+          scoreModel(
+            a,
+            requireTools,
+          );
+
+        if (
+          scoreDifference !== 0
+        ) {
+          return scoreDifference;
+        }
+
+        return (
+          Number(
+            b.context_length ??
+              0,
+          ) -
+          Number(
+            a.context_length ??
+              0,
+          )
+        );
+      },
+    );
+
   const result:
     OpenRouterModel[] = [];
 
@@ -803,9 +1033,9 @@ function buildRequestModels(
     new Set<string>();
 
   /*
-   * Only the first 3 discovered models are used.
+   * Add discovered models first.
    */
-  for (const model of models) {
+  for (const model of sorted) {
     if (
       result.length >=
       MAX_MODELS_PER_REQUEST
@@ -814,7 +1044,6 @@ function buildRequestModels(
     }
 
     if (
-      !model.id ||
       seen.has(model.id)
     ) {
       continue;
@@ -825,8 +1054,41 @@ function buildRequestModels(
     result.push(model);
   }
 
-  return result;
+  /*
+   * Always reserve a slot for openrouter/free when possible.
+   *
+   * This is especially important for tool requests because
+   * openrouter/free dynamically filters free models based on
+   * capabilities.
+   */
+  if (
+    result.length <
+    MAX_MODELS_PER_REQUEST
+  ) {
+    const alreadyIncluded =
+      result.some(
+        (model) =>
+          model.id ===
+          UNIVERSAL_FREE_MODEL,
+      );
+
+    if (!alreadyIncluded) {
+      result.push({
+        id:
+          UNIVERSAL_FREE_MODEL,
+      });
+    }
+  }
+
+  /*
+   * Safety limit.
+   */
+  return result.slice(
+    0,
+    MAX_MODELS_PER_REQUEST,
+  );
 }
+
 
 /* ============================================================
    NORMALIZE MESSAGES
@@ -847,11 +1109,11 @@ function normalizeMessages(
     .slice(-MAX_MESSAGES)
     .map(
       (message) => {
-        const normalized: OpenRouterMessage =
-          {
-            role:
-              message.role,
-          };
+        const normalized:
+          OpenRouterMessage = {
+          role:
+            message.role,
+        };
 
         if (
           typeof message.content ===
@@ -896,6 +1158,57 @@ function normalizeMessages(
     );
 }
 
+
+/* ============================================================
+   VALIDATE MESSAGES
+============================================================ */
+
+function validateMessages(
+  messages: OpenRouterMessage[],
+): void {
+  if (
+    !Array.isArray(
+      messages,
+    ) ||
+    messages.length === 0
+  ) {
+    throw new OpenRouterError(
+      "OpenRouter requires at least one message.",
+      {
+        statusCode: 400,
+        retryable: false,
+        code: "INVALID_MESSAGES",
+      },
+    );
+  }
+
+  for (
+    const message of messages
+  ) {
+    if (
+      !message ||
+      ![
+        "system",
+        "user",
+        "assistant",
+        "tool",
+      ].includes(
+        message.role,
+      )
+    ) {
+      throw new OpenRouterError(
+        "Invalid OpenRouter message role.",
+        {
+          statusCode: 400,
+          retryable: false,
+          code: "INVALID_MESSAGE_ROLE",
+        },
+      );
+    }
+  }
+}
+
+
 /* ============================================================
    REQUEST COMPLETION
 ============================================================ */
@@ -912,45 +1225,68 @@ async function requestCompletion(
     maxTokens?: number;
   },
 ): Promise<OpenRouterResponse> {
-  if (
-    models.length === 0
-  ) {
-    throw new OpenRouterError(
-      "No OpenRouter models are available.",
-      {
-        statusCode: 503,
-        retryable: true,
-        code: "NO_MODELS",
-      },
+  validateMessages(
+    messages,
+  );
+
+  /*
+   * Deduplicate and strictly limit the model list.
+   */
+  const safeModels =
+    deduplicateModels(
+      models,
+    ).slice(
+      0,
+      MAX_MODELS_PER_REQUEST,
     );
+
+  /*
+   * Never allow an empty model list.
+   */
+  if (
+    safeModels.length === 0
+  ) {
+    safeModels.push({
+      id:
+        UNIVERSAL_FREE_MODEL,
+    });
   }
 
-  /*
-   * The first model is the primary model.
-   */
-  const primaryModel =
-    models[0].id;
+  const modelIds =
+    safeModels.map(
+      (model) =>
+        model.id,
+    );
 
   /*
-   * Remaining models are OpenRouter fallbacks.
+   * ==========================================================
+   * IMPORTANT OPENROUTER FALLBACK FORMAT
+   * ==========================================================
+   *
+   * The `models` array contains the COMPLETE ordered chain.
+   *
+   * Do NOT send:
+   *
+   *   model: primary
+   *   models: [fallback1, fallback2]
+   *
+   * Instead send:
+   *
+   *   models: [
+   *     primary,
+   *     fallback1,
+   *     fallback2
+   *   ]
+   *
+   * This keeps the request consistent with OpenRouter's
+   * documented model-fallback mechanism.
    */
-  const fallbackModels =
-    models
-      .slice(
-        1,
-        MAX_MODELS_PER_REQUEST,
-      )
-      .map(
-        (model) =>
-          model.id,
-      );
-
   const body: Record<
     string,
     unknown
   > = {
-    model:
-      primaryModel,
+    models:
+      modelIds,
 
     messages:
       normalizeMessages(
@@ -964,28 +1300,22 @@ async function requestCompletion(
     max_tokens:
       options?.maxTokens ??
       700,
+
+    /*
+     * Explicitly disable streaming because this server function
+     * expects a normal JSON completion.
+     */
+    stream: false,
   };
 
   /*
-   * OpenRouter model fallback list.
-   */
-  if (
-    fallbackModels.length >
-    0
-  ) {
-    body.models =
-      fallbackModels;
-  }
-
-  /*
-   * Only include tools when tools actually exist.
+   * Add tools only when provided.
    */
   if (
     Array.isArray(
       options?.tools,
     ) &&
-    options.tools.length >
-      0
+    options.tools.length > 0
   ) {
     body.tools =
       options.tools;
@@ -993,6 +1323,19 @@ async function requestCompletion(
     body.tool_choice =
       "auto";
   }
+
+  console.log(
+    "OpenRouter request models:",
+    modelIds,
+  );
+
+  console.log(
+    "OpenRouter tool mode:",
+    Array.isArray(
+      options?.tools,
+    ) &&
+      options.tools.length > 0,
+  );
 
   const response =
     await fetchWithTimeout(
@@ -1018,7 +1361,9 @@ async function requestCompletion(
         },
 
         body:
-          JSON.stringify(body),
+          JSON.stringify(
+            body,
+          ),
       },
     );
 
@@ -1028,12 +1373,41 @@ async function requestCompletion(
     );
 
   const data =
-    raw as OpenRouterChatResponse | null;
+    raw as
+      | OpenRouterChatResponse
+      | OpenRouterErrorResponse
+      | null;
 
+  /*
+   * HTTP-level failure.
+   */
   if (!response.ok) {
+    const errorData =
+      data as
+        | OpenRouterErrorResponse
+        | null;
+
     const message =
-      data?.error?.message ||
+      errorData?.error?.message ||
+      errorData?.message ||
       `OpenRouter request failed with status ${response.status}.`;
+
+    console.error(
+      "OpenRouter HTTP failure:",
+      {
+        status:
+          response.status,
+
+        statusText:
+          response.statusText,
+
+        models:
+          modelIds,
+
+        error:
+          errorData?.error,
+      },
+    );
 
     throw new OpenRouterError(
       message,
@@ -1042,30 +1416,98 @@ async function requestCompletion(
           response.status,
 
         retryable:
-          response.status ===
-            408 ||
-          response.status ===
-            429 ||
-          response.status >=
-            500,
+          response.status === 408 ||
+          response.status === 409 ||
+          response.status === 429 ||
+          response.status >= 500,
 
         code:
-          data?.error?.code ??
+          errorData?.error?.code ??
           `HTTP_${response.status}`,
       },
     );
   }
 
+  const chatData =
+    data as
+      | OpenRouterChatResponse
+      | null;
+
+  /*
+   * Check for an application-level error even if the HTTP
+   * response was technically successful.
+   */
+  if (
+    chatData?.error
+  ) {
+    const errorMessage =
+      chatData.error.message ||
+      "OpenRouter returned an API error.";
+
+    throw new OpenRouterError(
+      errorMessage,
+      {
+        statusCode:
+          typeof chatData.error.code ===
+            "number"
+            ? chatData.error.code
+            : 502,
+
+        retryable: true,
+
+        code:
+          chatData.error.code ??
+          "OPENROUTER_API_ERROR",
+      },
+    );
+  }
+
+  /*
+   * OpenRouter should normally return choices.
+   */
   const choice =
-    data?.choices?.[0];
+    chatData?.choices?.[0];
 
   if (!choice) {
+    console.error(
+      "OpenRouter returned no choices:",
+      {
+        models:
+          modelIds,
+
+        response:
+          chatData,
+      },
+    );
+
     throw new OpenRouterError(
-      "OpenRouter returned no completion choice.",
+      "OpenRouter returned no completion choices.",
       {
         statusCode: 502,
         retryable: true,
         code: "EMPTY_CHOICES",
+      },
+    );
+  }
+
+  /*
+   * Some providers can attach an error to the choice.
+   */
+  if (
+    choice.error
+  ) {
+    const choiceError =
+      choice.error;
+
+    throw new OpenRouterError(
+      choiceError.message ||
+        "OpenRouter provider returned an error.",
+      {
+        statusCode: 502,
+        retryable: true,
+        code:
+          choiceError.code ??
+          "CHOICE_ERROR",
       },
     );
   }
@@ -1087,16 +1529,26 @@ async function requestCompletion(
       : [];
 
   /*
-   * A tool call may intentionally have empty content.
-   *
-   * Therefore an empty content string is valid when
-   * toolCalls exist.
+   * A tool-call response can legitimately contain no text.
    */
   if (
     !content &&
-    toolCalls.length ===
-      0
+    toolCalls.length === 0
   ) {
+    console.error(
+      "OpenRouter returned an empty assistant response:",
+      {
+        models:
+          modelIds,
+
+        finishReason:
+          choice.finish_reason,
+
+        response:
+          chatData,
+      },
+    );
+
     throw new OpenRouterError(
       "OpenRouter returned an empty response.",
       {
@@ -1113,8 +1565,11 @@ async function requestCompletion(
     toolCalls,
 
     model:
-      data?.model ??
-      primaryModel,
+      typeof chatData?.model ===
+      "string"
+        ? chatData.model
+        : modelIds[0] ??
+          null,
 
     finishReason:
       choice.finish_reason ??
@@ -1122,14 +1577,19 @@ async function requestCompletion(
   };
 }
 
+
 /* ============================================================
-   REQUEST ONE MODEL CHAIN
+   DIRECT UNIVERSAL FREE REQUEST
 ============================================================ */
 
-async function requestModelChain(
+/*
+ * This deliberately bypasses model discovery.
+ *
+ * It is the final OpenRouter-level fallback.
+ */
+async function requestUniversalFree(
   apiKey: string,
   messages: OpenRouterMessage[],
-  models: OpenRouterModel[],
   options?: {
     tools?: OpenRouterToolDefinition[];
 
@@ -1138,13 +1598,23 @@ async function requestModelChain(
     maxTokens?: number;
   },
 ): Promise<OpenRouterResponse> {
+  console.warn(
+    "Trying direct OpenRouter universal free model.",
+  );
+
   return requestCompletion(
     apiKey,
     messages,
-    models,
+    [
+      {
+        id:
+          UNIVERSAL_FREE_MODEL,
+      },
+    ],
     options,
   );
 }
+
 
 /* ============================================================
    DYNAMIC OPENROUTER REQUEST
@@ -1162,8 +1632,24 @@ export async function callOpenRouter(
   const apiKey =
     getOpenRouterApiKey();
 
+  const normalizedMessages =
+    normalizeMessages(
+      messages,
+    );
+
+  validateMessages(
+    normalizedMessages,
+  );
+
+  const hasTools =
+    Array.isArray(tools) &&
+    tools.length > 0;
+
   const requestOptions = {
-    tools,
+    tools:
+      hasTools
+        ? tools
+        : undefined,
 
     temperature:
       options?.temperature ??
@@ -1174,13 +1660,10 @@ export async function callOpenRouter(
       700,
   };
 
-  /*
-   * ==========================================================
-   * STEP 1
-   *
-   * Discover current free models.
-   * ==========================================================
-   */
+  /* ==========================================================
+     STEP 1
+     DISCOVER CURRENT FREE MODELS
+  ========================================================== */
 
   let availableModels:
     OpenRouterModel[] = [];
@@ -1192,239 +1675,165 @@ export async function callOpenRouter(
       );
   } catch (error) {
     console.warn(
-      "OpenRouter model discovery failed:",
+      "OpenRouter model discovery failed. Continuing with universal free fallback.",
       error,
     );
 
-    /*
-     * Discovery failure must not immediately prevent
-     * the universal free router from being tried.
-     */
     availableModels = [];
   }
 
-  /*
-   * ==========================================================
-   * STEP 2
-   *
-   * Build dynamic request models.
-   * ==========================================================
-   */
+  /* ==========================================================
+     STEP 2
+     BUILD MODEL CHAIN
+  ========================================================== */
 
   let requestModels =
     buildRequestModels(
       availableModels,
+      hasTools,
     );
 
   /*
-   * ==========================================================
-   * STEP 3
-   *
-   * Always keep openrouter/free as the final fallback.
-   *
-   * IMPORTANT:
-   *
-   * Do not exceed the maximum 3 models.
-   *
-   * If we have:
-   *
-   *   model A
-   *   model B
-   *   model C
-   *
-   * we send:
-   *
-   *   A
-   *   B
-   *   C
-   *
-   * We do NOT add a fourth model.
-   *
-   * If fewer than 3 discovered models exist, we can append
-   * openrouter/free.
-   * ==========================================================
-   */
-
-  const universalModel: OpenRouterModel = {
-    id:
-      UNIVERSAL_FREE_MODEL,
-  };
-
-  if (
-    requestModels.length <
-    MAX_MODELS_PER_REQUEST
-  ) {
-    const alreadyIncluded =
-      requestModels.some(
-        (model) =>
-          model.id ===
-          UNIVERSAL_FREE_MODEL,
-      );
-
-    if (!alreadyIncluded) {
-      requestModels = [
-        ...requestModels,
-        universalModel,
-      ];
-    }
-  }
-
-  /*
-   * If model discovery returned nothing,
-   * use the universal free router.
+   * Guarantee at least openrouter/free.
    */
   if (
-    requestModels.length ===
-    0
+    requestModels.length === 0
   ) {
     requestModels = [
-      universalModel,
+      {
+        id:
+          UNIVERSAL_FREE_MODEL,
+      },
     ];
   }
 
-  /*
-   * ==========================================================
-   * STEP 4
-   *
-   * First request.
-   * ==========================================================
-   */
+  console.log(
+    "OpenRouter selected model chain:",
+    requestModels.map(
+      (model) =>
+        model.id,
+    ),
+  );
+
+  /* ==========================================================
+     STEP 3
+     FIRST REQUEST
+  ========================================================== */
 
   try {
-    return await requestModelChain(
+    return await requestCompletion(
       apiKey,
-      messages,
+      normalizedMessages,
       requestModels,
       requestOptions,
     );
   } catch (firstError) {
     console.warn(
-      "OpenRouter dynamic model request failed:",
+      "OpenRouter first request failed:",
       firstError,
     );
-
-    /*
-     * ========================================================
-     * STEP 5
-     *
-     * Clear model cache.
-     *
-     * Model availability can change between:
-     *
-     * GET /models
-     *
-     * and:
-     *
-     * POST /chat/completions
-     * ========================================================
-     */
-
-    clearModelCache();
-
-    /*
-     * ========================================================
-     * STEP 6
-     *
-     * Refresh model list.
-     * ========================================================
-     */
-
-    let refreshedModels:
-      OpenRouterModel[] = [];
-
-    try {
-      refreshedModels =
-        await getAvailableModels(
-          apiKey,
-        );
-    } catch (refreshError) {
-      console.warn(
-        "OpenRouter model refresh failed:",
-        refreshError,
-      );
-
-      refreshedModels = [];
-    }
-
-    let refreshedRequestModels =
-      buildRequestModels(
-        refreshedModels,
-      );
-
-    /*
-     * Add universal free router when there is room.
-     */
-    if (
-      refreshedRequestModels.length <
-      MAX_MODELS_PER_REQUEST
-    ) {
-      const alreadyIncluded =
-        refreshedRequestModels.some(
-          (model) =>
-            model.id ===
-            UNIVERSAL_FREE_MODEL,
-        );
-
-      if (!alreadyIncluded) {
-        refreshedRequestModels = [
-          ...refreshedRequestModels,
-          universalModel,
-        ];
-      }
-    }
-
-    if (
-      refreshedRequestModels.length ===
-      0
-    ) {
-      refreshedRequestModels = [
-        universalModel,
-      ];
-    }
-
-    /*
-     * ========================================================
-     * STEP 7
-     *
-     * Retry with refreshed models.
-     * ========================================================
-     */
-
-    try {
-      return await requestModelChain(
-        apiKey,
-        messages,
-        refreshedRequestModels,
-        requestOptions,
-      );
-    } catch (secondError) {
-      console.warn(
-        "OpenRouter refreshed model request failed:",
-        secondError,
-      );
-
-      /*
-       * ======================================================
-       * STEP 8
-       *
-       * Final direct openrouter/free request.
-       *
-       * This guarantees that a stale model list cannot prevent
-       * the universal free router from being attempted.
-       * ======================================================
-       */
-
-      return requestCompletion(
-        apiKey,
-        messages,
-        [
-          universalModel,
-        ],
-        requestOptions,
-      );
-    }
   }
+
+  /* ==========================================================
+     STEP 4
+     CLEAR STALE MODEL CACHE
+  ========================================================== */
+
+  clearModelCache();
+
+  /* ==========================================================
+     STEP 5
+     REFRESH MODELS
+  ========================================================== */
+
+  let refreshedModels:
+    OpenRouterModel[] = [];
+
+  try {
+    refreshedModels =
+      await getAvailableModels(
+        apiKey,
+      );
+  } catch (refreshError) {
+    console.warn(
+      "OpenRouter model refresh failed:",
+      refreshError,
+    );
+
+    refreshedModels = [];
+  }
+
+  /* ==========================================================
+     STEP 6
+     BUILD REFRESHED CHAIN
+  ========================================================== */
+
+  let refreshedRequestModels =
+    buildRequestModels(
+      refreshedModels,
+      hasTools,
+    );
+
+  if (
+    refreshedRequestModels.length === 0
+  ) {
+    refreshedRequestModels = [
+      {
+        id:
+          UNIVERSAL_FREE_MODEL,
+      },
+    ];
+  }
+
+  console.log(
+    "OpenRouter refreshed model chain:",
+    refreshedRequestModels.map(
+      (model) =>
+        model.id,
+    ),
+  );
+
+  /* ==========================================================
+     STEP 7
+     SECOND REQUEST
+  ========================================================== */
+
+  try {
+    return await requestCompletion(
+      apiKey,
+      normalizedMessages,
+      refreshedRequestModels,
+      requestOptions,
+    );
+  } catch (secondError) {
+    console.warn(
+      "OpenRouter refreshed request failed:",
+      secondError,
+    );
+  }
+
+  /* ==========================================================
+     STEP 8
+     FINAL DIRECT UNIVERSAL FREE REQUEST
+  ========================================================== */
+
+  /*
+   * This is intentionally a separate direct request.
+   *
+   * It avoids:
+   *
+   * - stale discovered model IDs
+   * - unavailable free model
+   * - incorrect capability metadata
+   * - model-list changes between discovery and completion
+   */
+  return requestUniversalFree(
+    apiKey,
+    normalizedMessages,
+    requestOptions,
+  );
 }
+
 
 /* ============================================================
    generateOpenRouterResponse
@@ -1433,14 +1842,9 @@ export async function callOpenRouter(
 /*
  * IMPORTANT:
  *
- * support.ts currently imports:
+ * support.ts imports this function.
  *
- *   generateOpenRouterResponse
- *
- * Therefore this function MUST be exported.
- *
- * It delegates to the same dynamic model-selection engine
- * used by callOpenRouter().
+ * Therefore this export must remain available.
  */
 export async function generateOpenRouterResponse(
   input:
@@ -1449,18 +1853,13 @@ export async function generateOpenRouterResponse(
   tools?: OpenRouterToolDefinition[],
 ): Promise<OpenRouterResponse> {
   /*
-   * Support both calling styles:
+   * Style 1:
    *
-   * generateOpenRouterResponse(messages, tools)
-   *
-   * and:
-   *
-   * generateOpenRouterResponse({
+   * generateOpenRouterResponse(
    *   messages,
    *   tools,
-   * })
+   * )
    */
-
   if (
     Array.isArray(input)
   ) {
@@ -1470,6 +1869,16 @@ export async function generateOpenRouterResponse(
     );
   }
 
+  /*
+   * Style 2:
+   *
+   * generateOpenRouterResponse({
+   *   messages,
+   *   tools,
+   *   temperature,
+   *   maxTokens,
+   * })
+   */
   return callOpenRouter(
     input.messages,
     input.tools,
@@ -1483,14 +1892,11 @@ export async function generateOpenRouterResponse(
   );
 }
 
+
 /* ============================================================
-   SIMPLE TEXT HELPER
+   TEXT HELPER
 ============================================================ */
 
-/*
- * This helper is useful for code that only needs the textual
- * answer and does not need tool-call metadata.
- */
 export async function generateOpenRouterText(
   messages: OpenRouterMessage[],
   tools?: OpenRouterToolDefinition[],
@@ -1503,6 +1909,7 @@ export async function generateOpenRouterText(
 
   return response.content;
 }
+
 
 /* ============================================================
    DEFAULT EXPORT
