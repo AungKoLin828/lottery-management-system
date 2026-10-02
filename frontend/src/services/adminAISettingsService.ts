@@ -3,23 +3,30 @@
 ============================================================ */
 
 export interface AdminAISettings {
-  key: string;
-
-  databaseEnabled: boolean;
-
-  environmentEnabled: boolean;
-
   enabled: boolean;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
 
-  description?: string | null;
-
-  updatedAt?: string | null;
+export interface AdminAISettingsAdmin {
+  id: string;
+  username: string | null;
 }
 
 export interface AdminAISettingsResponse {
   success: boolean;
 
-  setting?: AdminAISettings;
+  settings?: AdminAISettings;
+
+  admin?: AdminAISettingsAdmin;
+
+  message?: string;
+}
+
+export interface UpdateAdminAISettingsResponse {
+  success: boolean;
+
+  settings?: AdminAISettings;
 
   message?: string;
 }
@@ -34,10 +41,12 @@ async function apiRequest<T>(
 ): Promise<T> {
   const response =
     await fetch(url, {
-      credentials:
-        "include",
+      credentials: "include",
 
       headers: {
+        Accept:
+          "application/json",
+
         "Content-Type":
           "application/json",
 
@@ -48,45 +57,72 @@ async function apiRequest<T>(
       ...options,
     });
 
+  const contentType =
+    response.headers.get(
+      "content-type",
+    ) ?? "";
+
+  const raw =
+    await response.text();
+
+  if (!raw.trim()) {
+    throw new Error(
+      `API returned ${response.status} ${response.statusText} with an empty response.`,
+    );
+  }
+
+  if (
+    !contentType
+      .toLowerCase()
+      .includes("application/json")
+  ) {
+    console.error(
+      "Admin AI settings API returned non-JSON:",
+      raw.slice(0, 1000),
+    );
+
+    throw new Error(
+      `API returned ${response.status} ${response.statusText} instead of JSON.`,
+    );
+  }
+
   let data: unknown;
 
   try {
     data =
-      await response.json();
+      JSON.parse(raw);
   } catch {
     throw new Error(
-      "Invalid server response.",
+      "The server returned invalid JSON.",
     );
   }
 
-  if (!response.ok) {
-    let message =
-      "Request failed.";
-
+  if (
+    !response.ok
+  ) {
     if (
       typeof data ===
         "object" &&
       data !== null &&
       "message" in data
     ) {
-      const possibleMessage =
-        (
-          data as {
-            message?: unknown;
-          }
-        ).message;
+      const message =
+        (data as {
+          message?: unknown;
+        }).message;
 
       if (
-        typeof possibleMessage ===
+        typeof message ===
         "string"
       ) {
-        message =
-          possibleMessage;
+        throw new Error(
+          message,
+        );
       }
     }
 
     throw new Error(
-      message,
+      `Request failed with status ${response.status}.`,
     );
   }
 
@@ -94,23 +130,26 @@ async function apiRequest<T>(
 }
 
 /* ============================================================
-   GET
+   GET AI SETTINGS
 ============================================================ */
 
 export async function getAdminAISettings(): Promise<AdminAISettingsResponse> {
   return apiRequest<AdminAISettingsResponse>(
     "/api/admin/ai-support/settings",
+    {
+      method: "GET",
+    },
   );
 }
 
 /* ============================================================
-   UPDATE
+   UPDATE AI ENABLED STATE
 ============================================================ */
 
 export async function updateAdminAISettings(
   enabled: boolean,
-): Promise<AdminAISettingsResponse> {
-  return apiRequest<AdminAISettingsResponse>(
+): Promise<UpdateAdminAISettingsResponse> {
+  return apiRequest<UpdateAdminAISettingsResponse>(
     "/api/admin/ai-support/settings/update",
     {
       method: "PATCH",
@@ -120,4 +159,29 @@ export async function updateAdminAISettings(
       }),
     },
   );
+}
+
+/* ============================================================
+   CONVENIENCE FUNCTION
+============================================================ */
+
+export async function setAdminAIEnabled(
+  enabled: boolean,
+): Promise<AdminAISettings> {
+  const response =
+    await updateAdminAISettings(
+      enabled,
+    );
+
+  if (
+    !response.success ||
+    !response.settings
+  ) {
+    throw new Error(
+      response.message ??
+        "Failed to update AI support settings.",
+    );
+  }
+
+  return response.settings;
 }

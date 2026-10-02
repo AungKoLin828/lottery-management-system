@@ -1,267 +1,215 @@
 import type {
   Handler,
-  HandlerEvent,
-  HandlerContext,
 } from "@netlify/functions";
 
 import {
-  eq,
-} from "drizzle-orm";
-
-import {
-  systemSettings,
-} from "../../db/schema/systemSettings";
-
-import {
-  db,
-} from "../../db";
-
-import {
   verifyAdminAuth,
+  AuthError,
+  jsonResponse,
+  parseBody,
 } from "./ai/auth";
 
-const AI_SUPPORT_SETTING_KEY =
-  "ai_support_enabled";
+import {
+  setAISupportEnabled,
+} from "./ai/settings";
 
 /* ============================================================
-   REQUEST TYPE
+   TYPES
 ============================================================ */
 
-interface UpdateRequest {
+interface UpdateAISupportSettingsBody {
   enabled?: unknown;
+}
+
+/* ============================================================
+   BOOLEAN NORMALIZER
+============================================================ */
+
+function parseBoolean(
+  value: unknown,
+): boolean | null {
+  if (
+    typeof value ===
+    "boolean"
+  ) {
+    return value;
+  }
+
+  if (
+    typeof value ===
+    "string"
+  ) {
+    const normalized =
+      value
+        .trim()
+        .toLowerCase();
+
+    if (
+      normalized === "true" ||
+      normalized === "1" ||
+      normalized === "on"
+    ) {
+      return true;
+    }
+
+    if (
+      normalized === "false" ||
+      normalized === "0" ||
+      normalized === "off"
+    ) {
+      return false;
+    }
+  }
+
+  return null;
 }
 
 /* ============================================================
    HANDLER
 ============================================================ */
 
-export const handler: Handler = async (
-  event: HandlerEvent,
-  context: HandlerContext,
-) => {
-  try {
+export const handler: Handler =
+  async (event) => {
+    /*
+     * PATCH is used because we are modifying
+     * an existing setting.
+     */
+
     if (
       event.httpMethod !==
       "PATCH"
     ) {
-      return {
-        statusCode: 405,
-
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-
-        body: JSON.stringify({
+      return jsonResponse(
+        405,
+        {
           success: false,
           message:
             "Method not allowed.",
-        }),
-      };
-    }
-
-    /* ========================================================
-       ADMIN AUTH
-    ======================================================== */
-
-    const auth =
-      await verifyAdminAuth(
-        event,
-      );
-
-    if (!auth) {
-      return {
-        statusCode: 401,
-
-        headers: {
-          "Content-Type":
-            "application/json",
         },
-
-        body: JSON.stringify({
-          success: false,
-          message:
-            "Unauthorized.",
-        }),
-      };
+        {
+          Allow: "PATCH",
+        },
+      );
     }
-
-    /* ========================================================
-       REQUEST BODY
-    ======================================================== */
-
-    let body: UpdateRequest;
 
     try {
-      body = JSON.parse(
-        event.body ?? "{}",
+      /* ======================================================
+         ADMIN AUTH
+      ====================================================== */
+
+      const admin =
+        await verifyAdminAuth(
+          event,
+        );
+
+      /* ======================================================
+         REQUEST BODY
+      ====================================================== */
+
+      let body:
+        UpdateAISupportSettingsBody;
+
+      try {
+        body =
+          parseBody<UpdateAISupportSettingsBody>(
+            event,
+          );
+      } catch (error) {
+        return jsonResponse(
+          400,
+          {
+            success: false,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Invalid request body.",
+          },
+        );
+      }
+
+      /* ======================================================
+         ENABLED
+      ====================================================== */
+
+      const enabled =
+        parseBoolean(
+          body.enabled,
+        );
+
+      if (
+        enabled === null
+      ) {
+        return jsonResponse(
+          400,
+          {
+            success: false,
+            message:
+              "The 'enabled' field must be a boolean.",
+          },
+        );
+      }
+
+      /* ======================================================
+         SAVE
+      ====================================================== */
+
+      const settings =
+        await setAISupportEnabled(
+          enabled,
+          admin.userId,
+        );
+
+      /* ======================================================
+         RESPONSE
+      ====================================================== */
+
+      return jsonResponse(
+        200,
+        {
+          success: true,
+
+          message: enabled
+            ? "AI support enabled successfully."
+            : "AI support disabled successfully.",
+
+          settings: {
+            enabled:
+              settings.enabled,
+
+            updatedAt:
+              settings.updatedAt,
+
+            updatedBy:
+              settings.updatedBy,
+          },
+        },
       );
-    } catch {
-      return {
-        statusCode: 400,
+    } catch (error) {
+      console.error(
+        "UPDATE AI SUPPORT SETTINGS ERROR:",
+        error,
+      );
 
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
+      if (
+        error instanceof AuthError
+      ) {
+        return jsonResponse(
+          error.statusCode,
+          {
+            success: false,
+            message:
+              error.message,
+          },
+        );
+      }
 
-        body: JSON.stringify({
+      return jsonResponse(
+        500,
+        {
           success: false,
           message:
-            "Invalid JSON request body.",
-        }),
-      };
-    }
-
-    /* ========================================================
-       VALIDATE ENABLED
-    ======================================================== */
-
-    if (
-      typeof body.enabled !==
-      "boolean"
-    ) {
-      return {
-        statusCode: 400,
-
-        headers: {
-          "Content-Type":
-            "application/json",
+            "Failed to update AI support settings.",
         },
-
-        body: JSON.stringify({
-          success: false,
-          message:
-            "enabled must be a boolean.",
-        }),
-      };
+      );
     }
-
-    /* ========================================================
-       UPDATE
-    ======================================================== */
-
-    const result =
-      await db
-        .update(systemSettings)
-        .set({
-          booleanValue:
-            body.enabled,
-
-          updatedBy:
-            auth.id,
-
-          updatedAt:
-            new Date(),
-        })
-        .where(
-          eq(
-            systemSettings.key,
-            AI_SUPPORT_SETTING_KEY,
-          ),
-        )
-        .returning({
-          id:
-            systemSettings.id,
-
-          key:
-            systemSettings.key,
-
-          booleanValue:
-            systemSettings.booleanValue,
-
-          updatedAt:
-            systemSettings.updatedAt,
-        });
-
-    if (
-      result.length ===
-      0
-    ) {
-      return {
-        statusCode: 404,
-
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-
-        body: JSON.stringify({
-          success: false,
-          message:
-            "AI support setting was not found.",
-        }),
-      };
-    }
-
-    const environmentEnabled =
-      process.env
-        .AI_SUPPORT_ENABLED
-        ?.trim()
-        .toLowerCase() ===
-      "true";
-
-    const databaseEnabled =
-      result[0].booleanValue ===
-      true;
-
-    const effectiveEnabled =
-      environmentEnabled &&
-      databaseEnabled;
-
-    return {
-      statusCode: 200,
-
-      headers: {
-        "Content-Type":
-          "application/json",
-        "Cache-Control":
-          "no-store",
-      },
-
-      body: JSON.stringify({
-        success: true,
-
-        message:
-          databaseEnabled
-            ? "AI support has been enabled."
-            : "AI support has been disabled.",
-
-        setting: {
-          key:
-            result[0].key,
-
-          databaseEnabled,
-
-          environmentEnabled,
-
-          enabled:
-            effectiveEnabled,
-
-          updatedAt:
-            result[0].updatedAt,
-        },
-      }),
-    };
-  } catch (error) {
-    console.error(
-      "Admin AI support settings update error:",
-      error,
-    );
-
-    return {
-      statusCode: 500,
-
-      headers: {
-        "Content-Type":
-          "application/json",
-      },
-
-      body: JSON.stringify({
-        success: false,
-        message:
-          "Unable to update AI support settings.",
-      }),
-    };
-  }
-};
+  };
