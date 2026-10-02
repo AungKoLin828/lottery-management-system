@@ -12,7 +12,6 @@ import {
   Clock3,
   Loader2,
   MessageCircle,
-  Power,
   RefreshCw,
   Search,
   Send,
@@ -38,9 +37,11 @@ import {
   type AdminAISettings,
 } from "../../services/adminAISettingsService";
 
-/* ============================================================
-   HELPERS
-============================================================ */
+/*
+ * ============================================================
+ * HELPERS
+ * ============================================================
+ */
 
 function formatDateTime(
   value?: string | Date | null,
@@ -145,6 +146,9 @@ function getPriorityClassName(
   }
 }
 
+/*
+ * Ticket subject comes directly from AdminSupportTicket.subject.
+ */
 function getTicketTitle(
   ticket: AdminSupportTicket,
 ): string {
@@ -154,6 +158,11 @@ function getTicketTitle(
   );
 }
 
+/*
+ * Ticket list does not have a top-level "message" property.
+ *
+ * The latest message is taken from ticket.messages.
+ */
 function getTicketPreview(
   ticket: AdminSupportTicket,
 ): string {
@@ -173,9 +182,11 @@ function getTicketPreview(
   );
 }
 
-/* ============================================================
-   MESSAGE BUBBLE
-============================================================ */
+/*
+ * ============================================================
+ * MESSAGE BUBBLE
+ * ============================================================
+ */
 
 type MessageBubbleProps = {
   message: AdminSupportMessage;
@@ -249,127 +260,25 @@ function MessageBubble({
   );
 }
 
-/* ============================================================
-   AI SUPPORT SETTING
-============================================================ */
-
-type AISupportControlProps = {
-  settings: AdminAISettings | null;
-  loading: boolean;
-  updating: boolean;
-  error: string | null;
-  onToggle: (enabled: boolean) => void;
-};
-
-function AISupportControl({
-  settings,
-  loading,
-  updating,
-  error,
-  onToggle,
-}: AISupportControlProps) {
-  const enabled =
-    settings?.enabled === true;
-
-  return (
-    <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-start gap-3">
-          <div
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-              enabled
-                ? "bg-violet-100 text-violet-600"
-                : "bg-slate-100 text-slate-500"
-            }`}
-          >
-            <Bot className="h-5 w-5" />
-          </div>
-
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-sm font-bold text-slate-900 sm:text-base">
-                AI Support
-              </h2>
-
-              <span
-                className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset ${
-                  enabled
-                    ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20"
-                    : "bg-slate-100 text-slate-500 ring-slate-500/20"
-                }`}
-              >
-                {enabled
-                  ? "Enabled"
-                  : "Disabled"}
-              </span>
-            </div>
-
-            <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500 sm:text-sm">
-              When enabled, player support can use
-              OpenRouter AI. If OpenRouter is unavailable,
-              the local training/knowledge fallback can
-              continue handling supported questions.
-            </p>
-
-            {settings?.updatedAt && (
-              <p className="mt-1 text-[11px] text-slate-400">
-                Last updated:{" "}
-                {formatDateTime(
-                  settings.updatedAt,
-                )}
-              </p>
-            )}
-
-            {error && (
-              <p className="mt-2 text-xs font-medium text-red-600">
-                {error}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          disabled={
-            loading ||
-            updating ||
-            !settings
-          }
-          onClick={() =>
-            onToggle(!enabled)
-          }
-          className={`inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-5 text-sm font-bold text-white shadow-sm transition ${
-            enabled
-              ? "bg-emerald-600 hover:bg-emerald-700"
-              : "bg-slate-600 hover:bg-slate-700"
-          } disabled:cursor-not-allowed disabled:opacity-50`}
-        >
-          {loading || updating ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Power className="h-4 w-4" />
-          )}
-
-          {updating
-            ? "Updating..."
-            : enabled
-              ? "AI Support ON"
-              : "AI Support OFF"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================
-   MAIN PAGE
-============================================================ */
+/*
+ * ============================================================
+ * MAIN PAGE
+ * ============================================================
+ */
 
 export default function CustomerSupport() {
+  /*
+   * ==========================================================
+   * SUPPORT TICKET STATE
+   * ==========================================================
+   */
+
   const [
     tickets,
     setTickets,
-  ] = useState<AdminSupportTicket[]>([]);
+  ] = useState<AdminSupportTicket[]>(
+    [],
+  );
 
   const [
     selectedTicket,
@@ -431,16 +340,20 @@ export default function CustomerSupport() {
   const [
     error,
     setError,
-  ] = useState<string | null>(null);
+  ] = useState<string | null>(
+    null,
+  );
 
   const [
     mobileShowDetail,
     setMobileShowDetail,
   ] = useState(false);
 
-  /* ==========================================================
-     AI SETTINGS
-  ========================================================== */
+  /*
+   * ==========================================================
+   * AI SUPPORT SETTINGS STATE
+   * ==========================================================
+   */
 
   const [
     aiSettings,
@@ -453,7 +366,7 @@ export default function CustomerSupport() {
   const [
     loadingAISettings,
     setLoadingAISettings,
-  ] = useState(true);
+  ] = useState(false);
 
   const [
     updatingAISettings,
@@ -467,9 +380,11 @@ export default function CustomerSupport() {
     null,
   );
 
-  /* ==========================================================
-     LOAD AI SETTINGS
-  ========================================================== */
+  /*
+   * ==========================================================
+   * LOAD AI SETTINGS
+   * ==========================================================
+   */
 
   const loadAISettings =
     useCallback(async () => {
@@ -480,9 +395,34 @@ export default function CustomerSupport() {
         const response =
           await getAdminAISettings();
 
-        setAISettings(
-          response.settings,
-        );
+        if (!response.success) {
+          throw new Error(
+            response.message ||
+              "Failed to load AI support settings.",
+          );
+        }
+
+        /*
+         * IMPORTANT:
+         *
+         * response.settings is optional.
+         *
+         * Do not pass it directly into
+         * setAISettings().
+         *
+         * This avoids:
+         *
+         * AdminAISettings | undefined
+         *
+         * -> AdminAISettings | null
+         *
+         * TypeScript error.
+         */
+        if (response.settings) {
+          setAISettings(
+            response.settings,
+          );
+        }
       } catch (err) {
         console.error(
           "Failed to load AI support settings:",
@@ -499,12 +439,20 @@ export default function CustomerSupport() {
       }
     }, []);
 
-  /* ==========================================================
-     UPDATE AI SETTINGS
-  ========================================================== */
+  /*
+   * ==========================================================
+   * UPDATE AI SETTINGS
+   * ==========================================================
+   */
 
-  const handleAIToggle =
-    async (enabled: boolean) => {
+  const handleAISettingsToggle =
+    async (
+      enabled: boolean,
+    ) => {
+      if (updatingAISettings) {
+        return;
+      }
+
       try {
         setUpdatingAISettings(true);
         setAISettingsError(null);
@@ -514,28 +462,71 @@ export default function CustomerSupport() {
             enabled,
           );
 
-        setAISettings(
-          response.settings,
-        );
+        if (!response.success) {
+          throw new Error(
+            response.message ||
+              "Failed to update AI support settings.",
+          );
+        }
+
+        /*
+         * IMPORTANT:
+         *
+         * Only update state when the server
+         * actually returned settings.
+         */
+        if (response.settings) {
+          setAISettings(
+            response.settings,
+          );
+        } else {
+          /*
+           * Safe local fallback.
+           *
+           * This preserves the current object
+           * and changes only enabled.
+           */
+          setAISettings(
+            (current) =>
+              current
+                ? {
+                    ...current,
+                    enabled,
+                  }
+                : current,
+          );
+        }
       } catch (err) {
         console.error(
-          "Failed to update AI support setting:",
+          "Failed to update AI support settings:",
           err,
         );
 
         setAISettingsError(
           err instanceof Error
             ? err.message
-            : "Failed to update AI support setting.",
+            : "Failed to update AI support settings.",
         );
       } finally {
         setUpdatingAISettings(false);
       }
     };
 
-  /* ==========================================================
-     LOAD TICKETS
-  ========================================================== */
+  /*
+   * ==========================================================
+   * INITIAL AI SETTINGS LOAD
+   * ==========================================================
+   */
+
+  useEffect(() => {
+    void loadAISettings();
+  }, [loadAISettings]);
+
+  /*
+   * ==========================================================
+   * LOAD TICKETS
+   * ==========================================================
+   */
 
   const loadTickets =
     useCallback(async () => {
@@ -599,13 +590,17 @@ export default function CustomerSupport() {
       search,
     ]);
 
-  /* ==========================================================
-     LOAD SINGLE TICKET
-  ========================================================== */
+  /*
+   * ==========================================================
+   * LOAD SINGLE TICKET
+   * ==========================================================
+   */
 
   const loadTicket =
     useCallback(
-      async (ticketId: string) => {
+      async (
+        ticketId: string,
+      ) => {
         try {
           setLoadingTicket(true);
           setError(null);
@@ -636,21 +631,21 @@ export default function CustomerSupport() {
       [],
     );
 
-  /* ==========================================================
-     INITIAL LOAD
-  ========================================================== */
+  /*
+   * ==========================================================
+   * INITIAL / FILTER LOAD
+   * ==========================================================
+   */
 
   useEffect(() => {
     void loadTickets();
   }, [loadTickets]);
 
-  useEffect(() => {
-    void loadAISettings();
-  }, [loadAISettings]);
-
-  /* ==========================================================
-     SELECT TICKET
-  ========================================================== */
+  /*
+   * ==========================================================
+   * SELECT TICKET
+   * ==========================================================
+   */
 
   const handleSelectTicket =
     async (
@@ -663,27 +658,30 @@ export default function CustomerSupport() {
       );
     };
 
-  /* ==========================================================
-     REFRESH
-  ========================================================== */
+  /*
+   * ==========================================================
+   * REFRESH
+   * ==========================================================
+   */
 
   const handleRefresh =
     async () => {
-      await Promise.all([
-        loadTickets(),
-        loadAISettings(),
-      ]);
+      await loadTickets();
 
       if (selectedTicket?.id) {
         await loadTicket(
           selectedTicket.id,
         );
       }
+
+      await loadAISettings();
     };
 
-  /* ==========================================================
-     ADMIN REPLY
-  ========================================================== */
+  /*
+   * ==========================================================
+   * ADMIN REPLY
+   * ==========================================================
+   */
 
   const handleReply =
     async () => {
@@ -730,9 +728,11 @@ export default function CustomerSupport() {
       }
     };
 
-  /* ==========================================================
-     STATUS
-  ========================================================== */
+  /*
+   * ==========================================================
+   * STATUS
+   * ==========================================================
+   */
 
   const handleStatusChange =
     async (
@@ -772,9 +772,11 @@ export default function CustomerSupport() {
       }
     };
 
-  /* ==========================================================
-     PRIORITY
-  ========================================================== */
+  /*
+   * ==========================================================
+   * PRIORITY
+   * ==========================================================
+   */
 
   const handlePriorityChange =
     async (
@@ -814,67 +816,77 @@ export default function CustomerSupport() {
       }
     };
 
-  /* ==========================================================
-     COUNTS
-  ========================================================== */
+  /*
+   * ==========================================================
+   * COUNTS
+   * ==========================================================
+   */
 
-  const counts =
-    useMemo(() => {
-      return {
-        total: tickets.length,
+  const counts = useMemo(() => {
+    return {
+      total: tickets.length,
 
-        open: tickets.filter(
-          (ticket) =>
-            ticket.status ===
-            "OPEN",
-        ).length,
+      open: tickets.filter(
+        (ticket) =>
+          ticket.status ===
+          "OPEN",
+      ).length,
 
-        inProgress:
-          tickets.filter(
-            (ticket) =>
-              ticket.status ===
-              "IN_PROGRESS",
-          ).length,
+      inProgress: tickets.filter(
+        (ticket) =>
+          ticket.status ===
+          "IN_PROGRESS",
+      ).length,
 
-        resolved:
-          tickets.filter(
-            (ticket) =>
-              ticket.status ===
-              "RESOLVED",
-          ).length,
-      };
-    }, [tickets]);
+      resolved: tickets.filter(
+        (ticket) =>
+          ticket.status ===
+          "RESOLVED",
+      ).length,
+    };
+  }, [tickets]);
+
+  /*
+   * ==========================================================
+   * CURRENT MESSAGES
+   * ==========================================================
+   */
 
   const messages =
     selectedTicket?.messages ?? [];
 
-  /* ==========================================================
-     RENDER
-  ========================================================== */
+  /*
+   * ==========================================================
+   * RENDER
+   * ==========================================================
+   */
 
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-5 lg:px-6">
-
         {/* ==================================================
             HEADER
         ================================================== */}
 
         <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
-              <MessageCircle className="h-5 w-5" />
-            </div>
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+                <MessageCircle className="h-5 w-5" />
+              </div>
 
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-                Customer Support
-              </h1>
+              <div>
+                <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+                  Customer Support
+                </h1>
 
-              <p className="text-sm text-slate-500">
-                Manage player, automated AI,
-                and human support conversations.
-              </p>
+                <p className="text-sm text-slate-500">
+                  Manage player,
+                  automated AI,
+                  and human support
+                  conversations.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -905,16 +917,88 @@ export default function CustomerSupport() {
         </div>
 
         {/* ==================================================
-            AI SUPPORT CONTROL
+            AI SUPPORT SETTINGS
         ================================================== */}
 
-        <AISupportControl
-          settings={aiSettings}
-          loading={loadingAISettings}
-          updating={updatingAISettings}
-          error={aiSettingsError}
-          onToggle={handleAIToggle}
-        />
+        <div className="mb-5 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 via-white to-indigo-50 p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-sm">
+                <Bot className="h-5 w-5" />
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-sm font-bold text-slate-900 sm:text-base">
+                    AI Support
+                  </h2>
+
+                  {aiSettings && (
+                    <span
+                      className={`rounded-full px-2 py-1 text-[10px] font-bold ring-1 ring-inset ${
+                        aiSettings.enabled
+                          ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20"
+                          : "bg-slate-100 text-slate-600 ring-slate-500/20"
+                      }`}
+                    >
+                      {aiSettings.enabled
+                        ? "ON"
+                        : "OFF"}
+                    </span>
+                  )}
+                </div>
+
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Controls automated AI
+                  customer support. When
+                  disabled, player
+                  conversations can be
+                  routed to human support.
+                </p>
+
+                {aiSettingsError && (
+                  <p className="mt-1 text-xs text-red-600">
+                    {aiSettingsError}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={
+                loadingAISettings ||
+                updatingAISettings ||
+                !aiSettings
+              }
+              onClick={() =>
+                void handleAISettingsToggle(
+                  !aiSettings?.enabled,
+                )
+              }
+              className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                aiSettings?.enabled
+                  ? "bg-slate-700 hover:bg-slate-800"
+                  : "bg-violet-600 hover:bg-violet-700"
+              }`}
+            >
+              {loadingAISettings ||
+              updatingAISettings ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Bot className="h-4 w-4" />
+              )}
+
+              {loadingAISettings
+                ? "Loading..."
+                : updatingAISettings
+                  ? "Updating..."
+                  : aiSettings?.enabled
+                    ? "Disable AI"
+                    : "Enable AI"}
+            </button>
+          </div>
+        </div>
 
         {/* ==================================================
             SUMMARY
@@ -999,7 +1083,6 @@ export default function CustomerSupport() {
 
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="grid min-h-[650px] grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)]">
-
             {/* ==============================================
                 TICKET LIST
             ============================================== */}
@@ -1022,6 +1105,8 @@ export default function CustomerSupport() {
                   )}
                 </div>
 
+                {/* SEARCH */}
+
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
@@ -1037,12 +1122,17 @@ export default function CustomerSupport() {
                   />
                 </div>
 
+                {/* FILTERS */}
+
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <select
-                    value={statusFilter}
+                    value={
+                      statusFilter
+                    }
                     onChange={(event) =>
                       setStatusFilter(
-                        event.target.value as
+                        event.target
+                          .value as
                           | SupportTicketStatus
                           | "ALL",
                       )
@@ -1071,10 +1161,13 @@ export default function CustomerSupport() {
                   </select>
 
                   <select
-                    value={priorityFilter}
+                    value={
+                      priorityFilter
+                    }
                     onChange={(event) =>
                       setPriorityFilter(
-                        event.target.value as
+                        event.target
+                          .value as
                           | SupportTicketPriority
                           | "ALL",
                       )
@@ -1104,6 +1197,8 @@ export default function CustomerSupport() {
                 </div>
               </div>
 
+              {/* TICKETS */}
+
               <div className="max-h-[590px] overflow-y-auto">
                 {loadingTickets &&
                 tickets.length === 0 ? (
@@ -1112,7 +1207,8 @@ export default function CustomerSupport() {
                       <Loader2 className="h-6 w-6 animate-spin" />
 
                       <span>
-                        Loading support tickets...
+                        Loading support
+                        tickets...
                       </span>
                     </div>
                   </div>
@@ -1122,12 +1218,14 @@ export default function CustomerSupport() {
                     <MessageCircle className="mb-3 h-10 w-10 text-slate-300" />
 
                     <p className="font-medium text-slate-700">
-                      No support tickets
+                      No support
+                      tickets
                     </p>
 
                     <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Tickets created from unresolved
-                      automated support conversations
+                      Tickets created from
+                      unresolved automated
+                      support conversations
                       will appear here.
                     </p>
                   </div>
@@ -1140,7 +1238,9 @@ export default function CustomerSupport() {
 
                       return (
                         <button
-                          key={ticket.id}
+                          key={
+                            ticket.id
+                          }
                           type="button"
                           onClick={() =>
                             void handleSelectTicket(
@@ -1192,15 +1292,20 @@ export default function CustomerSupport() {
                               </span>
 
                               {ticket.messages &&
-                                ticket.messages.length >
+                                ticket
+                                  .messages
+                                  .length >
                                   0 && (
                                   <span className="text-[11px] text-slate-400">
                                     {
-                                      ticket.messages
+                                      ticket
+                                        .messages
                                         .length
                                     }{" "}
-                                    {ticket.messages
-                                      .length === 1
+                                    {ticket
+                                      .messages
+                                      .length ===
+                                    1
                                       ? "message"
                                       : "messages"}
                                   </span>
@@ -1240,12 +1345,14 @@ export default function CustomerSupport() {
                     </div>
 
                     <h3 className="mt-4 text-lg font-semibold text-slate-900">
-                      Select a support ticket
+                      Select a support
+                      ticket
                     </h3>
 
                     <p className="mt-2 text-sm leading-6 text-slate-500">
-                      Select a ticket from the list
-                      to view the conversation and
+                      Select a ticket from
+                      the list to view the
+                      conversation and
                       respond to the player.
                     </p>
 
@@ -1255,16 +1362,21 @@ export default function CustomerSupport() {
 
                         <div>
                           <p className="text-sm font-semibold text-slate-800">
-                            Automated support
+                            Automated
+                            support
                           </p>
 
                           <p className="mt-1 text-xs leading-5 text-slate-500">
-                            AI Assistant messages can come
-                            from OpenRouter AI or the
-                            built-in training/knowledge
-                            fallback. Unresolved
-                            conversations can be handled
-                            by an administrator here.
+                            AI Assistant
+                            messages can come
+                            from automated AI
+                            support or the
+                            built-in support
+                            knowledge fallback.
+                            Unresolved
+                            conversations can be
+                            handled by an
+                            administrator here.
                           </p>
                         </div>
                       </div>
@@ -1273,7 +1385,6 @@ export default function CustomerSupport() {
                 </div>
               ) : (
                 <div className="flex h-full min-h-[650px] flex-col">
-
                   {/* DETAIL HEADER */}
 
                   <div className="border-b border-slate-200 px-4 py-4 sm:px-6">
@@ -1323,16 +1434,26 @@ export default function CustomerSupport() {
                         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
                           <span>
                             Ticket #
-                            {selectedTicket.id}
+                            {
+                              selectedTicket.id
+                            }
                           </span>
 
                           {selectedTicket.user && (
                             <span>
                               Player:{" "}
-                              {selectedTicket.user.fullName ||
-                                selectedTicket.user.username ||
-                                selectedTicket.user.phone ||
-                                selectedTicket.user.id}
+                              {selectedTicket
+                                .user
+                                .fullName ||
+                                selectedTicket
+                                  .user
+                                  .username ||
+                                selectedTicket
+                                  .user
+                                  .phone ||
+                                selectedTicket
+                                  .user
+                                  .id}
                             </span>
                           )}
 
@@ -1531,11 +1652,15 @@ export default function CustomerSupport() {
                     <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
                       <span>
                         Press Enter to send ·
-                        Shift + Enter for a new line
+                        Shift + Enter for a
+                        new line
                       </span>
 
                       <span>
-                        {replyMessage.length}/2000
+                        {
+                          replyMessage.length
+                        }
+                        /2000
                       </span>
                     </div>
                   </div>

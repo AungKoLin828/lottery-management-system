@@ -1,11 +1,14 @@
-/* ============================================================
-   TYPES
-============================================================ */
+/*
+ * ============================================================
+ * ADMIN AI SUPPORT SETTINGS SERVICE
+ * ============================================================
+ */
 
 export interface AdminAISettings {
+  id: number;
   enabled: boolean;
-  updatedAt: string | null;
-  updatedBy: string | null;
+  updatedAt: string;
+  updatedBy?: string | null;
 }
 
 export interface AdminAISettingsResponse {
@@ -14,135 +17,81 @@ export interface AdminAISettingsResponse {
   message?: string;
 }
 
-export interface AdminAISettingsUpdateResponse {
-  success: boolean;
-  settings?: AdminAISettings;
-  message?: string;
-}
-
-/* ============================================================
-   API REQUEST
-============================================================ */
-
 async function apiRequest<T>(
   url: string,
   options?: RequestInit,
 ): Promise<T> {
-  const response =
-    await fetch(url, {
-      credentials: "include",
+  const response = await fetch(url, {
+    credentials: "include",
 
-      headers: {
-        Accept:
-          "application/json",
+    headers: {
+      "Content-Type": "application/json",
+      ...(options?.headers ?? {}),
+    },
 
-        "Content-Type":
-          "application/json",
-
-        ...(options?.headers ??
-          {}),
-      },
-
-      ...options,
-    });
-
-  const contentType =
-    response.headers.get(
-      "content-type",
-    ) ?? "";
-
-  const text =
-    await response.text();
-
-  if (!text.trim()) {
-    throw new Error(
-      response.ok
-        ? "The server returned an empty response."
-        : `Request failed with status ${response.status}.`,
-    );
-  }
-
-  if (
-    !contentType
-      .toLowerCase()
-      .includes(
-        "application/json",
-      )
-  ) {
-    console.error(
-      "Admin AI settings returned non-JSON:",
-      text.slice(0, 1000),
-    );
-
-    throw new Error(
-      "The server returned an invalid response.",
-    );
-  }
+    ...options,
+  });
 
   let data: unknown;
 
   try {
-    data =
-      JSON.parse(text);
+    data = await response.json();
   } catch {
     throw new Error(
-      "The server returned invalid JSON.",
+      "Invalid server response.",
     );
   }
 
   if (!response.ok) {
+    let message =
+      "Request failed.";
+
     if (
-      typeof data ===
-        "object" &&
+      typeof data === "object" &&
       data !== null &&
       "message" in data
     ) {
-      const message =
-        (
-          data as {
-            message?: unknown;
-          }
-        ).message;
+      const possibleMessage = (
+        data as {
+          message?: unknown;
+        }
+      ).message;
 
       if (
-        typeof message ===
-        "string"
+        typeof possibleMessage === "string"
       ) {
-        throw new Error(
-          message,
-        );
+        message = possibleMessage;
       }
     }
 
-    throw new Error(
-      `Request failed with status ${response.status}.`,
-    );
+    throw new Error(message);
   }
 
   return data as T;
 }
 
-/* ============================================================
-   GET
-============================================================ */
+/*
+ * ============================================================
+ * GET AI SETTINGS
+ * ============================================================
+ */
 
 export async function getAdminAISettings(): Promise<AdminAISettingsResponse> {
   return apiRequest<AdminAISettingsResponse>(
     "/api/admin/ai-support/settings",
-    {
-      method: "GET",
-    },
   );
 }
 
-/* ============================================================
-   UPDATE
-============================================================ */
+/*
+ * ============================================================
+ * UPDATE AI SETTINGS
+ * ============================================================
+ */
 
 export async function updateAdminAISettings(
   enabled: boolean,
-): Promise<AdminAISettingsUpdateResponse> {
-  return apiRequest<AdminAISettingsUpdateResponse>(
+): Promise<AdminAISettingsResponse> {
+  return apiRequest<AdminAISettingsResponse>(
     "/api/admin/ai-support/settings/update",
     {
       method: "PATCH",
@@ -154,48 +103,22 @@ export async function updateAdminAISettings(
   );
 }
 
-/* ============================================================
-   ENABLE
-============================================================ */
+/*
+ * ============================================================
+ * ENABLE AI
+ * ============================================================
+ */
 
-export async function enableAdminAI(): Promise<AdminAISettings> {
-  const response =
-    await updateAdminAISettings(
-      true,
-    );
-
-  if (
-    !response.success ||
-    !response.settings
-  ) {
-    throw new Error(
-      response.message ??
-        "Failed to enable AI support.",
-    );
-  }
-
-  return response.settings;
+export async function enableAdminAI(): Promise<AdminAISettingsResponse> {
+  return updateAdminAISettings(true);
 }
 
-/* ============================================================
-   DISABLE
-============================================================ */
+/*
+ * ============================================================
+ * DISABLE AI
+ * ============================================================
+ */
 
-export async function disableAdminAI(): Promise<AdminAISettings> {
-  const response =
-    await updateAdminAISettings(
-      false,
-    );
-
-  if (
-    !response.success ||
-    !response.settings
-  ) {
-    throw new Error(
-      response.message ??
-        "Failed to disable AI support.",
-    );
-  }
-
-  return response.settings;
+export async function disableAdminAI(): Promise<AdminAISettingsResponse> {
+  return updateAdminAISettings(false);
 }
