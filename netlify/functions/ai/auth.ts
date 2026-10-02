@@ -5,39 +5,19 @@ import { jwtVerify, type JWTPayload } from "jose";
    TYPES
 ============================================================ */
 
-export type AuthRole =
-  | "ADMIN"
-  | "PLAYER"
-  | string;
-
-export interface AuthPayload extends JWTPayload {
+export interface AIAuthPayload extends JWTPayload {
   userId?: string;
-  sub?: string;
   username?: string;
   phone?: string;
-  role?: AuthRole;
+  role?: string;
 }
 
 export interface AuthenticatedUser {
+  id: string;
   userId: string;
   username?: string;
   phone?: string;
-  role: AuthRole;
-}
-
-export class AuthError extends Error {
-  public readonly statusCode: number;
-
-  constructor(
-    message: string,
-    statusCode = 401,
-  ) {
-    super(message);
-
-    this.name = "AuthError";
-
-    this.statusCode = statusCode;
-  }
+  role?: string;
 }
 
 /* ============================================================
@@ -50,18 +30,19 @@ const AUTH_COOKIE_NAME = "lottery_auth";
    JWT SECRET
 ============================================================ */
 
-function getJwtSecret(): Uint8Array {
+function getJWTSecret(): Uint8Array {
   const secret =
     process.env.JWT_SECRET?.trim();
 
   if (!secret) {
-    throw new AuthError(
-      "JWT authentication is not configured.",
-      500,
+    throw new Error(
+      "JWT_SECRET is not configured.",
     );
   }
 
-  return new TextEncoder().encode(secret);
+  return new TextEncoder().encode(
+    secret,
+  );
 }
 
 /* ============================================================
@@ -69,35 +50,35 @@ function getJwtSecret(): Uint8Array {
 ============================================================ */
 
 function parseCookies(
-  cookieHeader: string | undefined,
+  cookieHeader?: string,
 ): Record<string, string> {
-  if (!cookieHeader) {
-    return {};
-  }
-
   const cookies: Record<
     string,
     string
   > = {};
 
+  if (!cookieHeader) {
+    return cookies;
+  }
+
   for (
     const part of cookieHeader.split(";")
   ) {
-    const separatorIndex =
+    const separator =
       part.indexOf("=");
 
-    if (separatorIndex === -1) {
+    if (separator < 0) {
       continue;
     }
 
     const name =
       part
-        .slice(0, separatorIndex)
+        .slice(0, separator)
         .trim();
 
     const value =
       part
-        .slice(separatorIndex + 1)
+        .slice(separator + 1)
         .trim();
 
     if (!name) {
@@ -116,20 +97,19 @@ function parseCookies(
 }
 
 /* ============================================================
-   AUTH COOKIE
+   GET AUTH TOKEN
 ============================================================ */
 
 export function getAuthTokenFromCookie(
   event: HandlerEvent,
 ): string | null {
-  /*
-   * Netlify normally provides the Cookie
-   * header here.
-   */
-
   const cookieHeader =
     event.headers?.cookie ??
     event.headers?.Cookie;
+
+  if (!cookieHeader) {
+    return null;
+  }
 
   const cookies =
     parseCookies(cookieHeader);
@@ -138,13 +118,13 @@ export function getAuthTokenFromCookie(
     cookies[AUTH_COOKIE_NAME];
 
   if (
-    !token ||
-    typeof token !== "string"
+    typeof token !== "string" ||
+    !token.trim()
   ) {
     return null;
   }
 
-  return token.trim() || null;
+  return token.trim();
 }
 
 /* ============================================================
@@ -153,19 +133,18 @@ export function getAuthTokenFromCookie(
 
 export async function verifyToken(
   token: string,
-): Promise<AuthPayload> {
+): Promise<AIAuthPayload> {
   if (!token?.trim()) {
-    throw new AuthError(
+    throw new Error(
       "Authentication token is missing.",
-      401,
     );
   }
 
   try {
     const result =
-      await jwtVerify<AuthPayload>(
+      await jwtVerify<AIAuthPayload>(
         token,
-        getJwtSecret(),
+        getJWTSecret(),
         {
           algorithms: ["HS256"],
         },
@@ -174,31 +153,33 @@ export async function verifyToken(
     return result.payload;
   } catch (error) {
     console.error(
-      "JWT verification failed:",
+      "AI JWT verification failed:",
       error,
     );
 
-    throw new AuthError(
-      "Your session has expired. Please log in again.",
-      401,
+    throw new Error(
+      "Invalid or expired authentication token.",
     );
   }
 }
 
 /* ============================================================
-   GET CURRENT USER
+   REQUIRE AUTH
+   ------------------------------------------------------------
+   IMPORTANT:
+   Existing ai/support.ts already imports this function.
+   Keep this API for compatibility.
 ============================================================ */
 
-export async function getAuthenticatedUser(
+export async function requireAuth(
   event: HandlerEvent,
 ): Promise<AuthenticatedUser> {
   const token =
     getAuthTokenFromCookie(event);
 
   if (!token) {
-    throw new AuthError(
+    throw new Error(
       "Authentication required.",
-      401,
     );
   }
 
@@ -215,13 +196,13 @@ export async function getAuthenticatedUser(
         : "";
 
   if (!userId) {
-    throw new AuthError(
+    throw new Error(
       "Invalid authentication token.",
-      401,
     );
   }
 
   return {
+    id: userId,
     userId,
 
     username:
@@ -240,33 +221,44 @@ export async function getAuthenticatedUser(
       typeof payload.role ===
       "string"
         ? payload.role
-        : "",
+        : undefined,
   };
 }
 
 /* ============================================================
-   VERIFY ADMIN
+   VERIFY ADMIN AUTH
+   ------------------------------------------------------------
+   Used by admin AI settings endpoints.
 ============================================================ */
 
 export async function verifyAdminAuth(
   event: HandlerEvent,
 ): Promise<AuthenticatedUser> {
   const user =
-    await getAuthenticatedUser(
-      event,
-    );
+    await requireAuth(event);
 
   if (
-    user.role.toUpperCase() !==
+    user.role?.toUpperCase() !==
     "ADMIN"
   ) {
-    throw new AuthError(
+    throw new Error(
       "Admin access required.",
-      403,
     );
   }
 
   return user;
+}
+
+/* ============================================================
+   REQUIRE ADMIN
+   ------------------------------------------------------------
+   Alias for future compatibility.
+============================================================ */
+
+export async function requireAdmin(
+  event: HandlerEvent,
+): Promise<AuthenticatedUser> {
+  return verifyAdminAuth(event);
 }
 
 /* ============================================================
@@ -276,10 +268,7 @@ export async function verifyAdminAuth(
 export function jsonResponse(
   statusCode: number,
   body: unknown,
-  extraHeaders?: Record<
-    string,
-    string
-  >,
+  headers?: Record<string, string>,
 ) {
   return {
     statusCode,
@@ -291,7 +280,7 @@ export function jsonResponse(
       "Cache-Control":
         "no-store",
 
-      ...extraHeaders,
+      ...headers,
     },
 
     body: JSON.stringify(body),
@@ -299,7 +288,7 @@ export function jsonResponse(
 }
 
 /* ============================================================
-   REQUEST BODY
+   PARSE BODY
 ============================================================ */
 
 export function parseBody<T>(
@@ -314,38 +303,8 @@ export function parseBody<T>(
       event.body,
     ) as T;
   } catch {
-    throw new AuthError(
+    throw new Error(
       "Invalid JSON request body.",
-      400,
     );
   }
-}
-
-/* ============================================================
-   AUTH ERROR RESPONSE HELPER
-============================================================ */
-
-export function authErrorResponse(
-  error: unknown,
-) {
-  if (
-    error instanceof AuthError
-  ) {
-    return jsonResponse(
-      error.statusCode,
-      {
-        success: false,
-        message: error.message,
-      },
-    );
-  }
-
-  return jsonResponse(
-    500,
-    {
-      success: false,
-      message:
-        "Authentication failed.",
-    },
-  );
 }

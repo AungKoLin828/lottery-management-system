@@ -16,26 +16,10 @@ export interface AISupportSettings {
    CONSTANTS
 ============================================================ */
 
-const DEFAULT_SETTING_ID = 1;
-
-/*
- * Database table used by the AI support switch.
- *
- * We intentionally keep this table independent from the
- * existing application settings so changing AI support does
- * not affect lottery/deposit/withdraw settings.
- */
-const CREATE_TABLE_SQL = sql`
-  CREATE TABLE IF NOT EXISTS ai_support_settings (
-    id INTEGER PRIMARY KEY,
-    enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_by TEXT NULL
-  )
-`;
+const SETTINGS_ID = 1;
 
 /* ============================================================
-   ENV DEFAULT
+   ENVIRONMENT DEFAULT
 ============================================================ */
 
 function getEnvironmentDefault(): boolean {
@@ -43,7 +27,8 @@ function getEnvironmentDefault(): boolean {
     process.env.AI_SUPPORT_ENABLED;
 
   if (
-    typeof value !== "string"
+    value === undefined ||
+    value === null
   ) {
     return true;
   }
@@ -70,9 +55,14 @@ function getEnvironmentDefault(): boolean {
 ============================================================ */
 
 async function ensureTable(): Promise<void> {
-  await db.execute(
-    CREATE_TABLE_SQL,
-  );
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS ai_support_settings (
+      id INTEGER PRIMARY KEY,
+      enabled BOOLEAN NOT NULL DEFAULT TRUE,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_by TEXT NULL
+    )
+  `);
 }
 
 /* ============================================================
@@ -87,12 +77,14 @@ async function ensureDefaultRow(): Promise<void> {
     INSERT INTO ai_support_settings (
       id,
       enabled,
-      updated_at
+      updated_at,
+      updated_by
     )
     VALUES (
-      ${DEFAULT_SETTING_ID},
+      ${SETTINGS_ID},
       ${defaultEnabled},
-      NOW()
+      NOW(),
+      NULL
     )
     ON CONFLICT (id)
     DO NOTHING
@@ -115,17 +107,21 @@ export async function getAISupportSettings(): Promise<AISupportSettings> {
         updated_at,
         updated_by
       FROM ai_support_settings
-      WHERE id = ${DEFAULT_SETTING_ID}
+      WHERE id = ${SETTINGS_ID}
       LIMIT 1
     `);
 
   const rows =
     result.rows as Array<{
-      enabled: boolean;
+      enabled:
+        | boolean
+        | string;
+
       updated_at:
         | string
         | Date
         | null;
+
       updated_by:
         | string
         | null;
@@ -145,9 +141,16 @@ export async function getAISupportSettings(): Promise<AISupportSettings> {
     };
   }
 
+  const enabled =
+    typeof row.enabled ===
+    "boolean"
+      ? row.enabled
+      : String(row.enabled)
+          .toLowerCase() ===
+        "true";
+
   return {
-    enabled:
-      Boolean(row.enabled),
+    enabled,
 
     updatedAt:
       row.updated_at
@@ -163,7 +166,7 @@ export async function getAISupportSettings(): Promise<AISupportSettings> {
 }
 
 /* ============================================================
-   GET ONLY ENABLED STATE
+   GET ONLY ENABLED
 ============================================================ */
 
 export async function getAISupportEnabled(): Promise<boolean> {
@@ -174,12 +177,12 @@ export async function getAISupportEnabled(): Promise<boolean> {
 }
 
 /* ============================================================
-   UPDATE SETTINGS
+   UPDATE
 ============================================================ */
 
 export async function setAISupportEnabled(
   enabled: boolean,
-  updatedBy?: string | null,
+  updatedBy: string | null,
 ): Promise<AISupportSettings> {
   await ensureTable();
 
@@ -191,10 +194,10 @@ export async function setAISupportEnabled(
       updated_by
     )
     VALUES (
-      ${DEFAULT_SETTING_ID},
+      ${SETTINGS_ID},
       ${enabled},
       NOW(),
-      ${updatedBy ?? null}
+      ${updatedBy}
     )
     ON CONFLICT (id)
     DO UPDATE SET
@@ -204,15 +207,4 @@ export async function setAISupportEnabled(
   `);
 
   return getAISupportSettings();
-}
-
-/* ============================================================
-   RESET TO ENV DEFAULT
-============================================================ */
-
-export async function resetAISupportSetting(): Promise<AISupportSettings> {
-  return setAISupportEnabled(
-    getEnvironmentDefault(),
-    null,
-  );
 }
