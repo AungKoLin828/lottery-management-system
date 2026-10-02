@@ -71,6 +71,27 @@ function getCookieValue(
 }
 
 /* ============================================================
+   ADMIN AUTHENTICATION
+============================================================ */
+
+export async function verifyAdminAuth(
+  event: HandlerEvent,
+): Promise<AuthUser | null> {
+  const user =
+    await getAuthenticatedUser(event);
+
+  if (!user) {
+    return null;
+  }
+
+  if (user.role !== "ADMIN") {
+    return null;
+  }
+
+  return user;
+}
+
+/* ============================================================
    AUTHENTICATION
 ============================================================ */
 
