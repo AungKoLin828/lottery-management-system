@@ -1,83 +1,271 @@
-import type { Handler } from "@netlify/functions";
+/*
+ * ============================================================
+ * ADMIN AI SUPPORT SETTINGS UPDATE
+ * ============================================================
+ *
+ * Endpoint:
+ *
+ * PATCH /api/admin/ai-support/settings/update
+ *
+ * Purpose:
+ * - Allow ADMIN users to enable / disable AI support.
+ *
+ * Request:
+ *
+ * {
+ *   "enabled": true
+ * }
+ *
+ * or:
+ *
+ * {
+ *   "enabled": false
+ * }
+ *
+ * The database stores enabled as BOOLEAN.
+ *
+ * IMPORTANT:
+ * - Does not change other AI support functionality.
+ * - Does not change OpenRouter behavior.
+ * - Does not change player authentication.
+ * - Does not change the AI support endpoint.
+ * - Only fixes the admin AI settings update request handling.
+ * ============================================================
+ */
+
+import type { Handler, HandlerEvent } from "@netlify/functions";
 
 import {
-  verifyAdminAuth,
   AuthError,
   jsonResponse,
   parseBody,
+  verifyAdminAuth,
 } from "./ai/auth";
 
-import { setAISupportEnabled } from "./ai/settings";
+import {
+  setAISupportEnabled,
+} from "./ai/settings";
 
-interface UpdateAISupportSettingsBody {
+/*
+ * ============================================================
+ * TYPES
+ * ============================================================
+ */
+
+interface UpdateAISettingsBody {
   enabled?: unknown;
 }
 
-function parseBoolean(value: unknown): boolean | null {
-  if (typeof value === "boolean") return value;
+/*
+ * ============================================================
+ * BOOLEAN PARSER
+ * ============================================================
+ *
+ * Accept:
+ *
+ * true
+ * false
+ *
+ * Also safely accept:
+ *
+ * "true"
+ * "false"
+ *
+ * This is useful because some clients / proxies / forms can
+ * serialize boolean values as strings.
+ *
+ * IMPORTANT:
+ * We NEVER use Boolean(value) here because:
+ *
+ * Boolean("false") === true
+ *
+ * which would be dangerous for an ON/OFF setting.
+ * ============================================================
+ */
+
+function parseEnabled(value: unknown): boolean | null {
+  if (typeof value === "boolean") {
+    return value;
+  }
 
   if (typeof value === "string") {
     const normalized = value.trim().toLowerCase();
-    if (normalized === "true") return true;
-    if (normalized === "false") return false;
+
+    if (normalized === "true") {
+      return true;
+    }
+
+    if (normalized === "false") {
+      return false;
+    }
   }
 
   return null;
 }
 
-export const handler: Handler = async (event) => {
+/*
+ * ============================================================
+ * METHOD CHECK
+ * ============================================================
+ */
+
+function methodNotAllowed() {
+  return jsonResponse(
+    {
+      success: false,
+      error: "METHOD_NOT_ALLOWED",
+      message: "Only PATCH requests are allowed.",
+    },
+    405,
+    {
+      Allow: "PATCH",
+    },
+  );
+}
+
+/*
+ * ============================================================
+ * MAIN HANDLER
+ * ============================================================
+ */
+
+export const handler: Handler = async (
+  event: HandlerEvent,
+) => {
+  console.log(
+    "ADMIN AI SETTINGS UPDATE:",
+    event.httpMethod,
+  );
+
+  /*
+   * ----------------------------------------------------------
+   * METHOD
+   * ----------------------------------------------------------
+   */
+
   if (event.httpMethod !== "PATCH") {
-    return jsonResponse(
-      {
-        success: false,
-        message: "Method not allowed.",
-      },
-      405,
-      { Allow: "PATCH" },
-    );
+    return methodNotAllowed();
   }
 
   try {
+    /*
+     * --------------------------------------------------------
+     * ADMIN AUTHENTICATION
+     * --------------------------------------------------------
+     *
+     * verifyAdminAuth() already validates:
+     *
+     * - lottery_auth cookie
+     * - JWT
+     * - ADMIN role
+     *
+     * It throws AuthError when authentication fails.
+     * --------------------------------------------------------
+     */
+
     const admin = await verifyAdminAuth(event);
 
-    let body: UpdateAISupportSettingsBody;
+    /*
+     * --------------------------------------------------------
+     * REQUEST BODY
+     * --------------------------------------------------------
+     */
 
-    try {
-      body = parseBody<UpdateAISupportSettingsBody>(event);
-    } catch {
+    const body = (await parseBody(
+      event,
+    )) as UpdateAISettingsBody;
+
+    console.log(
+      "ADMIN AI SETTINGS REQUEST BODY:",
+      JSON.stringify(body),
+    );
+
+    /*
+     * --------------------------------------------------------
+     * VALIDATE BODY
+     * --------------------------------------------------------
+     */
+
+    if (
+      !body ||
+      typeof body !== "object" ||
+      !Object.prototype.hasOwnProperty.call(
+        body,
+        "enabled",
+      )
+    ) {
       return jsonResponse(
         {
           success: false,
-          message: "Invalid JSON request body.",
+          error: "INVALID_REQUEST",
+          message:
+            "'enabled' is required.",
         },
         400,
       );
     }
 
-    const enabled = parseBoolean(body.enabled);
+    /*
+     * --------------------------------------------------------
+     * PARSE ENABLED
+     * --------------------------------------------------------
+     */
+
+    const enabled = parseEnabled(
+      body.enabled,
+    );
 
     if (enabled === null) {
+      console.error(
+        "Invalid AI support enabled value:",
+        body.enabled,
+        "type:",
+        typeof body.enabled,
+      );
+
       return jsonResponse(
         {
           success: false,
-          message: "'enabled' must be a boolean.",
+          error: "INVALID_ENABLED",
+          message:
+            "'enabled' must be a boolean.",
         },
         400,
       );
     }
 
-    const settings = await setAISupportEnabled(
-      enabled,
-      admin.userId,
+    /*
+     * --------------------------------------------------------
+     * UPDATE DATABASE
+     * --------------------------------------------------------
+     */
+
+    const settings =
+      await setAISupportEnabled(
+        enabled,
+        admin.userId,
+      );
+
+    /*
+     * --------------------------------------------------------
+     * SUCCESS
+     * --------------------------------------------------------
+     */
+
+    console.log(
+      "ADMIN AI SUPPORT UPDATED:",
+      {
+        enabled,
+        updatedBy: admin.userId,
+      },
     );
 
     return jsonResponse(
       {
         success: true,
-        message: enabled
-          ? "AI support enabled successfully."
-          : "AI support disabled successfully.",
+
         settings: {
+          id: settings.id,
           enabled: settings.enabled,
           updatedAt: settings.updatedAt,
           updatedBy: settings.updatedBy,
@@ -86,10 +274,11 @@ export const handler: Handler = async (event) => {
       200,
     );
   } catch (error) {
-    console.error(
-      "ADMIN AI SUPPORT SETTINGS UPDATE ERROR:",
-      error,
-    );
+    /*
+     * --------------------------------------------------------
+     * AUTH ERROR
+     * --------------------------------------------------------
+     */
 
     if (error instanceof AuthError) {
       return jsonResponse(
@@ -102,13 +291,23 @@ export const handler: Handler = async (event) => {
       );
     }
 
+    /*
+     * --------------------------------------------------------
+     * UNEXPECTED ERROR
+     * --------------------------------------------------------
+     */
+
+    console.error(
+      "ADMIN AI SUPPORT SETTINGS UPDATE ERROR:",
+      error,
+    );
+
     return jsonResponse(
       {
         success: false,
+        error: "INTERNAL_SERVER_ERROR",
         message:
-          error instanceof Error
-            ? error.message
-            : "Failed to update AI support settings.",
+          "Failed to update AI support settings.",
       },
       500,
     );
