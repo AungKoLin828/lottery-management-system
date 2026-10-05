@@ -549,6 +549,7 @@ export const handler: Handler =
     event: HandlerEvent,
     _context: HandlerContext,
   ) => {
+    try {
     /*
      * --------------------------------------------------------
      * METHOD
@@ -572,22 +573,32 @@ export const handler: Handler =
      * --------------------------------------------------------
      */
 
-    const auth =
-      await requireAuth(event);
+    let user;
 
-    if (!auth.success) {
-      return response(
-        auth.statusCode ?? 401,
-        {
-          success: false,
-          message:
-            auth.message ??
-            "Authentication required.",
-        },
-      );
+    try {
+      user = await requireAuth(event);
+    } catch (error) {
+      console.error("AI support authentication error:", error);
+
+      if (error instanceof Error && "statusCode" in error) {
+        const statusCode = Number(
+          (error as Error & { statusCode?: unknown }).statusCode,
+        );
+
+        return response(
+          Number.isInteger(statusCode) ? statusCode : 401,
+          {
+            success: false,
+            message: error.message || "Authentication required.",
+          },
+        );
+      }
+
+      return response(401, {
+        success: false,
+        message: "Authentication required. Please log in again.",
+      });
     }
-
-    const user = auth.user;
 
     if (!user?.id) {
       return response(401, {
@@ -878,4 +889,12 @@ export const handler: Handler =
       source:
         "HUMAN",
     });
+    } catch (error) {
+      console.error("AI SUPPORT UNHANDLED ERROR:", error);
+
+      return response(500, {
+        success: false,
+        message: "AI support is temporarily unavailable. Please try again or contact support.",
+      });
+    }
   };

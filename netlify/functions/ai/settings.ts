@@ -1,10 +1,4 @@
-import { sql } from "drizzle-orm";
-
-import { db } from "../utils/db";
-
-/* ============================================================
-   TYPES
-============================================================ */
+import { Pool } from "pg";
 
 export interface AISupportSettings {
   enabled: boolean;
@@ -12,50 +6,41 @@ export interface AISupportSettings {
   updatedBy: string | null;
 }
 
-/* ============================================================
-   CONSTANTS
-============================================================ */
-
 const SETTINGS_ID = 1;
 
-/* ============================================================
-   ENVIRONMENT DEFAULT
-============================================================ */
+let pool: Pool | undefined;
 
-function getEnvironmentDefault(): boolean {
-  const value =
-    process.env.AI_SUPPORT_ENABLED;
+function getPool(): Pool {
+  if (pool) return pool;
 
-  if (
-    value === undefined ||
-    value === null
-  ) {
-    return true;
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL environment variable is not configured");
   }
 
-  const normalized =
-    value
-      .trim()
-      .toLowerCase();
+  pool = new Pool({
+    connectionString: databaseUrl,
+    max: 3,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 15_000,
+    ssl:
+      process.env.DATABASE_SSL === "true"
+        ? { rejectUnauthorized: false }
+        : undefined,
+  });
 
-  if (
-    normalized === "false" ||
-    normalized === "0" ||
-    normalized === "off" ||
-    normalized === "no"
-  ) {
-    return false;
-  }
-
-  return true;
+  return pool;
 }
 
-/* ============================================================
-   ENSURE TABLE
-============================================================ */
+function getEnvironmentDefault(): boolean {
+  const value = process.env.AI_SUPPORT_ENABLED;
+  if (value == null) return true;
+  const normalized = value.trim().toLowerCase();
+  return !["false", "0", "off", "no"].includes(normalized);
+}
 
 async function ensureTable(): Promise<void> {
-  await db.execute(sql`
+  await getPool().query(`
     CREATE TABLE IF NOT EXISTS ai_support_settings (
       id INTEGER PRIMARY KEY,
       enabled BOOLEAN NOT NULL DEFAULT TRUE,
@@ -65,120 +50,59 @@ async function ensureTable(): Promise<void> {
   `);
 }
 
-/* ============================================================
-   ENSURE DEFAULT ROW
-============================================================ */
-
 async function ensureDefaultRow(): Promise<void> {
-  const defaultEnabled =
-    getEnvironmentDefault();
-
-  await db.execute(sql`
-    INSERT INTO ai_support_settings (
-      id,
-      enabled,
-      updated_at,
-      updated_by
-    )
-    VALUES (
-      ${SETTINGS_ID},
-      ${defaultEnabled},
-      NOW(),
-      NULL
-    )
-    ON CONFLICT (id)
-    DO NOTHING
-  `);
+  await getPool().query(
+    `
+      INSERT INTO ai_support_settings
+        (id, enabled, updated_at, updated_by)
+      VALUES ($1, $2, NOW(), NULL)
+      ON CONFLICT (id) DO NOTHING
+    `,
+    [SETTINGS_ID, getEnvironmentDefault()],
+  );
 }
-
-/* ============================================================
-   GET SETTINGS
-============================================================ */
 
 export async function getAISupportSettings(): Promise<AISupportSettings> {
   await ensureTable();
-
   await ensureDefaultRow();
 
-  const result =
-    await db.execute(sql`
-      SELECT
-        enabled,
-        updated_at,
-        updated_by
+  const result = await getPool().query(
+    `
+      SELECT enabled, updated_at, updated_by
       FROM ai_support_settings
-      WHERE id = ${SETTINGS_ID}
+      WHERE id = $1
       LIMIT 1
-    `);
+    `,
+    [SETTINGS_ID],
+  );
 
-  const rows =
-    result.rows as Array<{
-      enabled:
-        | boolean
-        | string;
-
-      updated_at:
-        | string
-        | Date
-        | null;
-
-      updated_by:
-        | string
-        | null;
-    }>;
-
-  const row =
-    rows[0];
+  const row = result.rows[0] as
+    | { enabled: boolean | string; updated_at: string | Date | null; updated_by: string | null }
+    | undefined;
 
   if (!row) {
     return {
-      enabled:
-        getEnvironmentDefault(),
-
+      enabled: getEnvironmentDefault(),
       updatedAt: null,
-
       updatedBy: null,
     };
   }
 
-  const enabled =
-    typeof row.enabled ===
-    "boolean"
-      ? row.enabled
-      : String(row.enabled)
-          .toLowerCase() ===
-        "true";
-
   return {
-    enabled,
-
-    updatedAt:
-      row.updated_at
-        ? new Date(
-            row.updated_at,
-          ).toISOString()
-        : null,
-
-    updatedBy:
-      row.updated_by ??
-      null,
+    enabled:
+      typeof row.enabled === "boolean"
+        ? row.enabled
+        : String(row.enabled).toLowerCase() === "true",
+    updatedAt: row.updated_at
+      ? new Date(row.updated_at).toISOString()
+      : null,
+    updatedBy: row.updated_by ?? null,
   };
 }
 
-/* ============================================================
-   GET ONLY ENABLED
-============================================================ */
-
 export async function getAISupportEnabled(): Promise<boolean> {
-  const settings =
-    await getAISupportSettings();
-
-  return settings.enabled;
+  return (await getAISupportSettings()).enabled;
 }
-
-/* ============================================================
-   UPDATE
-============================================================ */
 
 export async function setAISupportEnabled(
   enabled: boolean,
@@ -186,25 +110,18 @@ export async function setAISupportEnabled(
 ): Promise<AISupportSettings> {
   await ensureTable();
 
-  await db.execute(sql`
-    INSERT INTO ai_support_settings (
-      id,
-      enabled,
-      updated_at,
-      updated_by
-    )
-    VALUES (
-      ${SETTINGS_ID},
-      ${enabled},
-      NOW(),
-      ${updatedBy}
-    )
-    ON CONFLICT (id)
-    DO UPDATE SET
-      enabled = EXCLUDED.enabled,
-      updated_at = NOW(),
-      updated_by = EXCLUDED.updated_by
-  `);
+  await getPool().query(
+    `
+      INSERT INTO ai_support_settings
+        (id, enabled, updated_at, updated_by)
+      VALUES ($1, $2, NOW(), $3)
+      ON CONFLICT (id) DO UPDATE SET
+        enabled = EXCLUDED.enabled,
+        updated_at = NOW(),
+        updated_by = EXCLUDED.updated_by
+    `,
+    [SETTINGS_ID, enabled, updatedBy],
+  );
 
   return getAISupportSettings();
 }
