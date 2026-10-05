@@ -89,7 +89,7 @@ export const MAX_MODELS_PER_REQUEST = 3;
  * Server-side request timeout.
  */
 export const OPENROUTER_TIMEOUT_MS =
-  20_000;
+  5_000;
 
 /*
  * Model discovery cache lifetime.
@@ -1625,100 +1625,42 @@ export async function callOpenRouter(
   tools?: OpenRouterToolDefinition[],
   options?: {
     temperature?: number;
-
     maxTokens?: number;
   },
 ): Promise<OpenRouterResponse> {
-  const apiKey =
-    getOpenRouterApiKey();
+  const apiKey = getOpenRouterApiKey();
+  const normalizedMessages = normalizeMessages(messages);
+  validateMessages(normalizedMessages);
 
-  const normalizedMessages =
-    normalizeMessages(
-      messages,
-    );
-
-  validateMessages(
-    normalizedMessages,
-  );
-
-  const hasTools =
-    Array.isArray(tools) &&
-    tools.length > 0;
-
+  const hasTools = Array.isArray(tools) && tools.length > 0;
   const requestOptions = {
-    tools:
-      hasTools
-        ? tools
-        : undefined,
-
-    temperature:
-      options?.temperature ??
-      0.2,
-
-    maxTokens:
-      options?.maxTokens ??
-      700,
+    tools: hasTools ? tools : undefined,
+    temperature: options?.temperature ?? 0.2,
+    maxTokens: options?.maxTokens ?? 700,
   };
 
-  /* ==========================================================
-     STEP 1
-     DISCOVER CURRENT FREE MODELS
-  ========================================================== */
-
-  let availableModels:
-    OpenRouterModel[] = [];
-
+  // One bounded OpenRouter attempt per support round.
+  // OpenRouter's `models` array already provides provider/model fallback.
+  // Do not perform multiple server-side retries before local training fallback.
+  let availableModels: OpenRouterModel[] = [];
   try {
-    availableModels =
-      await getAvailableModels(
-        apiKey,
-      );
+    availableModels = await getAvailableModels(apiKey);
   } catch (error) {
     console.warn(
-      "OpenRouter model discovery failed. Continuing with universal free fallback.",
+      "OpenRouter model discovery failed; using universal free model:",
       error,
     );
-
-    availableModels = [];
   }
 
-  /* ==========================================================
-     STEP 2
-     BUILD MODEL CHAIN
-  ========================================================== */
-
-  let requestModels =
-    buildRequestModels(
-      availableModels,
-      hasTools,
-    );
-
-  /*
-   * Guarantee at least openrouter/free.
-   */
-  if (
-    requestModels.length === 0
-  ) {
-    requestModels = [
-      {
-        id:
-          UNIVERSAL_FREE_MODEL,
-      },
-    ];
+  let requestModels = buildRequestModels(availableModels, hasTools);
+  if (requestModels.length === 0) {
+    requestModels = [{ id: UNIVERSAL_FREE_MODEL }];
   }
 
   console.log(
     "OpenRouter selected model chain:",
-    requestModels.map(
-      (model) =>
-        model.id,
-    ),
+    requestModels.map((model) => model.id),
   );
-
-  /* ==========================================================
-     STEP 3
-     FIRST REQUEST
-  ========================================================== */
 
   try {
     return await requestCompletion(
@@ -1727,111 +1669,10 @@ export async function callOpenRouter(
       requestModels,
       requestOptions,
     );
-  } catch (firstError) {
-    console.warn(
-      "OpenRouter first request failed:",
-      firstError,
-    );
+  } catch (error) {
+    clearModelCache();
+    throw error;
   }
-
-  /* ==========================================================
-     STEP 4
-     CLEAR STALE MODEL CACHE
-  ========================================================== */
-
-  clearModelCache();
-
-  /* ==========================================================
-     STEP 5
-     REFRESH MODELS
-  ========================================================== */
-
-  let refreshedModels:
-    OpenRouterModel[] = [];
-
-  try {
-    refreshedModels =
-      await getAvailableModels(
-        apiKey,
-      );
-  } catch (refreshError) {
-    console.warn(
-      "OpenRouter model refresh failed:",
-      refreshError,
-    );
-
-    refreshedModels = [];
-  }
-
-  /* ==========================================================
-     STEP 6
-     BUILD REFRESHED CHAIN
-  ========================================================== */
-
-  let refreshedRequestModels =
-    buildRequestModels(
-      refreshedModels,
-      hasTools,
-    );
-
-  if (
-    refreshedRequestModels.length === 0
-  ) {
-    refreshedRequestModels = [
-      {
-        id:
-          UNIVERSAL_FREE_MODEL,
-      },
-    ];
-  }
-
-  console.log(
-    "OpenRouter refreshed model chain:",
-    refreshedRequestModels.map(
-      (model) =>
-        model.id,
-    ),
-  );
-
-  /* ==========================================================
-     STEP 7
-     SECOND REQUEST
-  ========================================================== */
-
-  try {
-    return await requestCompletion(
-      apiKey,
-      normalizedMessages,
-      refreshedRequestModels,
-      requestOptions,
-    );
-  } catch (secondError) {
-    console.warn(
-      "OpenRouter refreshed request failed:",
-      secondError,
-    );
-  }
-
-  /* ==========================================================
-     STEP 8
-     FINAL DIRECT UNIVERSAL FREE REQUEST
-  ========================================================== */
-
-  /*
-   * This is intentionally a separate direct request.
-   *
-   * It avoids:
-   *
-   * - stale discovered model IDs
-   * - unavailable free model
-   * - incorrect capability metadata
-   * - model-list changes between discovery and completion
-   */
-  return requestUniversalFree(
-    apiKey,
-    normalizedMessages,
-    requestOptions,
-  );
 }
 
 

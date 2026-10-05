@@ -102,7 +102,7 @@ const MAX_MESSAGE_LENGTH = 2000;
 
 const MAX_HISTORY_MESSAGES = 10;
 
-const MAX_TOOL_ROUNDS = 2;
+const MAX_TOOL_ROUNDS = 1;
 
 /* ============================================================
    JSON RESPONSE

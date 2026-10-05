@@ -507,22 +507,9 @@ export function jsonResponse(
   data: unknown,
   status = 200,
   extraHeaders?: Record<string, string>,
-): Response {
-  /*
-   * IMPORTANT: This helper intentionally has ONE argument order:
-   *
-   *   jsonResponse(data, status)
-   *
-   * Do not pass the status first. Keeping one signature prevents
-   * an object from accidentally being passed to Response.status,
-   * which causes:
-   *
-   *   RangeError: init["status"] must be in the range of 200 to 599
-   */
+) {
   const normalizedStatus =
-    Number.isInteger(status) &&
-    status >= 200 &&
-    status <= 599
+    Number.isInteger(status) && status >= 200 && status <= 599
       ? status
       : 500;
 
@@ -533,33 +520,20 @@ export function jsonResponse(
     );
   }
 
-  return new Response(
-    JSON.stringify(data),
-    {
-      status: normalizedStatus,
-      headers: {
-        "Content-Type":
-          "application/json; charset=utf-8",
-        "Cache-Control": "no-store",
-        ...extraHeaders,
-      },
+  return {
+    statusCode: normalizedStatus,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      ...extraHeaders,
     },
-  );
+    body: JSON.stringify(data),
+  };
 }
-
-/*
- * ============================================================
- * AUTH ERROR RESPONSE
- * ============================================================
- *
- * Converts AuthError into the JSON response
- * expected by frontend/API callers.
- * ============================================================
- */
 
 export function authErrorResponse(
   error: unknown,
-): Response {
+) {
   if (
     error instanceof AuthError
   ) {
