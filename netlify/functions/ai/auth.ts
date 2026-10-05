@@ -504,60 +504,43 @@ export async function requireAdmin(
  */
 
 export function jsonResponse(
-  dataOrStatus: unknown,
-  statusOrData: unknown = 200,
+  data: unknown,
+  status = 200,
   extraHeaders?: Record<string, string>,
 ): Response {
   /*
-   * Backward-compatible argument handling.
+   * IMPORTANT: This helper intentionally has ONE argument order:
    *
-   * Preferred style:
-   *   jsonResponse({ success: true }, 200)
+   *   jsonResponse(data, status)
    *
-   * Existing AI/admin handlers also use:
-   *   jsonResponse(200, { success: true })
+   * Do not pass the status first. Keeping one signature prevents
+   * an object from accidentally being passed to Response.status,
+   * which causes:
    *
-   * Supporting both prevents a malformed Response status when an
-   * OpenRouter error such as HTTP 429 is returned.
+   *   RangeError: init["status"] must be in the range of 200 to 599
    */
-  let data: unknown;
-  let status: number;
+  const normalizedStatus =
+    Number.isInteger(status) &&
+    status >= 200 &&
+    status <= 599
+      ? status
+      : 500;
 
-  if (typeof dataOrStatus === "number") {
-    status = dataOrStatus;
-    data = statusOrData;
-  } else {
-    data = dataOrStatus;
-    status =
-      typeof statusOrData === "number"
-        ? statusOrData
-        : 200;
-  }
-
-  /*
-   * Never allow an invalid status to crash the Netlify function.
-   */
-  if (!Number.isInteger(status) || status < 200 || status > 599) {
+  if (normalizedStatus !== status) {
     console.error(
       "Invalid HTTP response status supplied to jsonResponse:",
       status,
     );
-
-    status = 500;
   }
 
   return new Response(
     JSON.stringify(data),
     {
-      status,
-
+      status: normalizedStatus,
       headers: {
         "Content-Type":
           "application/json; charset=utf-8",
-
-        "Cache-Control":
-          "no-store",
-
+        "Cache-Control": "no-store",
         ...extraHeaders,
       },
     },

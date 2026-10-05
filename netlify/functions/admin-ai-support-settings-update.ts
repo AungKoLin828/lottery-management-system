@@ -1,196 +1,116 @@
-import type {
-  Handler,
-} from "@netlify/functions";
+import type { Handler } from "@netlify/functions";
 
 import {
   verifyAdminAuth,
+  AuthError,
   jsonResponse,
   parseBody,
 } from "./ai/auth";
 
-import {
-  setAISupportEnabled,
-} from "./ai/settings";
-
-/* ============================================================
-   REQUEST BODY
-============================================================ */
+import { setAISupportEnabled } from "./ai/settings";
 
 interface UpdateAISupportSettingsBody {
   enabled?: unknown;
 }
 
-/* ============================================================
-   BOOLEAN PARSER
-============================================================ */
+function parseBoolean(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
 
-function parseBoolean(
-  value: unknown,
-): boolean | null {
-  if (
-    typeof value ===
-    "boolean"
-  ) {
-    return value;
-  }
-
-  if (
-    typeof value !==
-    "string"
-  ) {
-    return null;
-  }
-
-  const normalized =
-    value
-      .trim()
-      .toLowerCase();
-
-  if (
-    normalized === "true" ||
-    normalized === "1" ||
-    normalized === "on"
-  ) {
-    return true;
-  }
-
-  if (
-    normalized === "false" ||
-    normalized === "0" ||
-    normalized === "off"
-  ) {
-    return false;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
   }
 
   return null;
 }
 
-/* ============================================================
-   HANDLER
-============================================================ */
+export const handler: Handler = async (event) => {
+  if (event.httpMethod !== "PATCH") {
+    return jsonResponse(
+      {
+        success: false,
+        message: "Method not allowed.",
+      },
+      405,
+      { Allow: "PATCH" },
+    );
+  }
 
-export const handler: Handler =
-  async (event) => {
-    if (
-      event.httpMethod !==
-      "PATCH"
-    ) {
-      return jsonResponse(
-        405,
-        {
-          success: false,
-          message:
-            "Method not allowed.",
-        },
-        {
-          Allow: "PATCH",
-        },
-      );
-    }
+  try {
+    const admin = await verifyAdminAuth(event);
+
+    let body: UpdateAISupportSettingsBody;
 
     try {
-      const admin =
-        await verifyAdminAuth(
-          event,
-        );
-
-      let body:
-        UpdateAISupportSettingsBody;
-
-      try {
-        body =
-          parseBody<UpdateAISupportSettingsBody>(
-            event,
-          );
-      } catch {
-        return jsonResponse(
-          400,
-          {
-            success: false,
-            message:
-              "Invalid JSON request body.",
-          },
-        );
-      }
-
-      const enabled =
-        parseBoolean(
-          body.enabled,
-        );
-
-      if (
-        enabled === null
-      ) {
-        return jsonResponse(
-          400,
-          {
-            success: false,
-            message:
-              "'enabled' must be a boolean.",
-          },
-        );
-      }
-
-      const settings =
-        await setAISupportEnabled(
-          enabled,
-          admin.id,
-        );
-
+      body = parseBody<UpdateAISupportSettingsBody>(event);
+    } catch {
       return jsonResponse(
-        200,
-        {
-          success: true,
-
-          message: enabled
-            ? "AI support enabled successfully."
-            : "AI support disabled successfully.",
-
-          settings: {
-            enabled:
-              settings.enabled,
-
-            updatedAt:
-              settings.updatedAt,
-
-            updatedBy:
-              settings.updatedBy,
-          },
-        },
-      );
-    } catch (error) {
-      console.error(
-        "Admin AI support settings update error:",
-        error,
-      );
-
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to update AI support settings.";
-
-      const statusCode =
-        message ===
-        "Admin access required."
-          ? 403
-          : message.includes(
-                "Authentication",
-              ) ||
-              message.includes(
-                "authentication",
-              ) ||
-              message.includes(
-                "token",
-              )
-            ? 401
-            : 500;
-
-      return jsonResponse(
-        statusCode,
         {
           success: false,
-          message,
+          message: "Invalid JSON request body.",
         },
+        400,
       );
     }
-  };
+
+    const enabled = parseBoolean(body.enabled);
+
+    if (enabled === null) {
+      return jsonResponse(
+        {
+          success: false,
+          message: "'enabled' must be a boolean.",
+        },
+        400,
+      );
+    }
+
+    const settings = await setAISupportEnabled(
+      enabled,
+      admin.userId,
+    );
+
+    return jsonResponse(
+      {
+        success: true,
+        message: enabled
+          ? "AI support enabled successfully."
+          : "AI support disabled successfully.",
+        settings: {
+          enabled: settings.enabled,
+          updatedAt: settings.updatedAt,
+          updatedBy: settings.updatedBy,
+        },
+      },
+      200,
+    );
+  } catch (error) {
+    console.error(
+      "ADMIN AI SUPPORT SETTINGS UPDATE ERROR:",
+      error,
+    );
+
+    if (error instanceof AuthError) {
+      return jsonResponse(
+        {
+          success: false,
+          error: error.code,
+          message: error.message,
+        },
+        error.statusCode,
+      );
+    }
+
+    return jsonResponse(
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to update AI support settings.",
+      },
+      500,
+    );
+  }
+};

@@ -113,8 +113,8 @@ function response(
   body: AIResponse | Record<string, unknown>,
 ) {
   return jsonResponse(
-    statusCode,
     body,
+    statusCode,
   );
 }
 
@@ -832,28 +832,27 @@ export const handler: Handler =
        * use the deterministic local fallback.
        */
 
-      if (
-        knowledgeResults &&
-        knowledgeResults.length >
-          0
-      ) {
-        const trainingAnswer =
-          await getTrainingAnswer(
-            message,
-          );
+      /*
+       * Training fallback MUST run even when the knowledge search
+       * returned zero results. The training JSON is itself the
+       * deterministic fallback knowledge base.
+       */
+      const trainingAnswer =
+        await getTrainingAnswer(
+          message,
+        );
 
-        if (
-          trainingAnswer &&
-          trainingAnswer.trim()
-        ) {
-          return response(200, {
-            success: true,
-            message:
-              trainingAnswer.trim(),
-            source:
-              "TRAINING",
-          });
-        }
+      if (
+        trainingAnswer &&
+        trainingAnswer.trim()
+      ) {
+        return response(200, {
+          success: true,
+          message:
+            trainingAnswer.trim(),
+          source:
+            "TRAINING",
+        });
       }
     } catch (error) {
       console.error(
@@ -890,11 +889,15 @@ export const handler: Handler =
         "HUMAN",
     });
     } catch (error) {
-      console.error("AI SUPPORT UNHANDLED ERROR:", error);
+      console.error(
+        "AI SUPPORT UNHANDLED ERROR:",
+        error,
+      );
 
       return response(500, {
         success: false,
-        message: "AI support is temporarily unavailable. Please try again or contact support.",
+        message:
+          "AI support is temporarily unavailable. Please try again or contact support.",
       });
     }
   };
