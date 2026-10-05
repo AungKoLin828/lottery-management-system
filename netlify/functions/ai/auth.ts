@@ -504,13 +504,48 @@ export async function requireAdmin(
  */
 
 export function jsonResponse(
-  data: unknown,
-  status = 200,
-  extraHeaders?: Record<
-    string,
-    string
-  >,
+  dataOrStatus: unknown,
+  statusOrData: unknown = 200,
+  extraHeaders?: Record<string, string>,
 ): Response {
+  /*
+   * Backward-compatible argument handling.
+   *
+   * Preferred style:
+   *   jsonResponse({ success: true }, 200)
+   *
+   * Existing AI/admin handlers also use:
+   *   jsonResponse(200, { success: true })
+   *
+   * Supporting both prevents a malformed Response status when an
+   * OpenRouter error such as HTTP 429 is returned.
+   */
+  let data: unknown;
+  let status: number;
+
+  if (typeof dataOrStatus === "number") {
+    status = dataOrStatus;
+    data = statusOrData;
+  } else {
+    data = dataOrStatus;
+    status =
+      typeof statusOrData === "number"
+        ? statusOrData
+        : 200;
+  }
+
+  /*
+   * Never allow an invalid status to crash the Netlify function.
+   */
+  if (!Number.isInteger(status) || status < 200 || status > 599) {
+    console.error(
+      "Invalid HTTP response status supplied to jsonResponse:",
+      status,
+    );
+
+    status = 500;
+  }
+
   return new Response(
     JSON.stringify(data),
     {
