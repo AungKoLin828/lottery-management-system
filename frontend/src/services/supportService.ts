@@ -1,124 +1,8 @@
-/*
- * ============================================================
- * SUPPORT SERVICE
- * ============================================================
- */
-
 import type {
+  SupportChatResponse,
   SupportConversation,
   SupportMessage,
 } from "@/types/support";
-
-/*
- * ============================================================
- * SUPPORT SOURCE
- * ============================================================
- */
-
-export type SupportSource =
-  | "OPENROUTER"
-  | "TRAINING"
-  | "HUMAN";
-
-/*
- * ============================================================
- * CHAT RESPONSE
- * ============================================================
- */
-
-export interface SupportChatResponse {
-  success: boolean;
-
-  conversation:
-    | SupportConversation
-    | null;
-
-  message: SupportMessage;
-
-  escalated: boolean;
-
-  source: SupportSource;
-
-  intent: string | null;
-
-  confidence: number;
-}
-
-/*
- * ============================================================
- * CONVERSATION RESPONSE
- * ============================================================
- */
-
-export interface SupportConversationResponse {
-  success: boolean;
-
-  conversation:
-    | SupportConversation
-    | null;
-
-  messages: SupportMessage[];
-}
-
-/*
- * ============================================================
- * ADMIN LIST RESPONSE
- * ============================================================
- */
-
-export interface AdminSupportListResponse {
-  success: boolean;
-
-  conversations:
-    SupportConversation[];
-}
-
-/*
- * ============================================================
- * ADMIN MESSAGES RESPONSE
- * ============================================================
- */
-
-export interface AdminSupportMessagesResponse {
-  success: boolean;
-
-  conversation:
-    SupportConversation;
-
-  messages:
-    SupportMessage[];
-}
-
-/*
- * ============================================================
- * ADMIN REPLY RESPONSE
- * ============================================================
- */
-
-export interface AdminSupportReplyResponse {
-  success: boolean;
-
-  conversation?:
-    | SupportConversation
-    | null;
-
-  message:
-    SupportMessage;
-}
-
-/*
- * ============================================================
- * ADMIN CLOSE RESPONSE
- * ============================================================
- */
-
-export interface AdminSupportCloseResponse {
-  success: boolean;
-
-  conversation?:
-    | SupportConversation
-    | null;
-}
 
 /*
  * ============================================================
@@ -126,61 +10,27 @@ export interface AdminSupportCloseResponse {
  * ============================================================
  */
 
-function getApiErrorMessage(
-  data: unknown,
-  fallback: string,
-): string {
-  if (
-    typeof data ===
-      "object" &&
-    data !== null
-  ) {
-    const value =
-      data as {
-        error?: unknown;
-        message?: unknown;
-      };
+async function parseResponseBody(
+  response: Response,
+): Promise<Record<string, unknown>> {
+  try {
+    const data =
+      await response.json();
 
     if (
-      typeof value.error ===
-      "string"
+      data &&
+      typeof data === "object"
     ) {
-      return value.error;
+      return data as Record<
+        string,
+        unknown
+      >;
     }
-
-    if (
-      typeof value.message ===
-      "string"
-    ) {
-      return value.message;
-    }
+  } catch {
+    // Ignore invalid/empty JSON.
   }
 
-  return fallback;
-}
-
-/*
- * ============================================================
- * NORMALIZE SOURCE
- * ============================================================
- */
-
-function normalizeSupportSource(
-  value: unknown,
-): SupportSource {
-  switch (value) {
-    case "OPENROUTER":
-      return "OPENROUTER";
-
-    case "TRAINING":
-      return "TRAINING";
-
-    case "HUMAN":
-      return "HUMAN";
-
-    default:
-      return "HUMAN";
-  }
+  return {};
 }
 
 /*
@@ -193,50 +43,35 @@ async function api<T>(
   url: string,
   init?: RequestInit,
 ): Promise<T> {
-  let response: Response;
+  const response =
+    await fetch(url, {
+      credentials: "include",
 
-  try {
-    response =
-      await fetch(
-        url,
-        {
-          credentials:
-            "include",
+      ...init,
 
-          ...init,
+      headers: {
+        "Content-Type":
+          "application/json",
 
-          headers: {
-            "Content-Type":
-              "application/json",
+        ...(init?.headers || {}),
+      },
+    });
 
-            ...(init?.headers ||
-              {}),
-          },
-        },
-      );
-  } catch (error) {
-    throw new Error(
-      error instanceof Error
-        ? error.message
-        : "Unable to connect to the support service.",
+  const data =
+    await parseResponseBody(
+      response,
     );
-  }
-
-  let data: unknown = {};
-
-  try {
-    data =
-      await response.json();
-  } catch {
-    data = {};
-  }
 
   if (!response.ok) {
+    const errorMessage =
+      typeof data.error === "string"
+        ? data.error
+        : typeof data.message === "string"
+          ? data.message
+          : `Support request failed (${response.status}).`;
+
     throw new Error(
-      getApiErrorMessage(
-        data,
-        `Support request failed (${response.status}).`,
-      ),
+      errorMessage,
     );
   }
 
@@ -245,24 +80,61 @@ async function api<T>(
 
 /*
  * ============================================================
- * CHAT
+ * ID VALIDATION
  * ============================================================
  */
 
-async function chat(
-  message: string,
-): Promise<SupportChatResponse> {
-  const trimmed =
-    message.trim();
-
-  if (!trimmed) {
+function validateConversationId(
+  id: number,
+): number {
+  if (
+    !Number.isInteger(id) ||
+    id <= 0
+  ) {
     throw new Error(
-      "Please enter a support message.",
+      "Invalid conversation ID",
     );
   }
 
-  const response =
-    await api<SupportChatResponse>(
+  return id;
+}
+
+/*
+ * ============================================================
+ * SUPPORT SERVICE
+ * ============================================================
+ */
+
+export const supportService = {
+  /*
+   * ----------------------------------------------------------
+   * PLAYER CHAT
+   * ----------------------------------------------------------
+   */
+
+  chat: (
+    message: string,
+  ): Promise<SupportChatResponse> => {
+    const trimmed =
+      message.trim();
+
+    if (!trimmed) {
+      return Promise.reject(
+        new Error(
+          "Message is required",
+        ),
+      );
+    }
+
+    if (trimmed.length > 2000) {
+      return Promise.reject(
+        new Error(
+          "Message must not exceed 2000 characters",
+        ),
+      );
+    }
+
+    return api<SupportChatResponse>(
       "/api/support/chat",
       {
         method: "POST",
@@ -272,182 +144,141 @@ async function chat(
         }),
       },
     );
+  },
 
-  return {
-    ...response,
+  /*
+   * ----------------------------------------------------------
+   * PLAYER ACTIVE CONVERSATION
+   * ----------------------------------------------------------
+   */
 
-    source:
-      normalizeSupportSource(
-        response.source,
-      ),
+  conversation: () =>
+    api<{
+      success: boolean;
 
-    escalated:
-      response.escalated ===
-      true,
+      conversation:
+        | SupportConversation
+        | null;
 
-    intent:
-      typeof response.intent ===
-      "string"
-        ? response.intent
-        : null,
+      messages: SupportMessage[];
+    }>(
+      "/api/support/conversations",
+    ),
 
-    confidence:
-      Number.isFinite(
-        Number(
-          response.confidence,
+  /*
+   * ----------------------------------------------------------
+   * ADMIN LIST
+   * ----------------------------------------------------------
+   */
+
+  adminList: () =>
+    api<{
+      success: boolean;
+
+      conversations:
+        SupportConversation[];
+    }>("/api/admin/support"),
+
+  /*
+   * ----------------------------------------------------------
+   * ADMIN MESSAGES
+   * ----------------------------------------------------------
+   */
+
+  adminMessages: (
+    id: number,
+  ) => {
+    validateConversationId(id);
+
+    return api<{
+      success: boolean;
+
+      conversation:
+        SupportConversation;
+
+      messages: SupportMessage[];
+    }>(
+      `/api/admin/support/messages?conversationId=${encodeURIComponent(
+        String(id),
+      )}`,
+    );
+  },
+
+  /*
+   * ----------------------------------------------------------
+   * ADMIN REPLY
+   * ----------------------------------------------------------
+   */
+
+  adminReply: (
+    conversationId: number,
+    message: string,
+  ) => {
+    validateConversationId(
+      conversationId,
+    );
+
+    const trimmed =
+      message.trim();
+
+    if (!trimmed) {
+      return Promise.reject(
+        new Error(
+          "Message is required",
         ),
-      )
-        ? Number(
-            response.confidence,
-          )
-        : 0,
-  };
-}
+      );
+    }
 
-/*
- * ============================================================
- * PLAYER CONVERSATION
- * ============================================================
- */
+    return api<{
+      success: boolean;
 
-async function conversation(): Promise<
-  SupportConversationResponse
-> {
-  return api<SupportConversationResponse>(
-    "/api/support/conversations",
-  );
-}
+      conversation:
+        | SupportConversation
+        | null;
 
-/*
- * ============================================================
- * ADMIN LIST
- * ============================================================
- */
+      message: SupportMessage;
+    }>(
+      "/api/admin/support/reply",
+      {
+        method: "POST",
 
-async function adminList(): Promise<
-  AdminSupportListResponse
-> {
-  return api<AdminSupportListResponse>(
-    "/api/admin/support",
-  );
-}
+        body: JSON.stringify({
+          conversationId,
 
-/*
- * ============================================================
- * ADMIN MESSAGES
- * ============================================================
- */
-
-async function adminMessages(
-  id: number,
-): Promise<AdminSupportMessagesResponse> {
-  if (
-    !Number.isInteger(id) ||
-    id <= 0
-  ) {
-    throw new Error(
-      "Invalid support conversation ID.",
+          message: trimmed,
+        }),
+      },
     );
-  }
+  },
 
-  return api<AdminSupportMessagesResponse>(
-    `/api/admin/support/messages?conversationId=${encodeURIComponent(
-      String(id),
-    )}`,
-  );
-}
+  /*
+   * ----------------------------------------------------------
+   * ADMIN CLOSE
+   * ----------------------------------------------------------
+   */
 
-/*
- * ============================================================
- * ADMIN REPLY
- * ============================================================
- */
-
-async function adminReply(
-  conversationId: number,
-  message: string,
-): Promise<AdminSupportReplyResponse> {
-  if (
-    !Number.isInteger(
+  adminClose: (
+    conversationId: number,
+  ) => {
+    validateConversationId(
       conversationId,
-    ) ||
-    conversationId <= 0
-  ) {
-    throw new Error(
-      "Invalid support conversation ID.",
     );
-  }
 
-  const trimmed =
-    message.trim();
+    return api<{
+      success: boolean;
 
-  if (!trimmed) {
-    throw new Error(
-      "Reply message cannot be empty.",
+      conversation:
+        | SupportConversation
+        | null;
+    }>(
+      "/api/admin/support/close",
+      {
+        method: "POST",
+
+        body: JSON.stringify({
+          conversationId,
+        }),
+      },
     );
-  }
-
-  return api<AdminSupportReplyResponse>(
-    "/api/admin/support/reply",
-    {
-      method: "POST",
-
-      body: JSON.stringify({
-        conversationId,
-        message: trimmed,
-      }),
-    },
-  );
-}
-
-/*
- * ============================================================
- * ADMIN CLOSE
- * ============================================================
- */
-
-async function adminClose(
-  conversationId: number,
-): Promise<AdminSupportCloseResponse> {
-  if (
-    !Number.isInteger(
-      conversationId,
-    ) ||
-    conversationId <= 0
-  ) {
-    throw new Error(
-      "Invalid support conversation ID.",
-    );
-  }
-
-  return api<AdminSupportCloseResponse>(
-    "/api/admin/support/close",
-    {
-      method: "POST",
-
-      body: JSON.stringify({
-        conversationId,
-      }),
-    },
-  );
-}
-
-/*
- * ============================================================
- * SERVICE
- * ============================================================
- */
-
-export const supportService = {
-  chat,
-
-  conversation,
-
-  adminList,
-
-  adminMessages,
-
-  adminReply,
-
-  adminClose,
+  },
 };

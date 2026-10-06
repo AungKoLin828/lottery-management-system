@@ -1,24 +1,10 @@
-/*
- * ============================================================
- * ADMIN SUPPORT CONVERSATIONS
- * ============================================================
- *
- * GET /api/admin/support
- *
- * Returns all support conversations.
- *
- * ============================================================
- */
-
-import type {
-  Handler,
-  HandlerEvent,
-  HandlerContext,
-} from "@netlify/functions";
+import type { Handler } from "@netlify/functions";
 
 import {
   authenticateAdmin,
-  json,
+  handleError,
+  requireMethod,
+  response,
 } from "./support/helpers";
 
 import {
@@ -27,105 +13,33 @@ import {
 
 /*
  * ============================================================
- * HANDLER
+ * ADMIN SUPPORT CONVERSATION LIST
  * ============================================================
  */
 
 export const handler: Handler = async (
-  event: HandlerEvent,
-  _context: HandlerContext,
+  event,
 ) => {
   try {
-    /*
-     * --------------------------------------------------------
-     * METHOD
-     * --------------------------------------------------------
-     */
+    requireMethod(event, "GET");
 
-    if (
-      event.httpMethod.toUpperCase() !==
-      "GET"
-    ) {
-      return json(
-        405,
-        {
-          success: false,
-          error: "Method not allowed.",
-        },
-      );
-    }
-
-    /*
-     * --------------------------------------------------------
-     * ADMIN AUTH
-     * --------------------------------------------------------
-     */
-
-    try {
-      await authenticateAdmin(
-        event,
-      );
-    } catch (error) {
-      const statusCode =
-        error &&
-        typeof error === "object" &&
-        "statusCode" in error
-          ? Number(
-              (
-                error as {
-                  statusCode?: unknown;
-                }
-              ).statusCode,
-            )
-          : 401;
-
-      return json(
-        Number.isInteger(
-          statusCode,
-        ) &&
-          statusCode >= 400 &&
-          statusCode <= 599
-          ? statusCode
-          : 401,
-        {
-          success: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Administrator authentication required.",
-        },
-      );
-    }
-
-    /*
-     * --------------------------------------------------------
-     * LIST
-     * --------------------------------------------------------
-     */
+    await authenticateAdmin(event);
 
     const conversations =
-      await listConversations();
+      await listConversations(200);
 
-    return json(
+    return response(
       200,
       {
         success: true,
+
         conversations,
       },
     );
   } catch (error) {
-    console.error(
-      "ADMIN SUPPORT LIST ERROR:",
+    return handleError(
       error,
-    );
-
-    return json(
-      500,
-      {
-        success: false,
-        error:
-          "Failed to load support conversations.",
-      },
+      "ADMIN SUPPORT LIST ERROR:",
     );
   }
 };

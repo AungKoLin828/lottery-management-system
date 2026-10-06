@@ -1,52 +1,23 @@
-/*
- * ============================================================
- * SUPPORT CHAT
- * ============================================================
- *
- * POST /api/support/chat
- *
- * Body:
- *
- * {
- *   "message": "How can I withdraw?"
- * }
- *
- * Flow:
- *
- * PLAYER
- *   |
- *   v
- * support conversation
- *   |
- *   v
- * existing AI support engine
- *   |
- *   +---- OPENROUTER
- *   |
- *   +---- TRAINING
- *   |
- *   +---- HUMAN
- *
- * ============================================================
- */
-
 import type {
   Handler,
   HandlerEvent,
-  HandlerContext,
 } from "@netlify/functions";
 
 import {
-  authenticate,
-  getUserId,
-  json,
-  parseJsonBody,
+  requireMethod,
 } from "./helpers";
 
 import {
-  addMessage,
+  authenticate,
+  parseJsonBody,
+  response,
+  handleError,
+} from "./helpers";
+
+import {
   getOrCreateConversation,
-  getUserConversationHistory,
+  listMessages,
+  addMessage,
   updateConversationStatus,
 } from "./db";
 
@@ -62,138 +33,126 @@ import {
 
 interface ChatBody {
   message?: unknown;
+  language?: unknown;
 }
 
-interface AIResponseBody {
-  success?: boolean;
-  message?: unknown;
-  source?: unknown;
-  intent?: unknown;
-  confidence?: unknown;
-  escalated?: unknown;
+interface AIHistoryMessage {
+  role: "user" | "assistant";
+  content: string;
 }
+
+type SupportSource =
+  | "OPENROUTER"
+  | "TRAINING"
+  | "HUMAN";
 
 /*
  * ============================================================
- * CONSTANTS
- * ============================================================
- */
-
-const MAX_MESSAGE_LENGTH =
-  2000;
-
-const MAX_HISTORY_MESSAGES =
-  10;
-
-/*
- * ============================================================
- * NORMALIZE SOURCE
+ * HELPERS
  * ============================================================
  */
 
 function normalizeSource(
-  value: unknown,
-): "OPENROUTER" | "TRAINING" | "HUMAN" {
-  if (
-    value ===
-    "OPENROUTER"
-  ) {
+  source: unknown,
+  escalated: unknown,
+): SupportSource {
+  const value =
+    String(source ?? "")
+      .trim()
+      .toUpperCase();
+
+  if (value === "OPENROUTER") {
     return "OPENROUTER";
   }
 
-  if (
-    value ===
-    "TRAINING"
-  ) {
+  if (value === "TRAINING") {
     return "TRAINING";
   }
 
   if (
-    value ===
-    "HUMAN"
+    value === "HUMAN" ||
+    escalated === true
   ) {
     return "HUMAN";
   }
 
-  return "HUMAN";
-}
-
-/*
- * ============================================================
- * NORMALIZE CONFIDENCE
- * ============================================================
- */
-
-function normalizeConfidence(
-  value: unknown,
-): number {
-  const numberValue =
-    Number(value);
-
-  if (
-    !Number.isFinite(
-      numberValue,
-    )
-  ) {
-    return 0;
-  }
-
-  return Math.max(
-    0,
-    Math.min(
-      1,
-      numberValue,
-    ),
-  );
-}
-
-/*
- * ============================================================
- * READ AI RESPONSE
- * ============================================================
- */
-
-async function readAIResponse(
-  event: HandlerEvent,
-): Promise<AIResponseBody> {
   /*
-   * The existing ai/support.ts is a Netlify handler.
-   *
-   * We call it internally so the existing AI pipeline remains
-   * the source of truth.
+   * Existing AI handler should normally return a source.
+   * If not, assume OPENROUTER because it produced an AI answer.
    */
+  return "OPENROUTER";
+}
 
-  const response =
-    await aiSupportHandler(
-      event,
-      {} as HandlerContext,
-    );
+function normalizeHistory(
+  messages: Awaited<
+    ReturnType<typeof listMessages>
+  >,
+): AIHistoryMessage[] {
+  return messages
+    .filter(
+      (item) =>
+        item.senderType === "PLAYER" ||
+        item.senderType === "AI",
+    )
+    .slice(-10)
+    .map((item) => ({
+      role:
+        item.senderType === "PLAYER"
+          ? "user"
+          : "assistant",
+      content: item.message,
+    }));
+}
 
-  if (
-    !response ||
-    typeof response !==
-      "object"
-  ) {
-    throw new Error(
-      "AI support returned an invalid response.",
-    );
+function parseAIResponseBody(
+  body: string | null | undefined,
+): Record<string, unknown> {
+  if (!body) {
+    return {};
   }
-
-  const body =
-    typeof response.body ===
-    "string"
-      ? response.body
-      : "{}";
 
   try {
-    return JSON.parse(
-      body,
-    ) as AIResponseBody;
-  } catch {
-    throw new Error(
-      "AI support returned invalid JSON.",
+    const parsed = JSON.parse(body);
+
+    if (
+      parsed &&
+      typeof parsed === "object"
+    ) {
+      return parsed as Record<
+        string,
+        unknown
+      >;
+    }
+  } catch (error) {
+    console.error(
+      "Unable to parse AI support response:",
+      error,
     );
   }
+
+  return {};
+}
+
+function getAIMessage(
+  data: Record<string, unknown>,
+): string {
+  const candidates = [
+    data.message,
+    data.answer,
+    data.response,
+    data.content,
+  ];
+
+  for (const candidate of candidates) {
+    if (
+      typeof candidate === "string" &&
+      candidate.trim()
+    ) {
+      return candidate.trim();
+    }
+  }
+
+  return "";
 }
 
 /*
@@ -204,155 +163,60 @@ async function readAIResponse(
 
 export const handler: Handler = async (
   event: HandlerEvent,
-  _context: HandlerContext,
 ) => {
   try {
-    /*
-     * --------------------------------------------------------
-     * METHOD
-     * --------------------------------------------------------
-     */
+    requireMethod(event, "POST");
 
-    if (
-      event.httpMethod.toUpperCase() !==
-      "POST"
-    ) {
-      return json(
-        405,
-        {
-          success: false,
-          error: "Method not allowed.",
-        },
-      );
-    }
+    const {
+      userId,
+    } = await authenticate(event);
 
-    /*
-     * --------------------------------------------------------
-     * AUTH
-     * --------------------------------------------------------
-     */
-
-    let user;
-
-    try {
-      user =
-        await authenticate(
-          event,
-        );
-    } catch (error) {
-      const statusCode =
-        error &&
-        typeof error === "object" &&
-        "statusCode" in error
-          ? Number(
-              (
-                error as {
-                  statusCode?: unknown;
-                }
-              ).statusCode,
-            )
-          : 401;
-
-      return json(
-        Number.isInteger(
-          statusCode,
-        ) &&
-          statusCode >= 400 &&
-          statusCode <= 599
-          ? statusCode
-          : 401,
-        {
-          success: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Authentication required.",
-        },
-      );
-    }
-
-    const userId =
-      getUserId(user);
-
-    /*
-     * --------------------------------------------------------
-     * BODY
-     * --------------------------------------------------------
-     */
-
-    let body: ChatBody;
-
-    try {
-      body =
-        parseJsonBody<ChatBody>(
-          event,
-        );
-    } catch {
-      return json(
-        400,
-        {
-          success: false,
-          error:
-            "Invalid JSON request body.",
-        },
-      );
-    }
-
-    if (
-      typeof body.message !==
-      "string"
-    ) {
-      return json(
-        400,
-        {
-          success: false,
-          error:
-            "Message is required.",
-        },
-      );
-    }
+    const body =
+      parseJsonBody<ChatBody>(event);
 
     const message =
-      body.message
-        .normalize("NFKC")
-        .replace(/\s+/g, " ")
-        .trim();
+      typeof body.message === "string"
+        ? body.message.trim()
+        : "";
+
+    const language =
+      typeof body.language === "string" &&
+      body.language.trim()
+        ? body.language.trim()
+        : "en";
 
     if (!message) {
-      return json(
+      return response(
         400,
         {
           success: false,
           error:
-            "Please enter a support message.",
+            "Message is required",
         },
       );
     }
 
-    if (
-      message.length >
-      MAX_MESSAGE_LENGTH
-    ) {
-      return json(
+    if (message.length > 2000) {
+      return response(
         400,
         {
           success: false,
           error:
-            `Message must not exceed ${MAX_MESSAGE_LENGTH} characters.`,
+            "Message must not exceed 2000 characters",
         },
       );
     }
 
     /*
      * --------------------------------------------------------
-     * CONVERSATION
+     * GET OR CREATE CONVERSATION
      * --------------------------------------------------------
      */
 
     const conversation =
       await getOrCreateConversation(
         userId,
-        "en",
+        language,
       );
 
     /*
@@ -361,140 +225,120 @@ export const handler: Handler = async (
      * --------------------------------------------------------
      */
 
-    const playerMessage =
-      await addMessage(
+    await addMessage({
+      conversationId:
         conversation.id,
-        "PLAYER",
-        userId,
-        message,
-        null,
-        null,
-      );
+
+      senderType: "PLAYER",
+
+      senderId: userId,
+
+      message,
+    });
 
     /*
      * --------------------------------------------------------
-     * BUILD SERVER-SIDE HISTORY
-     * --------------------------------------------------------
+     * LOAD CONVERSATION HISTORY
      *
-     * We intentionally build history from the database
-     * instead of trusting arbitrary client-provided history.
+     * This avoids trusting the browser to provide AI history.
+     * --------------------------------------------------------
      */
+
+    const storedMessages =
+      await listMessages(
+        conversation.id,
+        50,
+      );
 
     const history =
-      await getUserConversationHistory(
-        userId,
-        MAX_HISTORY_MESSAGES,
+      normalizeHistory(
+        storedMessages,
       );
-
-    /*
-     * --------------------------------------------------------
-     * CONVERT TO AI SUPPORT FORMAT
-     * --------------------------------------------------------
-     */
-
-    const historyMessages =
-      history
-        .filter(
-          (item) =>
-            item.senderType ===
-              "PLAYER" ||
-            item.senderType ===
-              "AI",
-        )
-        .slice(
-          -MAX_HISTORY_MESSAGES,
-        )
-        .map(
-          (item) => ({
-            role:
-              item.senderType ===
-              "PLAYER"
-                ? "user"
-                : "assistant",
-            content:
-              item.message,
-          }),
-        );
 
     /*
      * --------------------------------------------------------
      * CALL EXISTING AI SUPPORT
+     *
+     * We intentionally reuse:
+     *
+     * netlify/functions/ai/support.ts
+     *
+     * Therefore:
+     *
+     * OpenRouter
+     *     ↓
+     * Training fallback
+     *     ↓
+     * Human escalation
+     *
+     * remains in your existing implementation.
      * --------------------------------------------------------
-     *
-     * We create a child event that contains:
-     *
-     * message
-     * messages/history
-     *
-     * Authentication cookie is preserved.
      */
 
-    const aiEvent: HandlerEvent =
-      {
-        ...event,
-
-        body: JSON.stringify({
-          message,
-          messages:
-            historyMessages,
-        }),
-      };
-
-    let aiResponse: AIResponseBody;
+    let aiResult;
 
     try {
-      aiResponse =
-        await readAIResponse(
-          aiEvent,
-        );
+      aiResult =
+        await aiSupportHandler({
+          ...event,
+
+          body: JSON.stringify({
+            message,
+            history,
+          }),
+        });
     } catch (error) {
       console.error(
-        "SUPPORT CHAT AI ENGINE ERROR:",
+        "AI support handler failed:",
         error,
       );
 
       /*
-       * The existing AI engine should normally already
-       * perform:
+       * The existing AI service should normally
+       * convert OpenRouter failures into its
+       * training fallback.
        *
-       * OpenRouter -> Training -> Human
-       *
-       * If it completely fails, escalate to HUMAN.
+       * If the handler itself crashes, we still
+       * escalate instead of returning 500.
        */
-
-      const fallbackMessage =
-        "Our AI support service is currently unavailable. Your message has been sent to human support.";
 
       await updateConversationStatus(
         conversation.id,
         "HUMAN",
       );
 
-      const savedSystemMessage =
-        await addMessage(
-          conversation.id,
-          "SYSTEM",
-          null,
-          fallbackMessage,
-          "human_support",
-          0,
-        );
+      const systemMessage =
+        await addMessage({
+          conversationId:
+            conversation.id,
 
-      return json(
+          senderType: "SYSTEM",
+
+          senderId: null,
+
+          message:
+            "Your request has been forwarded to our support team. An administrator will assist you shortly.",
+        });
+
+      return response(
         200,
         {
           success: true,
+
           conversation:
-            {
-              ...conversation,
-              status: "HUMAN",
-            },
-          message:
-            savedSystemMessage,
+            await updateConversationStatus(
+              conversation.id,
+              "HUMAN",
+            ),
+
+          message: systemMessage,
+
           escalated: true,
+
           source: "HUMAN",
-          intent:
-            "human_support",
+
+          intent: null,
+
           confidence: 0,
         },
       );
@@ -502,37 +346,105 @@ export const handler: Handler = async (
 
     /*
      * --------------------------------------------------------
-     * AI MESSAGE
+     * READ AI FUNCTION RESPONSE
      * --------------------------------------------------------
      */
 
-    const aiMessage =
-      typeof aiResponse.message ===
-      "string"
-        ? aiResponse.message.trim()
-        : "";
+    const aiData =
+      parseAIResponseBody(
+        aiResult.body,
+      );
+
+    /*
+     * --------------------------------------------------------
+     * NON-2XX SAFETY
+     * --------------------------------------------------------
+     */
+
+    if (
+      aiResult.statusCode < 200 ||
+      aiResult.statusCode >= 300
+    ) {
+      console.error(
+        "AI support returned non-success status:",
+        aiResult.statusCode,
+        aiData,
+      );
+
+      await updateConversationStatus(
+        conversation.id,
+        "HUMAN",
+      );
+
+      const systemMessage =
+        await addMessage({
+          conversationId:
+            conversation.id,
+
+          senderType: "SYSTEM",
+
+          senderId: null,
+
+          message:
+            "Your request has been forwarded to our support team. An administrator will assist you shortly.",
+        });
+
+      const updatedConversation =
+        await updateConversationStatus(
+          conversation.id,
+          "HUMAN",
+        );
+
+      return response(
+        200,
+        {
+          success: true,
+
+          conversation:
+            updatedConversation,
+
+          message: systemMessage,
+
+          escalated: true,
+
+          source: "HUMAN",
+
+          intent: null,
+
+          confidence: 0,
+        },
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * NORMAL AI RESPONSE
+     * --------------------------------------------------------
+     */
+
+    const answer =
+      getAIMessage(aiData);
 
     const source =
       normalizeSource(
-        aiResponse.source,
-      );
-
-    const intent =
-      typeof aiResponse.intent ===
-      "string"
-        ? aiResponse.intent
-        : null;
-
-    const confidence =
-      normalizeConfidence(
-        aiResponse.confidence,
+        aiData.source,
+        aiData.escalated,
       );
 
     const escalated =
-      source ===
-      "HUMAN" ||
-      aiResponse.escalated ===
-        true;
+      source === "HUMAN" ||
+      aiData.escalated === true;
+
+    const intent =
+      typeof aiData.intent === "string"
+        ? aiData.intent
+        : null;
+
+    const confidence =
+      typeof aiData.confidence === "number" ||
+      typeof aiData.confidence === "string"
+        ? aiData.confidence
+        : 0;
 
     /*
      * --------------------------------------------------------
@@ -540,40 +452,50 @@ export const handler: Handler = async (
      * --------------------------------------------------------
      */
 
-    if (escalated) {
-      await updateConversationStatus(
-        conversation.id,
-        "HUMAN",
-      );
-
-      const humanMessage =
-        aiMessage ||
-        "Your request has been forwarded to human support.";
-
-      const savedMessage =
-        await addMessage(
+    if (
+      escalated ||
+      !answer
+    ) {
+      const updatedConversation =
+        await updateConversationStatus(
           conversation.id,
-          "SYSTEM",
-          null,
-          humanMessage,
-          intent,
-          confidence,
+          "HUMAN",
         );
 
-      return json(
+      const systemMessage =
+        await addMessage({
+          conversationId:
+            conversation.id,
+
+          senderType: "SYSTEM",
+
+          senderId: null,
+
+          message:
+            answer ||
+            "Your request has been forwarded to our support team. An administrator will assist you shortly.",
+
+          intent,
+
+          confidence,
+        });
+
+      return response(
         200,
         {
           success: true,
+
           conversation:
-            {
-              ...conversation,
-              status: "HUMAN",
-            },
-          message:
-            savedMessage,
+            updatedConversation,
+
+          message: systemMessage,
+
           escalated: true,
+
           source: "HUMAN",
+
           intent,
+
           confidence,
         },
       );
@@ -581,100 +503,61 @@ export const handler: Handler = async (
 
     /*
      * --------------------------------------------------------
-     * AI / TRAINING ANSWER
+     * SAVE AI MESSAGE
      * --------------------------------------------------------
      */
 
-    if (!aiMessage) {
-      await updateConversationStatus(
-        conversation.id,
-        "HUMAN",
-      );
-
-      const fallbackMessage =
-        "I could not find a reliable answer for your request. Your message has been forwarded to human support.";
-
-      const savedMessage =
-        await addMessage(
+    const aiMessage =
+      await addMessage({
+        conversationId:
           conversation.id,
-          "SYSTEM",
-          null,
-          fallbackMessage,
-          intent,
-          confidence,
-        );
 
-      return json(
-        200,
-        {
-          success: true,
-          conversation:
-            {
-              ...conversation,
-              status: "HUMAN",
-            },
-          message:
-            savedMessage,
-          escalated: true,
-          source: "HUMAN",
-          intent,
-          confidence,
-        },
-      );
-    }
+        senderType: "AI",
+
+        senderId: null,
+
+        message: answer,
+
+        intent,
+
+        confidence,
+      });
 
     /*
      * --------------------------------------------------------
-     * KEEP AI CONVERSATION ACTIVE
+     * RETURN
      * --------------------------------------------------------
      */
 
-    await updateConversationStatus(
-      conversation.id,
-      "AI",
-    );
-
-    const savedAIMessage =
-      await addMessage(
+    const updatedConversation =
+      await updateConversationStatus(
         conversation.id,
         "AI",
-        null,
-        aiMessage,
-        intent,
-        confidence,
       );
 
-    return json(
+    return response(
       200,
       {
         success: true,
+
         conversation:
-          {
-            ...conversation,
-            status: "AI",
-          },
-        message:
-          savedAIMessage,
+          updatedConversation,
+
+        message: aiMessage,
+
         escalated: false,
+
         source,
+
         intent,
+
         confidence,
-        playerMessage,
       },
     );
   } catch (error) {
-    console.error(
-      "SUPPORT CHAT ERROR:",
+    return handleError(
       error,
-    );
-
-    return json(
-      500,
-      {
-        success: false,
-        error:
-          "Failed to process support request.",
-      },
+      "SUPPORT CHAT ERROR:",
     );
   }
 };

@@ -1,23 +1,10 @@
-/*
- * ============================================================
- * PLAYER SUPPORT CONVERSATION
- * ============================================================
- *
- * GET /api/support/conversations
- *
- * ============================================================
- */
-
-import type {
-  Handler,
-  HandlerEvent,
-  HandlerContext,
-} from "@netlify/functions";
+import type { Handler } from "@netlify/functions";
 
 import {
   authenticate,
-  getUserId,
-  json,
+  handleError,
+  requireMethod,
+  response,
 } from "./helpers";
 
 import {
@@ -27,69 +14,19 @@ import {
 
 /*
  * ============================================================
- * HANDLER
+ * PLAYER CONVERSATION
  * ============================================================
  */
 
 export const handler: Handler = async (
-  event: HandlerEvent,
-  _context: HandlerContext,
+  event,
 ) => {
   try {
-    if (
-      event.httpMethod.toUpperCase() !==
-      "GET"
-    ) {
-      return json(
-        405,
-        {
-          success: false,
-          error: "Method not allowed.",
-        },
-      );
-    }
+    requireMethod(event, "GET");
 
-    let user;
-
-    try {
-      user =
-        await authenticate(
-          event,
-        );
-    } catch (error) {
-      const statusCode =
-        error &&
-        typeof error === "object" &&
-        "statusCode" in error
-          ? Number(
-              (
-                error as {
-                  statusCode?: unknown;
-                }
-              ).statusCode,
-            )
-          : 401;
-
-      return json(
-        Number.isInteger(
-          statusCode,
-        ) &&
-          statusCode >= 400 &&
-          statusCode <= 599
-          ? statusCode
-          : 401,
-        {
-          success: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Authentication required.",
-        },
-      );
-    }
-
-    const userId =
-      getUserId(user);
+    const {
+      userId,
+    } = await authenticate(event);
 
     const conversation =
       await findActiveConversation(
@@ -97,11 +34,13 @@ export const handler: Handler = async (
       );
 
     if (!conversation) {
-      return json(
+      return response(
         200,
         {
           success: true,
+
           conversation: null,
+
           messages: [],
         },
       );
@@ -110,29 +49,23 @@ export const handler: Handler = async (
     const messages =
       await listMessages(
         conversation.id,
+        200,
       );
 
-    return json(
+    return response(
       200,
       {
         success: true,
+
         conversation,
+
         messages,
       },
     );
   } catch (error) {
-    console.error(
-      "SUPPORT CONVERSATION ERROR:",
+    return handleError(
       error,
-    );
-
-    return json(
-      500,
-      {
-        success: false,
-        error:
-          "Failed to load support conversation.",
-      },
+      "SUPPORT CONVERSATION ERROR:",
     );
   }
 };

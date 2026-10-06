@@ -1,17 +1,13 @@
-/*
- * ============================================================
- * SUPPORT API HELPERS
- * ============================================================
- */
-
 import type {
   HandlerEvent,
   HandlerResponse,
 } from "@netlify/functions";
 
 import {
+  AuthError,
+  requireAdmin,
   requireAuth,
-  verifyAdminAuth,
+  jsonResponse,
   type AuthenticatedUser,
 } from "../ai/auth";
 
@@ -21,32 +17,20 @@ import {
  * ============================================================
  */
 
-export function json(
+export function response(
   statusCode: number,
   body: unknown,
 ): HandlerResponse {
-  return {
-    statusCode,
-
-    headers: {
-      "Content-Type":
-        "application/json; charset=utf-8",
-
-      "Cache-Control":
-        "no-store",
-    },
-
-    body: JSON.stringify(body),
-  };
+  return jsonResponse(body, statusCode);
 }
 
 /*
  * ============================================================
- * PARSE JSON BODY
+ * BODY
  * ============================================================
  */
 
-export function parseJsonBody<T>(
+export function parseJsonBody<T = Record<string, unknown>>(
   event: HandlerEvent,
 ): T {
   if (!event.body) {
@@ -54,14 +38,61 @@ export function parseJsonBody<T>(
   }
 
   try {
-    return JSON.parse(
-      event.body,
-    ) as T;
+    const raw = event.isBase64Encoded
+      ? Buffer.from(event.body, "base64").toString("utf8")
+      : event.body;
+
+    return JSON.parse(raw) as T;
   } catch {
-    throw new Error(
-      "Invalid JSON request body.",
+    throw new AuthError(
+      "Invalid JSON request body",
+      400,
     );
   }
+}
+
+/*
+ * ============================================================
+ * AUTH USER ID
+ *
+ * UUID-safe.
+ * ============================================================
+ */
+
+export function getAuthenticatedUserId(
+  user: AuthenticatedUser,
+): string {
+  const raw =
+    user as unknown as Record<
+      string,
+      unknown
+    >;
+
+  const candidate =
+    raw.userId ??
+    raw.id ??
+    raw.sub;
+
+  if (
+    typeof candidate !== "string" &&
+    typeof candidate !== "number"
+  ) {
+    throw new AuthError(
+      "Authenticated user ID is missing",
+      401,
+    );
+  }
+
+  const id = String(candidate).trim();
+
+  if (!id) {
+    throw new AuthError(
+      "Authenticated user ID is invalid",
+      401,
+    );
+  }
+
+  return id;
 }
 
 /*
@@ -72,8 +103,16 @@ export function parseJsonBody<T>(
 
 export async function authenticate(
   event: HandlerEvent,
-): Promise<AuthenticatedUser> {
-  return requireAuth(event);
+): Promise<{
+  user: AuthenticatedUser;
+  userId: string;
+}> {
+  const user = await requireAuth(event);
+
+  return {
+    user,
+    userId: getAuthenticatedUserId(user),
+  };
 }
 
 /*
@@ -84,93 +123,67 @@ export async function authenticate(
 
 export async function authenticateAdmin(
   event: HandlerEvent,
-): Promise<AuthenticatedUser> {
-  return verifyAdminAuth(event);
+): Promise<{
+  user: AuthenticatedUser;
+  userId: string;
+}> {
+  const user = await requireAdmin(event);
+
+  return {
+    user,
+    userId: getAuthenticatedUserId(user),
+  };
 }
 
 /*
  * ============================================================
- * USER ID
- * ============================================================
- *
- * The application uses UUID user IDs.
- *
- * Never convert this value to Number.
- * ============================================================
- */
-
-export function getUserId(
-  user: AuthenticatedUser,
-): string {
-  const userId =
-    user.userId ??
-    user.id;
-
-  if (
-    typeof userId !== "string" ||
-    !userId.trim()
-  ) {
-    throw new Error(
-      "Authenticated user ID is missing.",
-    );
-  }
-
-  return userId.trim();
-}
-
-/*
- * ============================================================
- * REQUIRE METHOD
+ * METHOD
  * ============================================================
  */
 
 export function requireMethod(
   event: HandlerEvent,
   method: string,
-): HandlerResponse | null {
+): void {
   if (
-    event.httpMethod.toUpperCase() !==
+    String(event.httpMethod ?? "")
+      .toUpperCase() !==
     method.toUpperCase()
   ) {
-    return json(
+    throw new AuthError(
+      `Method ${event.httpMethod} not allowed`,
       405,
-      {
-        success: false,
-        error: "Method not allowed.",
-      },
     );
   }
-
-  return null;
 }
 
 /*
  * ============================================================
- * INTEGER PARAMETER
+ * ERROR
  * ============================================================
  */
 
-export function parsePositiveInteger(
-  value: string | null | undefined,
-): number | null {
-  if (
-    typeof value !== "string" ||
-    !value.trim()
-  ) {
-    return null;
+export function handleError(
+  error: unknown,
+  label: string,
+): HandlerResponse {
+  console.error(label, error);
+
+  if (error instanceof AuthError) {
+    return response(
+      error.statusCode,
+      {
+        success: false,
+        error: error.message,
+      },
+    );
   }
 
-  const numberValue =
-    Number(value);
-
-  if (
-    !Number.isInteger(
-      numberValue,
-    ) ||
-    numberValue <= 0
-  ) {
-    return null;
-  }
-
-  return numberValue;
+  return response(
+    500,
+    {
+      success: false,
+      error: "Internal server error",
+    },
+  );
 }

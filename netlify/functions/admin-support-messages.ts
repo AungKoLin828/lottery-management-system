@@ -1,24 +1,10 @@
-/*
- * ============================================================
- * ADMIN SUPPORT CONVERSATION MESSAGES
- * ============================================================
- *
- * GET
- * /api/admin/support/messages?conversationId=123
- *
- * ============================================================
- */
-
-import type {
-  Handler,
-  HandlerEvent,
-  HandlerContext,
-} from "@netlify/functions";
+import type { Handler } from "@netlify/functions";
 
 import {
   authenticateAdmin,
-  json,
-  parsePositiveInteger,
+  handleError,
+  requireMethod,
+  response,
 } from "./support/helpers";
 
 import {
@@ -28,104 +14,38 @@ import {
 
 /*
  * ============================================================
- * HANDLER
+ * ADMIN SUPPORT MESSAGES
  * ============================================================
  */
 
 export const handler: Handler = async (
-  event: HandlerEvent,
-  _context: HandlerContext,
+  event,
 ) => {
   try {
-    /*
-     * --------------------------------------------------------
-     * METHOD
-     * --------------------------------------------------------
-     */
+    requireMethod(event, "GET");
 
-    if (
-      event.httpMethod.toUpperCase() !==
-      "GET"
-    ) {
-      return json(
-        405,
-        {
-          success: false,
-          error: "Method not allowed.",
-        },
-      );
-    }
+    await authenticateAdmin(event);
 
-    /*
-     * --------------------------------------------------------
-     * ADMIN AUTH
-     * --------------------------------------------------------
-     */
-
-    try {
-      await authenticateAdmin(
-        event,
-      );
-    } catch (error) {
-      const statusCode =
-        error &&
-        typeof error === "object" &&
-        "statusCode" in error
-          ? Number(
-              (
-                error as {
-                  statusCode?: unknown;
-                }
-              ).statusCode,
-            )
-          : 401;
-
-      return json(
-        Number.isInteger(
-          statusCode,
-        ) &&
-          statusCode >= 400 &&
-          statusCode <= 599
-          ? statusCode
-          : 401,
-        {
-          success: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Administrator authentication required.",
-        },
-      );
-    }
-
-    /*
-     * --------------------------------------------------------
-     * CONVERSATION ID
-     * --------------------------------------------------------
-     */
+    const rawId =
+      event.queryStringParameters
+        ?.conversationId;
 
     const conversationId =
-      parsePositiveInteger(
-        event.queryStringParameters
-          ?.conversationId,
-      );
+      Number(rawId);
 
-    if (!conversationId) {
-      return json(
+    if (
+      !Number.isInteger(conversationId) ||
+      conversationId <= 0
+    ) {
+      return response(
         400,
         {
           success: false,
           error:
-            "A valid conversationId is required.",
+            "Valid conversationId is required",
         },
       );
     }
-
-    /*
-     * --------------------------------------------------------
-     * GET CONVERSATION
-     * --------------------------------------------------------
-     */
 
     const conversation =
       await getConversation(
@@ -133,48 +53,36 @@ export const handler: Handler = async (
       );
 
     if (!conversation) {
-      return json(
+      return response(
         404,
         {
           success: false,
           error:
-            "Support conversation not found.",
+            "Conversation not found",
         },
       );
     }
 
-    /*
-     * --------------------------------------------------------
-     * GET MESSAGES
-     * --------------------------------------------------------
-     */
-
     const messages =
       await listMessages(
         conversationId,
+        500,
       );
 
-    return json(
+    return response(
       200,
       {
         success: true,
+
         conversation,
+
         messages,
       },
     );
   } catch (error) {
-    console.error(
-      "ADMIN SUPPORT MESSAGES ERROR:",
+    return handleError(
       error,
-    );
-
-    return json(
-      500,
-      {
-        success: false,
-        error:
-          "Failed to load support conversation messages.",
-      },
+      "ADMIN SUPPORT MESSAGES ERROR:",
     );
   }
 };

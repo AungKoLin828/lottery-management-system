@@ -1,29 +1,11 @@
-/*
- * ============================================================
- * ADMIN SUPPORT CLOSE
- * ============================================================
- *
- * POST /api/admin/support/close
- *
- * Body:
- *
- * {
- *   "conversationId": 123
- * }
- *
- * ============================================================
- */
-
-import type {
-  Handler,
-  HandlerEvent,
-  HandlerContext,
-} from "@netlify/functions";
+import type { Handler } from "@netlify/functions";
 
 import {
   authenticateAdmin,
-  json,
+  handleError,
   parseJsonBody,
+  requireMethod,
+  response,
 } from "./support/helpers";
 
 import {
@@ -37,104 +19,25 @@ interface CloseBody {
 
 /*
  * ============================================================
- * HANDLER
+ * ADMIN CLOSE SUPPORT CONVERSATION
  * ============================================================
  */
 
 export const handler: Handler = async (
-  event: HandlerEvent,
-  _context: HandlerContext,
+  event,
 ) => {
   try {
-    /*
-     * --------------------------------------------------------
-     * METHOD
-     * --------------------------------------------------------
-     */
+    requireMethod(event, "POST");
 
-    if (
-      event.httpMethod.toUpperCase() !==
-      "POST"
-    ) {
-      return json(
-        405,
-        {
-          success: false,
-          error: "Method not allowed.",
-        },
-      );
-    }
+    await authenticateAdmin(event);
 
-    /*
-     * --------------------------------------------------------
-     * ADMIN AUTH
-     * --------------------------------------------------------
-     */
-
-    try {
-      await authenticateAdmin(
+    const body =
+      parseJsonBody<CloseBody>(
         event,
       );
-    } catch (error) {
-      const statusCode =
-        error &&
-        typeof error === "object" &&
-        "statusCode" in error
-          ? Number(
-              (
-                error as {
-                  statusCode?: unknown;
-                }
-              ).statusCode,
-            )
-          : 401;
-
-      return json(
-        Number.isInteger(
-          statusCode,
-        ) &&
-          statusCode >= 400 &&
-          statusCode <= 599
-          ? statusCode
-          : 401,
-        {
-          success: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Administrator authentication required.",
-        },
-      );
-    }
-
-    /*
-     * --------------------------------------------------------
-     * BODY
-     * --------------------------------------------------------
-     */
-
-    let body: CloseBody;
-
-    try {
-      body =
-        parseJsonBody<CloseBody>(
-          event,
-        );
-    } catch {
-      return json(
-        400,
-        {
-          success: false,
-          error:
-            "Invalid JSON request body.",
-        },
-      );
-    }
 
     const conversationId =
-      Number(
-        body.conversationId,
-      );
+      Number(body.conversationId);
 
     if (
       !Number.isInteger(
@@ -142,21 +45,15 @@ export const handler: Handler = async (
       ) ||
       conversationId <= 0
     ) {
-      return json(
+      return response(
         400,
         {
           success: false,
           error:
-            "A valid conversationId is required.",
+            "Valid conversationId is required",
         },
       );
     }
-
-    /*
-     * --------------------------------------------------------
-     * CHECK CONVERSATION
-     * --------------------------------------------------------
-     */
 
     const conversation =
       await getConversation(
@@ -164,21 +61,15 @@ export const handler: Handler = async (
       );
 
     if (!conversation) {
-      return json(
+      return response(
         404,
         {
           success: false,
           error:
-            "Support conversation not found.",
+            "Conversation not found",
         },
       );
     }
-
-    /*
-     * --------------------------------------------------------
-     * CLOSE
-     * --------------------------------------------------------
-     */
 
     const updatedConversation =
       await updateConversationStatus(
@@ -186,28 +77,19 @@ export const handler: Handler = async (
         "CLOSED",
       );
 
-    return json(
+    return response(
       200,
       {
         success: true,
+
         conversation:
-          updatedConversation ??
-          conversation,
+          updatedConversation,
       },
     );
   } catch (error) {
-    console.error(
-      "ADMIN SUPPORT CLOSE ERROR:",
+    return handleError(
       error,
-    );
-
-    return json(
-      500,
-      {
-        success: false,
-        error:
-          "Failed to close support conversation.",
-      },
+      "ADMIN SUPPORT CLOSE ERROR:",
     );
   }
 };

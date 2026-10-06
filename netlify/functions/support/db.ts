@@ -1,70 +1,20 @@
-/*
- * ============================================================
- * SUPPORT CONVERSATION DATABASE
- * ============================================================
- *
- * IMPORTANT
- *
- * The application's users.id is UUID.
- *
- * Therefore:
- *
- *   support_conversations.user_id -> TEXT
- *   support_messages.sender_id    -> TEXT
- *
- * We intentionally do NOT create a foreign key to users.id.
- *
- * This keeps the support system independent from the exact
- * database type used by the application's users table.
- *
- * Support conversation IDs and message IDs remain INTEGER.
- *
- * ============================================================
- */
-
-import { Pool, type QueryResultRow } from "pg";
+import { Pool, type PoolClient } from "pg";
 
 /*
  * ============================================================
- * TYPES
+ * SUPPORT DATABASE
  * ============================================================
- */
-
-export type SupportConversationStatus =
-  | "AI"
-  | "HUMAN"
-  | "CLOSED";
-
-export type SupportSenderType =
-  | "PLAYER"
-  | "AI"
-  | "ADMIN"
-  | "SYSTEM";
-
-export interface SupportConversationRow {
-  id: number;
-  userId: string;
-  status: SupportConversationStatus;
-  language: string;
-  lastMessageAt: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface SupportMessageRow {
-  id: number;
-  conversationId: number;
-  senderType: SupportSenderType;
-  senderId: string | null;
-  message: string;
-  intent: string | null;
-  confidence: string | number | null;
-  createdAt: string;
-}
-
-/*
- * ============================================================
- * DATABASE POOL
+ *
+ * IMPORTANT:
+ *
+ * users.id in this project is UUID.
+ *
+ * Therefore support user IDs are stored as TEXT.
+ *
+ * We intentionally do NOT create a foreign key to users(id).
+ *
+ * This keeps the support system independent from the core
+ * users table type and avoids UUID/integer migration problems.
  * ============================================================
  */
 
@@ -72,22 +22,18 @@ let pool: Pool | undefined;
 
 function getPool(): Pool {
   if (!pool) {
-    const databaseUrl =
-      process.env.DATABASE_URL?.trim();
+    const databaseUrl = process.env.DATABASE_URL;
 
     if (!databaseUrl) {
       throw new Error(
-        "DATABASE_URL environment variable is not configured.",
+        "DATABASE_URL environment variable is not configured",
       );
     }
 
     pool = new Pool({
       connectionString: databaseUrl,
-
       max: 5,
-
       idleTimeoutMillis: 30_000,
-
       connectionTimeoutMillis: 15_000,
 
       ssl:
@@ -104,115 +50,54 @@ function getPool(): Pool {
 
 /*
  * ============================================================
- * QUERY HELPER
- * ============================================================
- */
-
-async function query<T extends QueryResultRow = QueryResultRow>(
-  text: string,
-  values: unknown[] = [],
-) {
-  return getPool().query<T>(text, values);
-}
-
-/*
- * ============================================================
- * ENSURE SUPPORT TABLES
- * ============================================================
- *
- * This function is safe to call from every support endpoint.
- *
- * IMPORTANT:
- *
- * We first remove the old incompatible FK if it exists.
- *
- * Then we make sure user_id/sender_id are TEXT.
- *
- * This fixes existing installations where an earlier version
- * created these columns as INTEGER.
- *
+ * TABLE INITIALIZATION
  * ============================================================
  */
 
 let ensurePromise: Promise<void> | null = null;
 
-export async function ensureSupportTables(): Promise<void> {
-  if (ensurePromise) {
-    return ensurePromise;
-  }
+async function initializeSupportTables(): Promise<void> {
+  const client: PoolClient = await getPool().connect();
 
-  ensurePromise = (async () => {
+  try {
+    await client.query("BEGIN");
+
     /*
      * --------------------------------------------------------
-     * SUPPORT CONVERSATIONS
+     * CONVERSATIONS
      * --------------------------------------------------------
-     *
-     * NO FOREIGN KEY TO users.
-     *
-     * user_id stores the authenticated user's UUID as text.
      */
 
-    await query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS support_conversations (
         id SERIAL PRIMARY KEY,
+
         user_id TEXT NOT NULL,
+
         status VARCHAR(20) NOT NULL DEFAULT 'AI',
+
         language VARCHAR(20) NOT NULL DEFAULT 'en',
+
         last_message_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
         CONSTRAINT support_conversations_status_check
-          CHECK (status IN ('AI', 'HUMAN', 'CLOSED'))
+          CHECK (
+            status IN ('AI', 'HUMAN', 'CLOSED')
+          )
       )
     `);
 
     /*
      * --------------------------------------------------------
-     * REMOVE OLD FOREIGN KEY
+     * MESSAGES
      * --------------------------------------------------------
-     *
-     * Older versions attempted:
-     *
-     * user_id INTEGER REFERENCES users(id)
-     *
-     * But users.id is UUID.
-     *
-     * Remove the old FK if it exists.
      */
 
-    await query(`
-      ALTER TABLE support_conversations
-      DROP CONSTRAINT IF EXISTS support_conversations_user_id_fkey
-    `);
-
-    /*
-     * --------------------------------------------------------
-     * MIGRATE user_id TO TEXT
-     * --------------------------------------------------------
-     *
-     * This handles an existing support_conversations table
-     * created by the older implementation.
-     *
-     * INTEGER -> TEXT is safe.
-     */
-
-    await query(`
-      ALTER TABLE support_conversations
-      ALTER COLUMN user_id TYPE TEXT
-      USING user_id::TEXT
-    `);
-
-    /*
-     * --------------------------------------------------------
-     * SUPPORT MESSAGES
-     * --------------------------------------------------------
-     *
-     * sender_id also uses TEXT because authenticated IDs are
-     * UUID strings.
-     */
-
-    await query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS support_messages (
         id SERIAL PRIMARY KEY,
 
@@ -249,14 +134,44 @@ export async function ensureSupportTables(): Promise<void> {
 
     /*
      * --------------------------------------------------------
-     * MIGRATE sender_id
+     * IMPORTANT MIGRATION
+     *
+     * Older version may have:
+     *
+     * user_id INTEGER REFERENCES users(id)
+     *
+     * That FK is incompatible with UUID users.id.
+     *
+     * Remove it first.
      * --------------------------------------------------------
      */
 
-    await query(`
+    await client.query(`
+      ALTER TABLE support_conversations
+      DROP CONSTRAINT IF EXISTS
+        support_conversations_user_id_fkey
+    `);
+
+    /*
+     * Convert old INTEGER user_id -> TEXT.
+     *
+     * If already TEXT, PostgreSQL handles this safely.
+     */
+
+    await client.query(`
+      ALTER TABLE support_conversations
+      ALTER COLUMN user_id TYPE TEXT
+      USING user_id::text
+    `);
+
+    /*
+     * Convert sender_id -> TEXT.
+     */
+
+    await client.query(`
       ALTER TABLE support_messages
       ALTER COLUMN sender_id TYPE TEXT
-      USING sender_id::TEXT
+      USING sender_id::text
     `);
 
     /*
@@ -265,58 +180,102 @@ export async function ensureSupportTables(): Promise<void> {
      * --------------------------------------------------------
      */
 
-    await query(`
+    await client.query(`
       CREATE INDEX IF NOT EXISTS
-        support_conversations_user_id_idx
-      ON support_conversations(user_id)
+        idx_support_conversations_user_status
+      ON support_conversations (
+        user_id,
+        status,
+        updated_at DESC
+      )
     `);
 
-    await query(`
+    await client.query(`
       CREATE INDEX IF NOT EXISTS
-        support_conversations_status_idx
-      ON support_conversations(status)
+        idx_support_conversations_last_message
+      ON support_conversations (
+        last_message_at DESC
+      )
     `);
 
-    await query(`
+    await client.query(`
       CREATE INDEX IF NOT EXISTS
-        support_conversations_last_message_idx
-      ON support_conversations(last_message_at DESC)
+        idx_support_messages_conversation
+      ON support_messages (
+        conversation_id,
+        created_at ASC
+      )
     `);
 
-    await query(`
-      CREATE INDEX IF NOT EXISTS
-        support_messages_conversation_id_idx
-      ON support_messages(conversation_id)
-    `);
-
-    await query(`
-      CREATE INDEX IF NOT EXISTS
-        support_messages_created_at_idx
-      ON support_messages(created_at)
-    `);
-  })().catch((error) => {
-    /*
-     * Allow a later request to retry initialization if the
-     * database was temporarily unavailable.
-     */
-
-    ensurePromise = null;
-
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
     throw error;
-  });
+  } finally {
+    client.release();
+  }
+}
 
-  return ensurePromise;
+export async function ensureSupportTables(): Promise<void> {
+  if (!ensurePromise) {
+    ensurePromise = initializeSupportTables().catch(
+      (error) => {
+        ensurePromise = null;
+        throw error;
+      },
+    );
+  }
+
+  await ensurePromise;
 }
 
 /*
  * ============================================================
- * DB -> APPLICATION MAPPERS
+ * TYPES
+ * ============================================================
+ */
+
+export type SupportConversationStatus =
+  | "AI"
+  | "HUMAN"
+  | "CLOSED";
+
+export type SupportSenderType =
+  | "PLAYER"
+  | "AI"
+  | "ADMIN"
+  | "SYSTEM";
+
+export interface SupportConversation {
+  id: number;
+  userId: string;
+  status: SupportConversationStatus;
+  language: string;
+  lastMessageAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SupportMessage {
+  id: number;
+  conversationId: number;
+  senderType: SupportSenderType;
+  senderId: string | null;
+  message: string;
+  intent: string | null;
+  confidence: string | number | null;
+  createdAt: string;
+}
+
+/*
+ * ============================================================
+ * MAPPERS
  * ============================================================
  */
 
 function mapConversation(
-  row: QueryResultRow,
-): SupportConversationRow {
+  row: Record<string, unknown>,
+): SupportConversation {
   return {
     id: Number(row.id),
 
@@ -324,41 +283,38 @@ function mapConversation(
 
     status:
       String(
-        row.status,
+        row.status ?? "AI",
       ) as SupportConversationStatus,
 
-    language:
-      String(
-        row.language ?? "en",
-      ),
+    language: String(
+      row.language ?? "en",
+    ),
 
     lastMessageAt:
       new Date(
-        row.last_message_at,
+        String(row.last_message_at),
       ).toISOString(),
 
     createdAt:
       new Date(
-        row.created_at,
+        String(row.created_at),
       ).toISOString(),
 
     updatedAt:
       new Date(
-        row.updated_at,
+        String(row.updated_at),
       ).toISOString(),
   };
 }
 
 function mapMessage(
-  row: QueryResultRow,
-): SupportMessageRow {
+  row: Record<string, unknown>,
+): SupportMessage {
   return {
     id: Number(row.id),
 
     conversationId:
-      Number(
-        row.conversation_id,
-      ),
+      Number(row.conversation_id),
 
     senderType:
       String(
@@ -366,47 +322,42 @@ function mapMessage(
       ) as SupportSenderType,
 
     senderId:
-      row.sender_id === null ||
-      row.sender_id === undefined
+      row.sender_id == null
         ? null
         : String(row.sender_id),
 
     message:
-      String(
-        row.message,
-      ),
+      String(row.message ?? ""),
 
     intent:
-      row.intent === null ||
-      row.intent === undefined
+      row.intent == null
         ? null
         : String(row.intent),
 
     confidence:
-      row.confidence === null ||
-      row.confidence === undefined
+      row.confidence == null
         ? null
         : String(row.confidence),
 
     createdAt:
       new Date(
-        row.created_at,
+        String(row.created_at),
       ).toISOString(),
   };
 }
 
 /*
  * ============================================================
- * FIND ACTIVE USER CONVERSATION
+ * CONVERSATIONS
  * ============================================================
  */
 
 export async function findActiveConversation(
   userId: string,
-): Promise<SupportConversationRow | null> {
+): Promise<SupportConversation | null> {
   await ensureSupportTables();
 
-  const result = await query(
+  const result = await getPool().query(
     `
       SELECT
         id,
@@ -419,7 +370,7 @@ export async function findActiveConversation(
       FROM support_conversations
       WHERE user_id = $1
         AND status <> 'CLOSED'
-      ORDER BY last_message_at DESC
+      ORDER BY updated_at DESC
       LIMIT 1
     `,
     [userId],
@@ -429,40 +380,26 @@ export async function findActiveConversation(
     return null;
   }
 
-  return mapConversation(
-    result.rows[0],
-  );
+  return mapConversation(result.rows[0]);
 }
-
-/*
- * ============================================================
- * CREATE CONVERSATION
- * ============================================================
- */
 
 export async function createConversation(
   userId: string,
   language = "en",
-): Promise<SupportConversationRow> {
+): Promise<SupportConversation> {
   await ensureSupportTables();
 
-  const result = await query(
+  const result = await getPool().query(
     `
       INSERT INTO support_conversations (
         user_id,
         status,
-        language,
-        last_message_at,
-        created_at,
-        updated_at
+        language
       )
       VALUES (
         $1,
         'AI',
-        $2,
-        NOW(),
-        NOW(),
-        NOW()
+        $2
       )
       RETURNING
         id,
@@ -473,31 +410,18 @@ export async function createConversation(
         created_at,
         updated_at
     `,
-    [
-      userId,
-      language,
-    ],
+    [userId, language],
   );
 
-  return mapConversation(
-    result.rows[0],
-  );
+  return mapConversation(result.rows[0]);
 }
-
-/*
- * ============================================================
- * GET OR CREATE CONVERSATION
- * ============================================================
- */
 
 export async function getOrCreateConversation(
   userId: string,
   language = "en",
-): Promise<SupportConversationRow> {
+): Promise<SupportConversation> {
   const existing =
-    await findActiveConversation(
-      userId,
-    );
+    await findActiveConversation(userId);
 
   if (existing) {
     return existing;
@@ -509,18 +433,12 @@ export async function getOrCreateConversation(
   );
 }
 
-/*
- * ============================================================
- * GET CONVERSATION
- * ============================================================
- */
-
 export async function getConversation(
   conversationId: number,
-): Promise<SupportConversationRow | null> {
+): Promise<SupportConversation | null> {
   await ensureSupportTables();
 
-  const result = await query(
+  const result = await getPool().query(
     `
       SELECT
         id,
@@ -541,52 +459,20 @@ export async function getConversation(
     return null;
   }
 
-  return mapConversation(
-    result.rows[0],
-  );
+  return mapConversation(result.rows[0]);
 }
 
-/*
- * ============================================================
- * CONVERSATION BELONGS TO USER
- * ============================================================
- */
-
-export async function conversationBelongsToUser(
-  conversationId: number,
-  userId: string,
-): Promise<boolean> {
+export async function listConversations(
+  limit = 100,
+): Promise<SupportConversation[]> {
   await ensureSupportTables();
 
-  const result = await query(
-    `
-      SELECT 1
-      FROM support_conversations
-      WHERE id = $1
-        AND user_id = $2
-      LIMIT 1
-    `,
-    [
-      conversationId,
-      userId,
-    ],
+  const safeLimit = Math.min(
+    Math.max(Number(limit) || 100, 1),
+    500,
   );
 
-  return result.rows.length > 0;
-}
-
-/*
- * ============================================================
- * LIST ADMIN CONVERSATIONS
- * ============================================================
- */
-
-export async function listConversations(): Promise<
-  SupportConversationRow[]
-> {
-  await ensureSupportTables();
-
-  const result = await query(
+  const result = await getPool().query(
     `
       SELECT
         id,
@@ -598,33 +484,33 @@ export async function listConversations(): Promise<
         updated_at
       FROM support_conversations
       ORDER BY
-        CASE status
-          WHEN 'HUMAN' THEN 1
-          WHEN 'AI' THEN 2
-          WHEN 'CLOSED' THEN 3
-          ELSE 4
-        END,
         last_message_at DESC
+      LIMIT $1
     `,
+    [safeLimit],
   );
 
-  return result.rows.map(
-    mapConversation,
-  );
+  return result.rows.map(mapConversation);
 }
 
 /*
  * ============================================================
- * LIST CONVERSATION MESSAGES
+ * MESSAGES
  * ============================================================
  */
 
 export async function listMessages(
   conversationId: number,
-): Promise<SupportMessageRow[]> {
+  limit = 200,
+): Promise<SupportMessage[]> {
   await ensureSupportTables();
 
-  const result = await query(
+  const safeLimit = Math.min(
+    Math.max(Number(limit) || 200, 1),
+    500,
+  );
+
+  const result = await getPool().query(
     `
       SELECT
         id,
@@ -637,33 +523,26 @@ export async function listMessages(
         created_at
       FROM support_messages
       WHERE conversation_id = $1
-      ORDER BY created_at ASC, id ASC
+      ORDER BY created_at ASC
+      LIMIT $2
     `,
-    [conversationId],
+    [conversationId, safeLimit],
   );
 
-  return result.rows.map(
-    mapMessage,
-  );
+  return result.rows.map(mapMessage);
 }
 
-/*
- * ============================================================
- * ADD MESSAGE
- * ============================================================
- */
-
-export async function addMessage(
-  conversationId: number,
-  senderType: SupportSenderType,
-  senderId: string | null,
-  message: string,
-  intent: string | null = null,
-  confidence: number | string | null = null,
-): Promise<SupportMessageRow> {
+export async function addMessage(params: {
+  conversationId: number;
+  senderType: SupportSenderType;
+  senderId?: string | null;
+  message: string;
+  intent?: string | null;
+  confidence?: number | string | null;
+}): Promise<SupportMessage> {
   await ensureSupportTables();
 
-  const result = await query(
+  const result = await getPool().query(
     `
       INSERT INTO support_messages (
         conversation_id,
@@ -671,8 +550,7 @@ export async function addMessage(
         sender_id,
         message,
         intent,
-        confidence,
-        created_at
+        confidence
       )
       VALUES (
         $1,
@@ -680,8 +558,7 @@ export async function addMessage(
         $3,
         $4,
         $5,
-        $6,
-        NOW()
+        $6
       )
       RETURNING
         id,
@@ -694,16 +571,16 @@ export async function addMessage(
         created_at
     `,
     [
-      conversationId,
-      senderType,
-      senderId,
-      message,
-      intent,
-      confidence,
+      params.conversationId,
+      params.senderType,
+      params.senderId ?? null,
+      params.message,
+      params.intent ?? null,
+      params.confidence ?? null,
     ],
   );
 
-  await query(
+  await getPool().query(
     `
       UPDATE support_conversations
       SET
@@ -711,27 +588,25 @@ export async function addMessage(
         updated_at = NOW()
       WHERE id = $1
     `,
-    [conversationId],
+    [params.conversationId],
   );
 
-  return mapMessage(
-    result.rows[0],
-  );
+  return mapMessage(result.rows[0]);
 }
 
 /*
  * ============================================================
- * UPDATE CONVERSATION STATUS
+ * STATUS
  * ============================================================
  */
 
 export async function updateConversationStatus(
   conversationId: number,
   status: SupportConversationStatus,
-): Promise<SupportConversationRow | null> {
+): Promise<SupportConversation | null> {
   await ensureSupportTables();
 
-  const result = await query(
+  const result = await getPool().query(
     `
       UPDATE support_conversations
       SET
@@ -747,66 +622,32 @@ export async function updateConversationStatus(
         created_at,
         updated_at
     `,
-    [
-      conversationId,
-      status,
-    ],
+    [conversationId, status],
   );
 
   if (result.rows.length === 0) {
     return null;
   }
 
-  return mapConversation(
-    result.rows[0],
-  );
+  return mapConversation(result.rows[0]);
 }
 
-/*
- * ============================================================
- * GET USER CONVERSATION HISTORY
- * ============================================================
- */
-
-export async function getUserConversationHistory(
+export async function conversationBelongsToUser(
+  conversationId: number,
   userId: string,
-  limit = 10,
-): Promise<SupportMessageRow[]> {
+): Promise<boolean> {
   await ensureSupportTables();
 
-  const safeLimit = Math.min(
-    Math.max(
-      Number(limit) || 10,
-      1,
-    ),
-    50,
-  );
-
-  const result = await query(
+  const result = await getPool().query(
     `
-      SELECT
-        m.id,
-        m.conversation_id,
-        m.sender_type,
-        m.sender_id,
-        m.message,
-        m.intent,
-        m.confidence,
-        m.created_at
-      FROM support_messages m
-      INNER JOIN support_conversations c
-        ON c.id = m.conversation_id
-      WHERE c.user_id = $1
-      ORDER BY m.created_at DESC, m.id DESC
-      LIMIT $2
+      SELECT 1
+      FROM support_conversations
+      WHERE id = $1
+        AND user_id = $2
+      LIMIT 1
     `,
-    [
-      userId,
-      safeLimit,
-    ],
+    [conversationId, userId],
   );
 
-  return result.rows
-    .map(mapMessage)
-    .reverse();
+  return result.rows.length > 0;
 }

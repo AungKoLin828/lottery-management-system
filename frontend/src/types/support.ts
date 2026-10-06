@@ -4,47 +4,21 @@
  * ============================================================
  */
 
-/*
- * ============================================================
- * SENDER TYPE
- * ============================================================
- */
-
 export type SenderType =
   | "PLAYER"
   | "AI"
   | "ADMIN"
   | "SYSTEM";
 
-/*
- * ============================================================
- * CONVERSATION STATUS
- * ============================================================
- */
-
 export type ConversationStatus =
   | "AI"
   | "HUMAN"
   | "CLOSED";
 
-/*
- * ============================================================
- * SUPPORT MESSAGE
- * ============================================================
- *
- * IMPORTANT:
- *
- * Support message ID:
- *   number
- *
- * Conversation ID:
- *   number
- *
- * Sender/user ID:
- *   string
- *
- * because application users use UUID IDs.
- */
+export type SupportSource =
+  | "OPENROUTER"
+  | "TRAINING"
+  | "HUMAN";
 
 export interface SupportMessage {
   id: number;
@@ -53,6 +27,9 @@ export interface SupportMessage {
 
   senderType: SenderType;
 
+  /*
+   * User IDs are UUID/string.
+   */
   senderId: string | null;
 
   message: string;
@@ -67,23 +44,15 @@ export interface SupportMessage {
   createdAt: string;
 }
 
-/*
- * ============================================================
- * SUPPORT CONVERSATION
- * ============================================================
- *
- * IMPORTANT:
- *
- * Conversation ID:
- *   number
- *
- * User ID:
- *   string / UUID
- */
-
 export interface SupportConversation {
+  /*
+   * Conversation database ID is still integer.
+   */
   id: number;
 
+  /*
+   * Authenticated user ID is UUID/string.
+   */
   userId: string;
 
   status: ConversationStatus;
@@ -95,4 +64,23 @@ export interface SupportConversation {
   createdAt: string;
 
   updatedAt: string;
+}
+
+export interface SupportChatResponse {
+  success: boolean;
+
+  conversation: SupportConversation;
+
+  message: SupportMessage;
+
+  escalated: boolean;
+
+  source: SupportSource;
+
+  intent: string | null;
+
+  confidence:
+    | number
+    | string
+    | null;
 }

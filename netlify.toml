@@ -73,21 +73,18 @@
 # ADMIN DEPOSITS API
 # ============================================================
 
-# Get admin deposit requests
 [[redirects]]
   from = "/api/admin-deposits"
   to = "/.netlify/functions/admin-deposits"
   status = 200
   force = true
 
-# Approve admin deposit
 [[redirects]]
   from = "/api/admin-deposit-approve"
   to = "/.netlify/functions/admin-deposit-approve"
   status = 200
   force = true
 
-# Reject admin deposit
 [[redirects]]
   from = "/api/admin-deposit-reject"
   to = "/.netlify/functions/admin-deposit-reject"
@@ -98,6 +95,8 @@
   from = "/api/player/withdraw-request"
   to = "/.netlify/functions/player-withdraw-request"
   status = 200
+  force = true
+
 
 # ============================================================
 # ADMIN USER BALANCE API
@@ -109,34 +108,41 @@
   status = 200
   force = true
 
+
 # ============================================================
-# ADMIN CUSTOMER SUPPORT
+# ADMIN CUSTOMER SUPPORT - EXISTING TICKETS
 # ============================================================
 
 [[redirects]]
   from = "/api/admin/support/tickets"
   to = "/.netlify/functions/admin-support-tickets"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/api/admin/support/ticket"
   to = "/.netlify/functions/admin-support-ticket"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/api/admin/support/ticket/reply"
   to = "/.netlify/functions/admin-support-ticket-reply"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/api/admin/support/ticket/status"
   to = "/.netlify/functions/admin-support-ticket-status"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/api/admin/support/ticket/priority"
   to = "/.netlify/functions/admin-support-ticket-priority"
   status = 200
+  force = true
+
 
 # ============================================================
 # PLAYER DASHBOARD API
@@ -221,35 +227,73 @@
   status = 200
   force = true
 
+
+# ============================================================
+# PLAYER SUPPORT CONVERSATION API
+#
+# IMPORTANT:
+# These point to TOP-LEVEL Netlify function wrappers:
+#
+# netlify/functions/support-chat.ts
+# netlify/functions/support-conversations.ts
+#
+# Do not rely on:
+# netlify/functions/support/chat.ts
+# being directly exposed as a Netlify function.
+# ============================================================
+
 [[redirects]]
   from = "/api/support/chat"
   to = "/.netlify/functions/support-chat"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/api/support/conversations"
   to = "/.netlify/functions/support-conversations"
   status = 200
+  force = true
+
+
+# ============================================================
+# ADMIN SUPPORT CONVERSATION API
+#
+# These are separate from the EXISTING ticket APIs above.
+#
+# Existing:
+#   /api/admin/support/tickets
+#
+# New conversation system:
+#   /api/admin/support
+#   /api/admin/support/messages
+#   /api/admin/support/reply
+#   /api/admin/support/close
+# ============================================================
 
 [[redirects]]
   from = "/api/admin/support"
   to = "/.netlify/functions/admin-support"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/api/admin/support/messages"
   to = "/.netlify/functions/admin-support-messages"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/api/admin/support/reply"
   to = "/.netlify/functions/admin-support-reply"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/api/admin/support/close"
   to = "/.netlify/functions/admin-support-close"
   status = 200
+  force = true
+
 
 # ============================================================
 # ADMIN DRAW SETTINGS API
@@ -276,46 +320,31 @@
   from = "/api/admin/payment-methods"
   to = "/.netlify/functions/admin-payment-methods"
   status = 200
+  force = true
 
 
 # ============================================================
 # ADMIN WITHDRAWALS API
 # ============================================================
 
-# Get all withdrawal requests
 [[redirects]]
   from = "/api/admin/withdrawals"
   to = "/.netlify/functions/admin-withdrawals"
   status = 200
   force = true
 
-# Get single withdrawal
-#
-# Example:
-# /api/admin/withdrawals/123
-#
 [[redirects]]
   from = "/api/admin/withdrawals/:withdrawId"
   to = "/.netlify/functions/admin-withdrawals?withdrawId=:withdrawId"
   status = 200
   force = true
 
-# Approve withdrawal
-#
-# Example:
-# /api/admin/withdrawals/123/approve
-#
 [[redirects]]
   from = "/api/admin/withdrawals/:withdrawId/approve"
   to = "/.netlify/functions/admin-withdrawals?withdrawId=:withdrawId&action=approve"
   status = 200
   force = true
 
-# Reject withdrawal
-#
-# Example:
-# /api/admin/withdrawals/123/reject
-#
 [[redirects]]
   from = "/api/admin/withdrawals/:withdrawId/reject"
   to = "/.netlify/functions/admin-withdrawals?withdrawId=:withdrawId&action=reject"
@@ -344,11 +373,26 @@
   to = "/.netlify/functions/player-deposit-settings"
   status = 200
   force = true
-  
+
+
+# ============================================================
+# EXISTING AI SUPPORT API
+#
+# KEEP THIS SEPARATE FROM /api/support/chat
+#
+# Existing AI endpoint:
+#   /api/ai/support
+#
+# New conversation endpoint:
+#   /api/support/chat
+# ============================================================
+
 [[redirects]]
   from = "/api/ai/support"
   to = "/.netlify/functions/ai-support"
   status = 200
+  force = true
+
 
 # ============================================================
 # REALTIME AUTHENTICATION API
@@ -359,16 +403,24 @@
   to = "/.netlify/functions/realtime-token"
   status = 200
   force = true
-  
+
+
+# ============================================================
+# ADMIN AI SUPPORT SETTINGS
+# ============================================================
+
 [[redirects]]
-from = "/api/admin/ai-support/settings"
-to = "/.netlify/functions/admin-ai-support-settings"
-status = 200
+  from = "/api/admin/ai-support/settings"
+  to = "/.netlify/functions/admin-ai-support-settings"
+  status = 200
+  force = true
 
 [[redirects]]
   from = "/api/admin/ai-support/settings/update"
   to = "/.netlify/functions/admin-ai-support-settings-update"
   status = 200
+  force = true
+
 
 # ============================================================
 # REACT SPA FALLBACK
