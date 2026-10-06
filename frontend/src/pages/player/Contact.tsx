@@ -48,11 +48,10 @@ export default function Contact() {
           </div>
 
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-            Have a question or need help? Our support
-            assistant can help with common questions,
-            account information, and application support.
-            If additional assistance is required, your
-            request can be handled by our human support team.
+            Have a question or need help? Our support assistant can help with
+            common questions, account information, and application support. When
+            automated assistance cannot resolve your request, your conversation
+            can be escalated to our human support team.
           </p>
         </div>
 
@@ -115,9 +114,9 @@ export default function Contact() {
                 </div>
 
                 <p className="mt-2 text-[10px] leading-5 text-emerald-700/80">
-                  Support uses AI assistance with a local
-                  training and knowledge fallback when the
-                  external AI service is unavailable.
+                  Support can use AI assistance, local training and knowledge
+                  data, and human support when automated assistance cannot
+                  resolve your request.
                 </p>
               </div>
 
@@ -144,7 +143,7 @@ export default function Contact() {
                       </p>
 
                       <p className="text-[10px] leading-4 text-violet-600">
-                        Answers common support questions
+                        Handles common support questions and account help
                       </p>
                     </div>
                   </div>
@@ -164,11 +163,11 @@ export default function Contact() {
 
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-emerald-800">
-                        Training & Knowledge
+                        Training & Knowledge Fallback
                       </p>
 
                       <p className="text-[10px] leading-4 text-emerald-600">
-                        Local fallback for support information
+                        Uses local support data when external AI is unavailable
                       </p>
                     </div>
                   </div>
@@ -192,9 +191,36 @@ export default function Contact() {
                       </p>
 
                       <p className="text-[10px] leading-4 text-blue-600">
-                        Admin support when further help is required
+                        Conversation is escalated to admin support when needed
                       </p>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* =================================================
+                  SUPPORT CONVERSATION INFORMATION
+              ================================================== */}
+
+              <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 p-4">
+                <div className="flex items-start gap-3">
+                  <Headphones className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+
+                  <div>
+                    <p className="text-xs font-bold text-blue-800">
+                      Conversation Support
+                    </p>
+
+                    <p className="mt-1 text-[11px] leading-5 text-blue-600">
+                      Your support conversation can be stored so that the
+                      support team can continue helping you if your request
+                      needs human assistance.
+                    </p>
+
+                    <p className="mt-2 text-[10px] leading-4 text-blue-500">
+                      Human support replies are handled through the support
+                      center and can continue from the same conversation.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -279,17 +305,16 @@ export default function Contact() {
                     </p>
 
                     <p className="mt-1 text-[11px] leading-5 text-violet-600">
-                      Ask about your wallet, deposits,
-                      withdrawals, transactions, 2D/3D
-                      results, account help, PWA installation,
-                      and general application support.
+                      Ask about your wallet, deposits, withdrawals,
+                      transactions, 2D/3D results, account help, PWA
+                      installation, and general application support.
                     </p>
 
                     <p className="mt-2 text-[10px] leading-4 text-violet-500">
-                      If the external AI service is temporarily
-                      unavailable, the assistant can use the
-                      application's local training and knowledge
-                      data instead.
+                      When external AI is unavailable, the support system can
+                      use the application's local training and knowledge data.
+                      If the request still cannot be answered, it can be
+                      escalated to human support.
                     </p>
                   </div>
                 </div>
@@ -309,9 +334,8 @@ export default function Contact() {
                     </p>
 
                     <p className="mt-1 text-[11px] leading-5 text-indigo-600">
-                      Never share your password, OTP, PIN,
-                      or payment credentials with support or
-                      the AI assistant.
+                      Never share your password, OTP, PIN, or payment
+                      credentials with support or the AI assistant.
                     </p>
                   </div>
                 </div>
@@ -346,9 +370,8 @@ export default function Contact() {
           <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
 
           <p className="text-center text-[10px] font-medium text-slate-400">
-            Support assistance may use external AI,
-            local training data, or human support depending
-            on availability and the type of request.
+            Support assistance may use external AI, local training data, or
+            human support depending on AI availability and the type of request.
           </p>
         </div>
       </div>
