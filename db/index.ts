@@ -26,7 +26,6 @@ import * as numberRestrictions from "../db/schema/numberRestrictions";
 import * as drawSettings from "../db/schema/drawSettings";
 import * as lotteryNumberSettings from "../db/schema/lotteryNumberSettings";
 import * as announcements from "../db/schema/announcements";
-import * as systemSettings from "../db/schema/systemSettings";
 
 // ============================================================
 // AI SUPPORT
@@ -47,9 +46,7 @@ import * as relations from "../db/relations";
 const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
-  throw new Error(
-    "DATABASE_URL environment variable is not configured.",
-  );
+  throw new Error("DATABASE_URL environment variable is not configured.");
 }
 
 // ============================================================
@@ -153,7 +150,6 @@ export const db = drizzle(pool, {
     // AI SUPPORT TICKETS
     // ----------------------------------------------------------
     ...supportTickets,
-	...systemSettings,
 
     // ----------------------------------------------------------
     // RELATIONS
@@ -193,7 +189,6 @@ export {
 
   // AI Support
   supportTickets,
-  systemSettings,
   // Relations
   relations,
 };

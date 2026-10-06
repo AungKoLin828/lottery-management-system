@@ -1,3 +1,46 @@
-import type {SupportConversation,SupportMessage} from '@/types/support';
-async function api<T>(url:string,init?:RequestInit):Promise<T>{const r=await fetch(url,{credentials:'include',...init,headers:{'Content-Type':'application/json',...(init?.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Support request failed');return d;}
-export const supportService={chat:(message:string)=>api<{conversation:SupportConversation;message:SupportMessage;escalated:boolean;intent:string|null;confidence:number}>('/api/support/chat',{method:'POST',body:JSON.stringify({message})}),conversation:()=>api<{conversation:SupportConversation|null;messages:SupportMessage[]}>('/api/support/conversations'),adminList:()=>api<{conversations:SupportConversation[]}>('/api/admin/support'),adminMessages:(id:number)=>api<{conversation:SupportConversation;messages:SupportMessage[]}>(`/api/admin/support/messages?conversationId=${id}`),adminReply:(conversationId:number,message:string)=>api<{message:SupportMessage}>('/api/admin/support/reply',{method:'POST',body:JSON.stringify({conversationId,message})}),adminClose:(conversationId:number)=>api('/api/admin/support/close',{method:'POST',body:JSON.stringify({conversationId})})};
+import type { SupportConversation, SupportMessage } from "@/types/support";
+
+async function api<T>(url: string, init?: RequestInit): Promise<T> {
+  const r = await fetch(url, {
+    credentials: "include",
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || "Support request failed");
+  return d;
+}
+export const supportService = {
+  chat: (message: string) =>
+    api<{
+      conversation: SupportConversation;
+      message: SupportMessage;
+      escalated: boolean;
+      intent: string | null;
+      confidence: number;
+    }>("/api/support/chat", {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    }),
+  conversation: () =>
+    api<{
+      conversation: SupportConversation | null;
+      messages: SupportMessage[];
+    }>("/api/support/conversations"),
+  adminList: () =>
+    api<{ conversations: SupportConversation[] }>("/api/admin/support"),
+  adminMessages: (id: number) =>
+    api<{ conversation: SupportConversation; messages: SupportMessage[] }>(
+      `/api/admin/support/messages?conversationId=${id}`,
+    ),
+  adminReply: (conversationId: number, message: string) =>
+    api<{ message: SupportMessage }>("/api/admin/support/reply", {
+      method: "POST",
+      body: JSON.stringify({ conversationId, message }),
+    }),
+  adminClose: (conversationId: number) =>
+    api("/api/admin/support/close", {
+      method: "POST",
+      body: JSON.stringify({ conversationId }),
+    }),
+};
