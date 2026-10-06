@@ -1,9 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   Bot,
@@ -37,23 +32,21 @@ import {
   type AdminAISettings,
 } from "../../services/adminAISettingsService";
 
+import { supportService } from "@/services/supportService";
+import type { SupportConversation, SupportMessage } from "@/types/support";
+
 /*
  * ============================================================
  * HELPERS
  * ============================================================
  */
 
-function formatDateTime(
-  value?: string | Date | null,
-): string {
+function formatDateTime(value?: string | Date | null): string {
   if (!value) {
     return "";
   }
 
-  const date =
-    value instanceof Date
-      ? value
-      : new Date(value);
+  const date = value instanceof Date ? value : new Date(value);
 
   if (Number.isNaN(date.getTime())) {
     return String(value);
@@ -62,9 +55,7 @@ function formatDateTime(
   return date.toLocaleString();
 }
 
-function getStatusLabel(
-  status?: SupportTicketStatus | null,
-): string {
+function getStatusLabel(status?: SupportTicketStatus | null): string {
   switch (status) {
     case "OPEN":
       return "Open";
@@ -83,9 +74,7 @@ function getStatusLabel(
   }
 }
 
-function getPriorityLabel(
-  priority?: SupportTicketPriority | null,
-): string {
+function getPriorityLabel(priority?: SupportTicketPriority | null): string {
   switch (priority) {
     case "LOW":
       return "Low";
@@ -104,9 +93,7 @@ function getPriorityLabel(
   }
 }
 
-function getStatusClassName(
-  status?: SupportTicketStatus | null,
-): string {
+function getStatusClassName(status?: SupportTicketStatus | null): string {
   switch (status) {
     case "OPEN":
       return "bg-blue-50 text-blue-700 ring-blue-600/20";
@@ -125,9 +112,7 @@ function getStatusClassName(
   }
 }
 
-function getPriorityClassName(
-  priority?: SupportTicketPriority | null,
-): string {
+function getPriorityClassName(priority?: SupportTicketPriority | null): string {
   switch (priority) {
     case "URGENT":
       return "bg-red-50 text-red-700 ring-red-600/20";
@@ -149,13 +134,8 @@ function getPriorityClassName(
 /*
  * Ticket subject comes directly from AdminSupportTicket.subject.
  */
-function getTicketTitle(
-  ticket: AdminSupportTicket,
-): string {
-  return (
-    ticket.subject?.trim() ||
-    "Support Request"
-  );
+function getTicketTitle(ticket: AdminSupportTicket): string {
+  return ticket.subject?.trim() || "Support Request";
 }
 
 /*
@@ -163,23 +143,16 @@ function getTicketTitle(
  *
  * The latest message is taken from ticket.messages.
  */
-function getTicketPreview(
-  ticket: AdminSupportTicket,
-): string {
-  const messages =
-    ticket.messages ?? [];
+function getTicketPreview(ticket: AdminSupportTicket): string {
+  const messages = ticket.messages ?? [];
 
   if (messages.length === 0) {
     return "No message";
   }
 
-  const latestMessage =
-    messages[messages.length - 1];
+  const latestMessage = messages[messages.length - 1];
 
-  return (
-    latestMessage?.message?.trim() ||
-    "No message"
-  );
+  return latestMessage?.message?.trim() || "No message";
 }
 
 /*
@@ -192,48 +165,26 @@ type MessageBubbleProps = {
   message: AdminSupportMessage;
 };
 
-function MessageBubble({
-  message,
-}: MessageBubbleProps) {
-  const isAdmin =
-    message.senderType === "ADMIN";
+function MessageBubble({ message }: MessageBubbleProps) {
+  const isAdmin = message.senderType === "ADMIN";
 
-  const isAI =
-    message.senderType === "AI";
+  const isAI = message.senderType === "AI";
 
-  const senderName = isAdmin
-    ? "Admin"
-    : isAI
-      ? "AI Assistant"
-      : "Player";
+  const senderName = isAdmin ? "Admin" : isAI ? "AI Assistant" : "Player";
 
-  const SenderIcon = isAdmin
-    ? CheckCircle2
-    : isAI
-      ? Bot
-      : User;
+  const SenderIcon = isAdmin ? CheckCircle2 : isAI ? Bot : User;
 
   return (
-    <div
-      className={`flex w-full ${
-        isAdmin
-          ? "justify-end"
-          : "justify-start"
-      }`}
-    >
+    <div className={`flex w-full ${isAdmin ? "justify-end" : "justify-start"}`}>
       <div
         className={`flex max-w-[92%] flex-col sm:max-w-[78%] ${
-          isAdmin
-            ? "items-end"
-            : "items-start"
+          isAdmin ? "items-end" : "items-start"
         }`}
       >
         <div className="mb-1 flex items-center gap-1.5 px-1 text-xs font-medium text-slate-500">
           <SenderIcon className="h-3.5 w-3.5" />
 
-          <span>
-            {senderName}
-          </span>
+          <span>{senderName}</span>
         </div>
 
         <div
@@ -245,19 +196,59 @@ function MessageBubble({
                 : "rounded-bl-md border border-slate-200 bg-white text-slate-800"
           }`}
         >
-          <p className="whitespace-pre-wrap break-words">
-            {message.message}
-          </p>
+          <p className="whitespace-pre-wrap break-words">{message.message}</p>
         </div>
 
         <span className="mt-1 px-1 text-[11px] text-slate-400">
-          {formatDateTime(
-            message.createdAt,
-          )}
+          {formatDateTime(message.createdAt)}
         </span>
       </div>
     </div>
   );
+}
+
+/*
+ * ============================================================
+ * SUPPORT CONVERSATION HELPERS
+ * ============================================================
+ */
+
+function getConversationStatusLabel(
+  status: SupportConversation["status"],
+): string {
+  switch (status) {
+    case "AI":
+      return "AI";
+    case "HUMAN":
+      return "Human";
+    case "CLOSED":
+      return "Closed";
+    default:
+      return status;
+  }
+}
+
+function getConversationStatusClassName(
+  status: SupportConversation["status"],
+): string {
+  switch (status) {
+    case "AI":
+      return "bg-violet-50 text-violet-700 ring-violet-600/20";
+    case "HUMAN":
+      return "bg-blue-50 text-blue-700 ring-blue-600/20";
+    case "CLOSED":
+      return "bg-slate-100 text-slate-600 ring-slate-500/20";
+    default:
+      return "bg-slate-100 text-slate-600 ring-slate-500/20";
+  }
+}
+
+function getConversationMessagePreview(messages: SupportMessage[]): string {
+  if (messages.length === 0) {
+    return "No messages";
+  }
+
+  return messages[messages.length - 1]?.message?.trim() || "No message";
 }
 
 /*
@@ -273,81 +264,36 @@ export default function CustomerSupport() {
    * ==========================================================
    */
 
-  const [
-    tickets,
-    setTickets,
-  ] = useState<AdminSupportTicket[]>(
-    [],
+  const [tickets, setTickets] = useState<AdminSupportTicket[]>([]);
+
+  const [selectedTicket, setSelectedTicket] =
+    useState<AdminSupportTicket | null>(null);
+
+  const [statusFilter, setStatusFilter] = useState<SupportTicketStatus | "ALL">(
+    "ALL",
   );
 
-  const [
-    selectedTicket,
-    setSelectedTicket,
-  ] =
-    useState<AdminSupportTicket | null>(
-      null,
-    );
-
-  const [
-    statusFilter,
-    setStatusFilter,
-  ] = useState<
-    SupportTicketStatus | "ALL"
-  >("ALL");
-
-  const [
-    priorityFilter,
-    setPriorityFilter,
-  ] = useState<
+  const [priorityFilter, setPriorityFilter] = useState<
     SupportTicketPriority | "ALL"
   >("ALL");
 
-  const [
-    search,
-    setSearch,
-  ] = useState("");
+  const [search, setSearch] = useState("");
 
-  const [
-    replyMessage,
-    setReplyMessage,
-  ] = useState("");
+  const [replyMessage, setReplyMessage] = useState("");
 
-  const [
-    loadingTickets,
-    setLoadingTickets,
-  ] = useState(false);
+  const [loadingTickets, setLoadingTickets] = useState(false);
 
-  const [
-    loadingTicket,
-    setLoadingTicket,
-  ] = useState(false);
+  const [loadingTicket, setLoadingTicket] = useState(false);
 
-  const [
-    sendingReply,
-    setSendingReply,
-  ] = useState(false);
+  const [sendingReply, setSendingReply] = useState(false);
 
-  const [
-    updatingStatus,
-    setUpdatingStatus,
-  ] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  const [
-    updatingPriority,
-    setUpdatingPriority,
-  ] = useState(false);
+  const [updatingPriority, setUpdatingPriority] = useState(false);
 
-  const [
-    error,
-    setError,
-  ] = useState<string | null>(
-    null,
-  );
+  const [error, setError] = useState<string | null>(null);
 
-  const [
-    mobileShowDetail,
-    setMobileShowDetail,
-  ] = useState(false);
+  const [mobileShowDetail, setMobileShowDetail] = useState(false);
 
   /*
    * ==========================================================
@@ -355,30 +301,44 @@ export default function CustomerSupport() {
    * ==========================================================
    */
 
-  const [
-    aiSettings,
-    setAISettings,
-  ] =
-    useState<AdminAISettings | null>(
-      null,
-    );
+  const [aiSettings, setAISettings] = useState<AdminAISettings | null>(null);
 
-  const [
-    loadingAISettings,
-    setLoadingAISettings,
-  ] = useState(false);
+  const [loadingAISettings, setLoadingAISettings] = useState(false);
 
-  const [
-    updatingAISettings,
-    setUpdatingAISettings,
-  ] = useState(false);
+  const [updatingAISettings, setUpdatingAISettings] = useState(false);
 
-  const [
-    aiSettingsError,
-    setAISettingsError,
-  ] = useState<string | null>(
-    null,
+  const [aiSettingsError, setAISettingsError] = useState<string | null>(null);
+
+  /*
+   * ==========================================================
+   * SUPPORT CONVERSATION STATE
+   * ==========================================================
+   */
+
+  const [activeView, setActiveView] = useState<"TICKETS" | "CONVERSATIONS">(
+    "TICKETS",
   );
+
+  const [conversations, setConversations] = useState<SupportConversation[]>([]);
+
+  const [selectedConversation, setSelectedConversation] =
+    useState<SupportConversation | null>(null);
+
+  const [conversationMessages, setConversationMessages] = useState<
+    SupportMessage[]
+  >([]);
+
+  const [conversationReply, setConversationReply] = useState("");
+
+  const [loadingConversations, setLoadingConversations] = useState(false);
+
+  const [loadingConversationMessages, setLoadingConversationMessages] =
+    useState(false);
+
+  const [sendingConversationReply, setSendingConversationReply] =
+    useState(false);
+
+  const [closingConversation, setClosingConversation] = useState(false);
 
   /*
    * ==========================================================
@@ -386,58 +346,50 @@ export default function CustomerSupport() {
    * ==========================================================
    */
 
-  const loadAISettings =
-    useCallback(async () => {
-      try {
-        setLoadingAISettings(true);
-        setAISettingsError(null);
+  const loadAISettings = useCallback(async () => {
+    try {
+      setLoadingAISettings(true);
+      setAISettingsError(null);
 
-        const response =
-          await getAdminAISettings();
+      const response = await getAdminAISettings();
 
-        if (!response.success) {
-          throw new Error(
-            response.message ||
-              "Failed to load AI support settings.",
-          );
-        }
-
-        /*
-         * IMPORTANT:
-         *
-         * response.settings is optional.
-         *
-         * Do not pass it directly into
-         * setAISettings().
-         *
-         * This avoids:
-         *
-         * AdminAISettings | undefined
-         *
-         * -> AdminAISettings | null
-         *
-         * TypeScript error.
-         */
-        if (response.settings) {
-          setAISettings(
-            response.settings,
-          );
-        }
-      } catch (err) {
-        console.error(
-          "Failed to load AI support settings:",
-          err,
+      if (!response.success) {
+        throw new Error(
+          response.message || "Failed to load AI support settings.",
         );
-
-        setAISettingsError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load AI support settings.",
-        );
-      } finally {
-        setLoadingAISettings(false);
       }
-    }, []);
+
+      /*
+       * IMPORTANT:
+       *
+       * response.settings is optional.
+       *
+       * Do not pass it directly into
+       * setAISettings().
+       *
+       * This avoids:
+       *
+       * AdminAISettings | undefined
+       *
+       * -> AdminAISettings | null
+       *
+       * TypeScript error.
+       */
+      if (response.settings) {
+        setAISettings(response.settings);
+      }
+    } catch (err) {
+      console.error("Failed to load AI support settings:", err);
+
+      setAISettingsError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load AI support settings.",
+      );
+    } finally {
+      setLoadingAISettings(false);
+    }
+  }, []);
 
   /*
    * ==========================================================
@@ -445,72 +397,59 @@ export default function CustomerSupport() {
    * ==========================================================
    */
 
-  const handleAISettingsToggle =
-    async (
-      enabled: boolean,
-    ) => {
-      if (updatingAISettings) {
-        return;
+  const handleAISettingsToggle = async (enabled: boolean) => {
+    if (updatingAISettings) {
+      return;
+    }
+
+    try {
+      setUpdatingAISettings(true);
+      setAISettingsError(null);
+
+      const response = await updateAdminAISettings(enabled);
+
+      if (!response.success) {
+        throw new Error(
+          response.message || "Failed to update AI support settings.",
+        );
       }
 
-      try {
-        setUpdatingAISettings(true);
-        setAISettingsError(null);
-
-        const response =
-          await updateAdminAISettings(
-            enabled,
-          );
-
-        if (!response.success) {
-          throw new Error(
-            response.message ||
-              "Failed to update AI support settings.",
-          );
-        }
-
+      /*
+       * IMPORTANT:
+       *
+       * Only update state when the server
+       * actually returned settings.
+       */
+      if (response.settings) {
+        setAISettings(response.settings);
+      } else {
         /*
-         * IMPORTANT:
+         * Safe local fallback.
          *
-         * Only update state when the server
-         * actually returned settings.
+         * This preserves the current object
+         * and changes only enabled.
          */
-        if (response.settings) {
-          setAISettings(
-            response.settings,
-          );
-        } else {
-          /*
-           * Safe local fallback.
-           *
-           * This preserves the current object
-           * and changes only enabled.
-           */
-          setAISettings(
-            (current) =>
-              current
-                ? {
-                    ...current,
-                    enabled,
-                  }
-                : current,
-          );
-        }
-      } catch (err) {
-        console.error(
-          "Failed to update AI support settings:",
-          err,
+        setAISettings((current) =>
+          current
+            ? {
+                ...current,
+                enabled,
+              }
+            : current,
         );
-
-        setAISettingsError(
-          err instanceof Error
-            ? err.message
-            : "Failed to update AI support settings.",
-        );
-      } finally {
-        setUpdatingAISettings(false);
       }
-    };
+    } catch (err) {
+      console.error("Failed to update AI support settings:", err);
+
+      setAISettingsError(
+        err instanceof Error
+          ? err.message
+          : "Failed to update AI support settings.",
+      );
+    } finally {
+      setUpdatingAISettings(false);
+    }
+  };
 
   /*
    * ==========================================================
@@ -524,71 +463,244 @@ export default function CustomerSupport() {
 
   /*
    * ==========================================================
-   * LOAD TICKETS
+   * LOAD ADMIN SUPPORT CONVERSATIONS
    * ==========================================================
    */
 
-  const loadTickets =
-    useCallback(async () => {
+  const loadConversations = useCallback(async () => {
+    try {
+      setLoadingConversations(true);
+      setError(null);
+
+      const response = await supportService.adminList();
+
+      setConversations(response.conversations ?? []);
+    } catch (err) {
+      console.error("Failed to load support conversations:", err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load support conversations.",
+      );
+    } finally {
+      setLoadingConversations(false);
+    }
+  }, []);
+
+  /*
+   * ==========================================================
+   * LOAD ADMIN CONVERSATION MESSAGES
+   * ==========================================================
+   */
+
+  const loadConversationMessages = useCallback(
+    async (conversationId: number) => {
       try {
-        setLoadingTickets(true);
+        setLoadingConversationMessages(true);
         setError(null);
 
-        const params: {
-          status?: SupportTicketStatus;
-          priority?: SupportTicketPriority;
-          search?: string;
-        } = {};
+        const response = await supportService.adminMessages(conversationId);
 
-        if (
-          statusFilter !== "ALL"
-        ) {
-          params.status =
-            statusFilter;
-        }
+        setSelectedConversation(response.conversation);
 
-        if (
-          priorityFilter !== "ALL"
-        ) {
-          params.priority =
-            priorityFilter;
-        }
-
-        const trimmedSearch =
-          search.trim();
-
-        if (trimmedSearch) {
-          params.search =
-            trimmedSearch;
-        }
-
-        const response =
-          await getAdminSupportTickets(
-            params,
-          );
-
-        setTickets(
-          response.tickets ?? [],
-        );
+        setConversationMessages(response.messages ?? []);
       } catch (err) {
-        console.error(
-          "Failed to load support tickets:",
-          err,
-        );
+        console.error("Failed to load support conversation messages:", err);
 
         setError(
           err instanceof Error
             ? err.message
-            : "Failed to load support tickets.",
+            : "Failed to load support conversation messages.",
         );
       } finally {
-        setLoadingTickets(false);
+        setLoadingConversationMessages(false);
       }
-    }, [
-      statusFilter,
-      priorityFilter,
-      search,
-    ]);
+    },
+    [],
+  );
+
+  /*
+   * ==========================================================
+   * CONVERSATION POLLING
+   * ==========================================================
+   *
+   * This polling only runs while the Conversations view is
+   * active, so the existing Support Tickets behavior is not
+   * changed.
+   */
+
+  useEffect(() => {
+    if (activeView !== "CONVERSATIONS") {
+      return;
+    }
+
+    void loadConversations();
+
+    const listTimer = window.setInterval(() => {
+      void loadConversations();
+    }, 5000);
+
+    return () => {
+      window.clearInterval(listTimer);
+    };
+  }, [activeView, loadConversations]);
+
+  useEffect(() => {
+    if (activeView !== "CONVERSATIONS" || !selectedConversation) {
+      return;
+    }
+
+    const conversationId = selectedConversation.id;
+
+    void loadConversationMessages(conversationId);
+
+    const messageTimer = window.setInterval(() => {
+      void loadConversationMessages(conversationId);
+    }, 3000);
+
+    return () => {
+      window.clearInterval(messageTimer);
+    };
+  }, [activeView, selectedConversation?.id, loadConversationMessages]);
+
+  /*
+   * ==========================================================
+   * SELECT CONVERSATION
+   * ==========================================================
+   */
+
+  const handleSelectConversation = async (
+    conversation: SupportConversation,
+  ) => {
+    setSelectedConversation(conversation);
+    setConversationMessages([]);
+    setConversationReply("");
+
+    await loadConversationMessages(conversation.id);
+  };
+
+  /*
+   * ==========================================================
+   * ADMIN CONVERSATION REPLY
+   * ==========================================================
+   */
+
+  const handleConversationReply = async () => {
+    if (!selectedConversation || selectedConversation.status === "CLOSED") {
+      return;
+    }
+
+    const message = conversationReply.trim();
+
+    if (!message) {
+      return;
+    }
+
+    try {
+      setSendingConversationReply(true);
+      setError(null);
+
+      const response = await supportService.adminReply(
+        selectedConversation.id,
+        message,
+      );
+
+      setConversationMessages((current) => [...current, response.message]);
+
+      setConversationReply("");
+
+      await loadConversations();
+    } catch (err) {
+      console.error("Failed to send support conversation reply:", err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to send support conversation reply.",
+      );
+    } finally {
+      setSendingConversationReply(false);
+    }
+  };
+
+  /*
+   * ==========================================================
+   * CLOSE ADMIN CONVERSATION
+   * ==========================================================
+   */
+
+  const handleCloseConversation = async () => {
+    if (!selectedConversation || selectedConversation.status === "CLOSED") {
+      return;
+    }
+
+    try {
+      setClosingConversation(true);
+      setError(null);
+
+      await supportService.adminClose(selectedConversation.id);
+
+      await loadConversationMessages(selectedConversation.id);
+
+      await loadConversations();
+    } catch (err) {
+      console.error("Failed to close support conversation:", err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to close support conversation.",
+      );
+    } finally {
+      setClosingConversation(false);
+    }
+  };
+
+  /*
+   * ==========================================================
+   * LOAD TICKETS
+   * ==========================================================
+   */
+
+  const loadTickets = useCallback(async () => {
+    try {
+      setLoadingTickets(true);
+      setError(null);
+
+      const params: {
+        status?: SupportTicketStatus;
+        priority?: SupportTicketPriority;
+        search?: string;
+      } = {};
+
+      if (statusFilter !== "ALL") {
+        params.status = statusFilter;
+      }
+
+      if (priorityFilter !== "ALL") {
+        params.priority = priorityFilter;
+      }
+
+      const trimmedSearch = search.trim();
+
+      if (trimmedSearch) {
+        params.search = trimmedSearch;
+      }
+
+      const response = await getAdminSupportTickets(params);
+
+      setTickets(response.tickets ?? []);
+    } catch (err) {
+      console.error("Failed to load support tickets:", err);
+
+      setError(
+        err instanceof Error ? err.message : "Failed to load support tickets.",
+      );
+    } finally {
+      setLoadingTickets(false);
+    }
+  }, [statusFilter, priorityFilter, search]);
 
   /*
    * ==========================================================
@@ -596,40 +708,24 @@ export default function CustomerSupport() {
    * ==========================================================
    */
 
-  const loadTicket =
-    useCallback(
-      async (
-        ticketId: string,
-      ) => {
-        try {
-          setLoadingTicket(true);
-          setError(null);
+  const loadTicket = useCallback(async (ticketId: string) => {
+    try {
+      setLoadingTicket(true);
+      setError(null);
 
-          const response =
-            await getAdminSupportTicket(
-              ticketId,
-            );
+      const response = await getAdminSupportTicket(ticketId);
 
-          setSelectedTicket(
-            response.ticket ?? null,
-          );
-        } catch (err) {
-          console.error(
-            "Failed to load support ticket:",
-            err,
-          );
+      setSelectedTicket(response.ticket ?? null);
+    } catch (err) {
+      console.error("Failed to load support ticket:", err);
 
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Failed to load support ticket.",
-          );
-        } finally {
-          setLoadingTicket(false);
-        }
-      },
-      [],
-    );
+      setError(
+        err instanceof Error ? err.message : "Failed to load support ticket.",
+      );
+    } finally {
+      setLoadingTicket(false);
+    }
+  }, []);
 
   /*
    * ==========================================================
@@ -647,16 +743,11 @@ export default function CustomerSupport() {
    * ==========================================================
    */
 
-  const handleSelectTicket =
-    async (
-      ticket: AdminSupportTicket,
-    ) => {
-      setMobileShowDetail(true);
+  const handleSelectTicket = async (ticket: AdminSupportTicket) => {
+    setMobileShowDetail(true);
 
-      await loadTicket(
-        ticket.id,
-      );
-    };
+    await loadTicket(ticket.id);
+  };
 
   /*
    * ==========================================================
@@ -664,18 +755,23 @@ export default function CustomerSupport() {
    * ==========================================================
    */
 
-  const handleRefresh =
-    async () => {
+  const handleRefresh = async () => {
+    if (activeView === "CONVERSATIONS") {
+      await loadConversations();
+
+      if (selectedConversation?.id) {
+        await loadConversationMessages(selectedConversation.id);
+      }
+    } else {
       await loadTickets();
 
       if (selectedTicket?.id) {
-        await loadTicket(
-          selectedTicket.id,
-        );
+        await loadTicket(selectedTicket.id);
       }
+    }
 
-      await loadAISettings();
-    };
+    await loadAISettings();
+  };
 
   /*
    * ==========================================================
@@ -683,50 +779,38 @@ export default function CustomerSupport() {
    * ==========================================================
    */
 
-  const handleReply =
-    async () => {
-      if (!selectedTicket?.id) {
-        return;
-      }
+  const handleReply = async () => {
+    if (!selectedTicket?.id) {
+      return;
+    }
 
-      const message =
-        replyMessage.trim();
+    const message = replyMessage.trim();
 
-      if (!message) {
-        return;
-      }
+    if (!message) {
+      return;
+    }
 
-      try {
-        setSendingReply(true);
-        setError(null);
+    try {
+      setSendingReply(true);
+      setError(null);
 
-        await replyToSupportTicket(
-          selectedTicket.id,
-          message,
-        );
+      await replyToSupportTicket(selectedTicket.id, message);
 
-        setReplyMessage("");
+      setReplyMessage("");
 
-        await loadTicket(
-          selectedTicket.id,
-        );
+      await loadTicket(selectedTicket.id);
 
-        await loadTickets();
-      } catch (err) {
-        console.error(
-          "Failed to send support reply:",
-          err,
-        );
+      await loadTickets();
+    } catch (err) {
+      console.error("Failed to send support reply:", err);
 
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to send support reply.",
-        );
-      } finally {
-        setSendingReply(false);
-      }
-    };
+      setError(
+        err instanceof Error ? err.message : "Failed to send support reply.",
+      );
+    } finally {
+      setSendingReply(false);
+    }
+  };
 
   /*
    * ==========================================================
@@ -734,43 +818,30 @@ export default function CustomerSupport() {
    * ==========================================================
    */
 
-  const handleStatusChange =
-    async (
-      status: SupportTicketStatus,
-    ) => {
-      if (!selectedTicket?.id) {
-        return;
-      }
+  const handleStatusChange = async (status: SupportTicketStatus) => {
+    if (!selectedTicket?.id) {
+      return;
+    }
 
-      try {
-        setUpdatingStatus(true);
-        setError(null);
+    try {
+      setUpdatingStatus(true);
+      setError(null);
 
-        await updateSupportTicketStatus(
-          selectedTicket.id,
-          status,
-        );
+      await updateSupportTicketStatus(selectedTicket.id, status);
 
-        await loadTicket(
-          selectedTicket.id,
-        );
+      await loadTicket(selectedTicket.id);
 
-        await loadTickets();
-      } catch (err) {
-        console.error(
-          "Failed to update support ticket status:",
-          err,
-        );
+      await loadTickets();
+    } catch (err) {
+      console.error("Failed to update support ticket status:", err);
 
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to update ticket status.",
-        );
-      } finally {
-        setUpdatingStatus(false);
-      }
-    };
+      setError(
+        err instanceof Error ? err.message : "Failed to update ticket status.",
+      );
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
 
   /*
    * ==========================================================
@@ -778,43 +849,32 @@ export default function CustomerSupport() {
    * ==========================================================
    */
 
-  const handlePriorityChange =
-    async (
-      priority: SupportTicketPriority,
-    ) => {
-      if (!selectedTicket?.id) {
-        return;
-      }
+  const handlePriorityChange = async (priority: SupportTicketPriority) => {
+    if (!selectedTicket?.id) {
+      return;
+    }
 
-      try {
-        setUpdatingPriority(true);
-        setError(null);
+    try {
+      setUpdatingPriority(true);
+      setError(null);
 
-        await updateSupportTicketPriority(
-          selectedTicket.id,
-          priority,
-        );
+      await updateSupportTicketPriority(selectedTicket.id, priority);
 
-        await loadTicket(
-          selectedTicket.id,
-        );
+      await loadTicket(selectedTicket.id);
 
-        await loadTickets();
-      } catch (err) {
-        console.error(
-          "Failed to update support ticket priority:",
-          err,
-        );
+      await loadTickets();
+    } catch (err) {
+      console.error("Failed to update support ticket priority:", err);
 
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to update ticket priority.",
-        );
-      } finally {
-        setUpdatingPriority(false);
-      }
-    };
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to update ticket priority.",
+      );
+    } finally {
+      setUpdatingPriority(false);
+    }
+  };
 
   /*
    * ==========================================================
@@ -826,23 +886,12 @@ export default function CustomerSupport() {
     return {
       total: tickets.length,
 
-      open: tickets.filter(
-        (ticket) =>
-          ticket.status ===
-          "OPEN",
-      ).length,
+      open: tickets.filter((ticket) => ticket.status === "OPEN").length,
 
-      inProgress: tickets.filter(
-        (ticket) =>
-          ticket.status ===
-          "IN_PROGRESS",
-      ).length,
+      inProgress: tickets.filter((ticket) => ticket.status === "IN_PROGRESS")
+        .length,
 
-      resolved: tickets.filter(
-        (ticket) =>
-          ticket.status ===
-          "RESOLVED",
-      ).length,
+      resolved: tickets.filter((ticket) => ticket.status === "RESOLVED").length,
     };
   }, [tickets]);
 
@@ -852,8 +901,7 @@ export default function CustomerSupport() {
    * ==========================================================
    */
 
-  const messages =
-    selectedTicket?.messages ?? [];
+  const messages = selectedTicket?.messages ?? [];
 
   /*
    * ==========================================================
@@ -881,10 +929,7 @@ export default function CustomerSupport() {
                 </h1>
 
                 <p className="text-sm text-slate-500">
-                  Manage player,
-                  automated AI,
-                  and human support
-                  conversations.
+                  Manage player, automated AI, and human support conversations.
                 </p>
               </div>
             </div>
@@ -892,13 +937,15 @@ export default function CustomerSupport() {
 
           <button
             type="button"
-            onClick={() =>
-              void handleRefresh()
-            }
+            onClick={() => void handleRefresh()}
             disabled={
               loadingTickets ||
               loadingTicket ||
-              loadingAISettings
+              loadingAISettings ||
+              loadingConversations ||
+              loadingConversationMessages ||
+              sendingConversationReply ||
+              closingConversation
             }
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -906,13 +953,65 @@ export default function CustomerSupport() {
               className={`h-4 w-4 ${
                 loadingTickets ||
                 loadingTicket ||
-                loadingAISettings
+                loadingAISettings ||
+                loadingConversations ||
+                loadingConversationMessages ||
+                sendingConversationReply ||
+                closingConversation
                   ? "animate-spin"
                   : ""
               }`}
             />
-
             Refresh
+          </button>
+        </div>
+
+        {/* ==================================================
+            SUPPORT VIEW TABS
+        ================================================== */}
+
+        <div className="mb-5 flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm sm:flex-row">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveView("TICKETS");
+              setMobileShowDetail(false);
+            }}
+            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition sm:flex-none ${
+              activeView === "TICKETS"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <MessageCircle className="h-4 w-4" />
+            Support Tickets
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveView("CONVERSATIONS");
+              setMobileShowDetail(false);
+            }}
+            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition sm:flex-none ${
+              activeView === "CONVERSATIONS"
+                ? "bg-violet-600 text-white shadow-sm"
+                : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <User className="h-4 w-4" />
+            Conversations
+            {conversations.length > 0 && (
+              <span
+                className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                  activeView === "CONVERSATIONS"
+                    ? "bg-white/20 text-white"
+                    : "bg-violet-50 text-violet-700"
+                }`}
+              >
+                {conversations.length}
+              </span>
+            )}
           </button>
         </div>
 
@@ -941,49 +1040,33 @@ export default function CustomerSupport() {
                           : "bg-slate-100 text-slate-600 ring-slate-500/20"
                       }`}
                     >
-                      {aiSettings.enabled
-                        ? "ON"
-                        : "OFF"}
+                      {aiSettings.enabled ? "ON" : "OFF"}
                     </span>
                   )}
                 </div>
 
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Controls automated AI
-                  customer support. When
-                  disabled, player
-                  conversations can be
-                  routed to human support.
+                  Controls automated AI customer support. When disabled, player
+                  conversations can be routed to human support.
                 </p>
 
                 {aiSettingsError && (
-                  <p className="mt-1 text-xs text-red-600">
-                    {aiSettingsError}
-                  </p>
+                  <p className="mt-1 text-xs text-red-600">{aiSettingsError}</p>
                 )}
               </div>
             </div>
 
             <button
               type="button"
-              disabled={
-                loadingAISettings ||
-                updatingAISettings ||
-                !aiSettings
-              }
-              onClick={() =>
-                void handleAISettingsToggle(
-                  !aiSettings?.enabled,
-                )
-              }
+              disabled={loadingAISettings || updatingAISettings || !aiSettings}
+              onClick={() => void handleAISettingsToggle(!aiSettings?.enabled)}
               className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
                 aiSettings?.enabled
                   ? "bg-slate-700 hover:bg-slate-800"
                   : "bg-violet-600 hover:bg-violet-700"
               }`}
             >
-              {loadingAISettings ||
-              updatingAISettings ? (
+              {loadingAISettings || updatingAISettings ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Bot className="h-4 w-4" />
@@ -1000,675 +1083,858 @@ export default function CustomerSupport() {
           </div>
         </div>
 
-        {/* ==================================================
-            SUMMARY
-        ================================================== */}
+        {activeView === "TICKETS" && (
+          <>
+            {/* ==================================================
+                SUMMARY
+            ================================================== */}
 
-        <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Total
-            </p>
+            <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Total
+                </p>
 
-            <p className="mt-1 text-2xl font-bold text-slate-900">
-              {counts.total}
-            </p>
-          </div>
+                <p className="mt-1 text-2xl font-bold text-slate-900">
+                  {counts.total}
+                </p>
+              </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Open
-            </p>
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Open
+                </p>
 
-            <p className="mt-1 text-2xl font-bold text-blue-600">
-              {counts.open}
-            </p>
-          </div>
+                <p className="mt-1 text-2xl font-bold text-blue-600">
+                  {counts.open}
+                </p>
+              </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              In Progress
-            </p>
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  In Progress
+                </p>
 
-            <p className="mt-1 text-2xl font-bold text-amber-600">
-              {counts.inProgress}
-            </p>
-          </div>
+                <p className="mt-1 text-2xl font-bold text-amber-600">
+                  {counts.inProgress}
+                </p>
+              </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Resolved
-            </p>
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Resolved
+                </p>
 
-            <p className="mt-1 text-2xl font-bold text-emerald-600">
-              {counts.resolved}
-            </p>
-          </div>
-        </div>
+                <p className="mt-1 text-2xl font-bold text-emerald-600">
+                  {counts.resolved}
+                </p>
+              </div>
+            </div>
 
-        {/* ==================================================
+            {/* ==================================================
             ERROR
         ================================================== */}
 
-        {error && (
-          <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            <XCircle className="mt-0.5 h-5 w-5 shrink-0" />
+            {error && (
+              <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <XCircle className="mt-0.5 h-5 w-5 shrink-0" />
 
-            <div className="flex-1">
-              <p className="font-medium">
-                Support operation failed
-              </p>
+                <div className="flex-1">
+                  <p className="font-medium">Support operation failed</p>
 
-              <p className="mt-0.5">
-                {error}
-              </p>
-            </div>
+                  <p className="mt-0.5">{error}</p>
+                </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                setError(null)
-              }
-              className="text-red-500 hover:text-red-700"
-              aria-label="Dismiss error"
-            >
-              <XCircle className="h-4 w-4" />
-            </button>
-          </div>
-        )}
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  className="text-red-500 hover:text-red-700"
+                  aria-label="Dismiss error"
+                >
+                  <XCircle className="h-4 w-4" />
+                </button>
+              </div>
+            )}
 
-        {/* ==================================================
+            {/* ==================================================
             MAIN
         ================================================== */}
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="grid min-h-[650px] grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)]">
-            {/* ==============================================
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="grid min-h-[650px] grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)]">
+                {/* ==============================================
                 TICKET LIST
             ============================================== */}
 
-            <aside
-              className={`border-slate-200 lg:border-r ${
-                mobileShowDetail
-                  ? "hidden lg:block"
-                  : "block"
-              }`}
-            >
-              <div className="border-b border-slate-200 p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="font-semibold text-slate-900">
-                    Support Tickets
-                  </h2>
+                <aside
+                  className={`border-slate-200 lg:border-r ${
+                    mobileShowDetail ? "hidden lg:block" : "block"
+                  }`}
+                >
+                  <div className="border-b border-slate-200 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h2 className="font-semibold text-slate-900">
+                        Support Tickets
+                      </h2>
 
-                  {loadingTickets && (
-                    <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-                  )}
-                </div>
+                      {loadingTickets && (
+                        <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                      )}
+                    </div>
 
-                {/* SEARCH */}
+                    {/* SEARCH */}
 
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
-                  <input
-                    value={search}
-                    onChange={(event) =>
-                      setSearch(
-                        event.target.value,
-                      )
-                    }
-                    placeholder="Search tickets..."
-                    className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
-                  />
-                </div>
+                      <input
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        placeholder="Search tickets..."
+                        className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
+                      />
+                    </div>
 
-                {/* FILTERS */}
+                    {/* FILTERS */}
 
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <select
-                    value={
-                      statusFilter
-                    }
-                    onChange={(event) =>
-                      setStatusFilter(
-                        event.target
-                          .value as
-                          | SupportTicketStatus
-                          | "ALL",
-                      )
-                    }
-                    className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-blue-500"
-                  >
-                    <option value="ALL">
-                      All Status
-                    </option>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <select
+                        value={statusFilter}
+                        onChange={(event) =>
+                          setStatusFilter(
+                            event.target.value as SupportTicketStatus | "ALL",
+                          )
+                        }
+                        className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-blue-500"
+                      >
+                        <option value="ALL">All Status</option>
 
-                    <option value="OPEN">
-                      Open
-                    </option>
+                        <option value="OPEN">Open</option>
 
-                    <option value="IN_PROGRESS">
-                      In Progress
-                    </option>
+                        <option value="IN_PROGRESS">In Progress</option>
 
-                    <option value="RESOLVED">
-                      Resolved
-                    </option>
+                        <option value="RESOLVED">Resolved</option>
 
-                    <option value="CLOSED">
-                      Closed
-                    </option>
-                  </select>
+                        <option value="CLOSED">Closed</option>
+                      </select>
 
-                  <select
-                    value={
-                      priorityFilter
-                    }
-                    onChange={(event) =>
-                      setPriorityFilter(
-                        event.target
-                          .value as
-                          | SupportTicketPriority
-                          | "ALL",
-                      )
-                    }
-                    className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-blue-500"
-                  >
-                    <option value="ALL">
-                      All Priority
-                    </option>
+                      <select
+                        value={priorityFilter}
+                        onChange={(event) =>
+                          setPriorityFilter(
+                            event.target.value as SupportTicketPriority | "ALL",
+                          )
+                        }
+                        className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-blue-500"
+                      >
+                        <option value="ALL">All Priority</option>
 
-                    <option value="LOW">
-                      Low
-                    </option>
+                        <option value="LOW">Low</option>
 
-                    <option value="NORMAL">
-                      Normal
-                    </option>
+                        <option value="NORMAL">Normal</option>
 
-                    <option value="HIGH">
-                      High
-                    </option>
+                        <option value="HIGH">High</option>
 
-                    <option value="URGENT">
-                      Urgent
-                    </option>
-                  </select>
-                </div>
-              </div>
-
-              {/* TICKETS */}
-
-              <div className="max-h-[590px] overflow-y-auto">
-                {loadingTickets &&
-                tickets.length === 0 ? (
-                  <div className="flex min-h-[300px] items-center justify-center">
-                    <div className="flex flex-col items-center gap-2 text-sm text-slate-500">
-                      <Loader2 className="h-6 w-6 animate-spin" />
-
-                      <span>
-                        Loading support
-                        tickets...
-                      </span>
+                        <option value="URGENT">Urgent</option>
+                      </select>
                     </div>
                   </div>
-                ) : tickets.length ===
-                  0 ? (
-                  <div className="flex min-h-[300px] flex-col items-center justify-center px-6 text-center">
-                    <MessageCircle className="mb-3 h-10 w-10 text-slate-300" />
 
-                    <p className="font-medium text-slate-700">
-                      No support
-                      tickets
-                    </p>
+                  {/* TICKETS */}
 
-                    <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Tickets created from
-                      unresolved automated
-                      support conversations
-                      will appear here.
-                    </p>
+                  <div className="max-h-[590px] overflow-y-auto">
+                    {loadingTickets && tickets.length === 0 ? (
+                      <div className="flex min-h-[300px] items-center justify-center">
+                        <div className="flex flex-col items-center gap-2 text-sm text-slate-500">
+                          <Loader2 className="h-6 w-6 animate-spin" />
+
+                          <span>Loading support tickets...</span>
+                        </div>
+                      </div>
+                    ) : tickets.length === 0 ? (
+                      <div className="flex min-h-[300px] flex-col items-center justify-center px-6 text-center">
+                        <MessageCircle className="mb-3 h-10 w-10 text-slate-300" />
+
+                        <p className="font-medium text-slate-700">
+                          No support tickets
+                        </p>
+
+                        <p className="mt-1 text-xs leading-5 text-slate-400">
+                          Tickets created from unresolved automated support
+                          conversations will appear here.
+                        </p>
+                      </div>
+                    ) : (
+                      tickets.map((ticket) => {
+                        const selected = selectedTicket?.id === ticket.id;
+
+                        return (
+                          <button
+                            key={ticket.id}
+                            type="button"
+                            onClick={() => void handleSelectTicket(ticket)}
+                            className={`w-full border-b border-slate-100 px-4 py-4 text-left transition ${
+                              selected
+                                ? "bg-blue-50"
+                                : "bg-white hover:bg-slate-50"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold text-slate-900">
+                                  {getTicketTitle(ticket)}
+                                </p>
+
+                                <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
+                                  {getTicketPreview(ticket)}
+                                </p>
+                              </div>
+
+                              <span
+                                className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ring-inset ${getStatusClassName(
+                                  ticket.status,
+                                )}`}
+                              >
+                                {getStatusLabel(ticket.status)}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ring-inset ${getPriorityClassName(
+                                    ticket.priority,
+                                  )}`}
+                                >
+                                  {getPriorityLabel(ticket.priority)}
+                                </span>
+
+                                {ticket.messages &&
+                                  ticket.messages.length > 0 && (
+                                    <span className="text-[11px] text-slate-400">
+                                      {ticket.messages.length}{" "}
+                                      {ticket.messages.length === 1
+                                        ? "message"
+                                        : "messages"}
+                                    </span>
+                                  )}
+                              </div>
+
+                              <span className="text-[11px] text-slate-400">
+                                {formatDateTime(ticket.createdAt)}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
-                ) : (
-                  tickets.map(
-                    (ticket) => {
+                </aside>
+
+                {/* ==============================================
+                DETAIL
+            ============================================== */}
+
+                <section
+                  className={`min-w-0 ${
+                    mobileShowDetail ? "block" : "hidden lg:block"
+                  }`}
+                >
+                  {!selectedTicket ? (
+                    <div className="flex min-h-[650px] items-center justify-center px-6">
+                      <div className="max-w-md text-center">
+                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
+                          <MessageCircle className="h-8 w-8 text-slate-400" />
+                        </div>
+
+                        <h3 className="mt-4 text-lg font-semibold text-slate-900">
+                          Select a support ticket
+                        </h3>
+
+                        <p className="mt-2 text-sm leading-6 text-slate-500">
+                          Select a ticket from the list to view the conversation
+                          and respond to the player.
+                        </p>
+
+                        <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4 text-left">
+                          <div className="flex items-start gap-3">
+                            <Bot className="mt-0.5 h-5 w-5 shrink-0 text-violet-600" />
+
+                            <div>
+                              <p className="text-sm font-semibold text-slate-800">
+                                Automated support
+                              </p>
+
+                              <p className="mt-1 text-xs leading-5 text-slate-500">
+                                AI Assistant messages can come from automated AI
+                                support or the built-in support knowledge
+                                fallback. Unresolved conversations can be
+                                handled by an administrator here.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex h-full min-h-[650px] flex-col">
+                      {/* DETAIL HEADER */}
+
+                      <div className="border-b border-slate-200 px-4 py-4 sm:px-6">
+                        <div className="flex items-start gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setMobileShowDetail(false)}
+                            className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 lg:hidden"
+                            aria-label="Back to support tickets"
+                          >
+                            <ChevronLeft className="h-5 w-5" />
+                          </button>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h2 className="truncate text-base font-semibold text-slate-900 sm:text-lg">
+                                {getTicketTitle(selectedTicket)}
+                              </h2>
+
+                              <span
+                                className={`rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ring-inset ${getStatusClassName(
+                                  selectedTicket.status,
+                                )}`}
+                              >
+                                {getStatusLabel(selectedTicket.status)}
+                              </span>
+
+                              <span
+                                className={`rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ring-inset ${getPriorityClassName(
+                                  selectedTicket.priority,
+                                )}`}
+                              >
+                                {getPriorityLabel(selectedTicket.priority)}
+                              </span>
+                            </div>
+
+                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                              <span>Ticket #{selectedTicket.id}</span>
+
+                              {selectedTicket.user && (
+                                <span>
+                                  Player:{" "}
+                                  {selectedTicket.user.fullName ||
+                                    selectedTicket.user.username ||
+                                    selectedTicket.user.phone ||
+                                    selectedTicket.user.id}
+                                </span>
+                              )}
+
+                              <span>
+                                Created{" "}
+                                {formatDateTime(selectedTicket.createdAt)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* CONTROLS */}
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <select
+                            value={selectedTicket.status}
+                            disabled={updatingStatus}
+                            onChange={(event) =>
+                              void handleStatusChange(
+                                event.target.value as SupportTicketStatus,
+                              )
+                            }
+                            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-blue-500 disabled:opacity-60"
+                          >
+                            <option value="OPEN">Open</option>
+
+                            <option value="IN_PROGRESS">In Progress</option>
+
+                            <option value="RESOLVED">Resolved</option>
+
+                            <option value="CLOSED">Closed</option>
+                          </select>
+
+                          <select
+                            value={selectedTicket.priority}
+                            disabled={updatingPriority}
+                            onChange={(event) =>
+                              void handlePriorityChange(
+                                event.target.value as SupportTicketPriority,
+                              )
+                            }
+                            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-blue-500 disabled:opacity-60"
+                          >
+                            <option value="LOW">Low</option>
+
+                            <option value="NORMAL">Normal</option>
+
+                            <option value="HIGH">High</option>
+
+                            <option value="URGENT">Urgent</option>
+                          </select>
+
+                          {updatingStatus || updatingPriority ? (
+                            <div className="inline-flex h-9 items-center gap-2 px-2 text-xs text-slate-400">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Updating...
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* MESSAGES */}
+
+                      <div className="flex-1 overflow-y-auto bg-slate-50/70 px-4 py-5 sm:px-6">
+                        {loadingTicket ? (
+                          <div className="flex min-h-[300px] items-center justify-center">
+                            <div className="flex items-center gap-2 text-sm text-slate-500">
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                              Loading conversation...
+                            </div>
+                          </div>
+                        ) : messages.length === 0 ? (
+                          <div className="flex min-h-[300px] items-center justify-center">
+                            <div className="text-center">
+                              <Clock3 className="mx-auto h-8 w-8 text-slate-300" />
+
+                              <p className="mt-3 text-sm font-medium text-slate-600">
+                                No messages yet
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-5">
+                            {messages.map((message) => (
+                              <MessageBubble
+                                key={message.id}
+                                message={message}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* REPLY */}
+
+                      <div className="border-t border-slate-200 bg-white p-4 sm:p-5">
+                        <div className="mb-2 flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-blue-600" />
+
+                          <span className="text-xs font-semibold text-slate-700">
+                            Admin Reply
+                          </span>
+                        </div>
+
+                        <div className="flex items-end gap-2">
+                          <textarea
+                            value={replyMessage}
+                            onChange={(event) =>
+                              setReplyMessage(event.target.value)
+                            }
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" && !event.shiftKey) {
+                                event.preventDefault();
+
+                                if (replyMessage.trim() && !sendingReply) {
+                                  void handleReply();
+                                }
+                              }
+                            }}
+                            rows={3}
+                            maxLength={2000}
+                            placeholder="Type your response..."
+                            className="min-h-[80px] flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm leading-6 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => void handleReply()}
+                            disabled={sendingReply || !replyMessage.trim()}
+                            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            aria-label="Send reply"
+                          >
+                            {sendingReply ? (
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                            ) : (
+                              <Send className="h-5 w-5" />
+                            )}
+                          </button>
+                        </div>
+
+                        <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
+                          <span>
+                            Press Enter to send · Shift + Enter for a new line
+                          </span>
+
+                          <span>
+                            {replyMessage.length}
+                            /2000
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              </div>
+            </div>
+          </>
+        )}
+
+        {activeView === "CONVERSATIONS" && (
+          <div className="overflow-hidden rounded-2xl border border-violet-200 bg-white shadow-sm">
+            <div className="grid min-h-[650px] grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)]">
+              {/* ==============================================
+                  CONVERSATION LIST
+              ============================================== */}
+
+              <aside
+                className={`border-slate-200 lg:border-r ${
+                  selectedConversation ? "hidden lg:block" : "block"
+                }`}
+              >
+                <div className="border-b border-slate-200 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="font-semibold text-slate-900">
+                        Support Conversations
+                      </h2>
+                      <p className="mt-1 text-xs text-slate-500">
+                        AI and human support conversations.
+                      </p>
+                    </div>
+
+                    {loadingConversations && (
+                      <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                    )}
+                  </div>
+                </div>
+
+                <div className="max-h-[590px] overflow-y-auto">
+                  {loadingConversations && conversations.length === 0 ? (
+                    <div className="flex min-h-[300px] items-center justify-center">
+                      <div className="flex flex-col items-center gap-2 text-sm text-slate-500">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        <span>Loading conversations...</span>
+                      </div>
+                    </div>
+                  ) : conversations.length === 0 ? (
+                    <div className="flex min-h-[300px] flex-col items-center justify-center px-6 text-center">
+                      <MessageCircle className="mb-3 h-10 w-10 text-slate-300" />
+                      <p className="font-medium text-slate-700">
+                        No support conversations
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-400">
+                        Player conversations will appear here.
+                      </p>
+                    </div>
+                  ) : (
+                    conversations.map((conversation) => {
                       const selected =
-                        selectedTicket?.id ===
-                        ticket.id;
+                        selectedConversation?.id === conversation.id;
 
                       return (
                         <button
-                          key={
-                            ticket.id
-                          }
+                          key={conversation.id}
                           type="button"
                           onClick={() =>
-                            void handleSelectTicket(
-                              ticket,
-                            )
+                            void handleSelectConversation(conversation)
                           }
                           className={`w-full border-b border-slate-100 px-4 py-4 text-left transition ${
                             selected
-                              ? "bg-blue-50"
+                              ? "bg-violet-50"
                               : "bg-white hover:bg-slate-50"
                           }`}
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-semibold text-slate-900">
-                                {getTicketTitle(
-                                  ticket,
-                                )}
+                                Player #{conversation.userId}
                               </p>
 
                               <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
-                                {getTicketPreview(
-                                  ticket,
-                                )}
+                                {selected
+                                  ? getConversationMessagePreview(
+                                      conversationMessages,
+                                    )
+                                  : `Last activity ${formatDateTime(
+                                      conversation.lastMessageAt,
+                                    )}`}
                               </p>
                             </div>
 
                             <span
-                              className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ring-inset ${getStatusClassName(
-                                ticket.status,
+                              className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ring-inset ${getConversationStatusClassName(
+                                conversation.status,
                               )}`}
                             >
-                              {getStatusLabel(
-                                ticket.status,
-                              )}
+                              {getConversationStatusLabel(conversation.status)}
                             </span>
                           </div>
 
-                          <div className="mt-3 flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ring-inset ${getPriorityClassName(
-                                  ticket.priority,
-                                )}`}
-                              >
-                                {getPriorityLabel(
-                                  ticket.priority,
-                                )}
-                              </span>
+                          <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                            <span>
+                              {conversation.language || "Unknown language"}
+                            </span>
 
-                              {ticket.messages &&
-                                ticket
-                                  .messages
-                                  .length >
-                                  0 && (
-                                  <span className="text-[11px] text-slate-400">
-                                    {
-                                      ticket
-                                        .messages
-                                        .length
-                                    }{" "}
-                                    {ticket
-                                      .messages
-                                      .length ===
-                                    1
-                                      ? "message"
-                                      : "messages"}
-                                  </span>
-                                )}
-                            </div>
-
-                            <span className="text-[11px] text-slate-400">
-                              {formatDateTime(
-                                ticket.createdAt,
-                              )}
+                            <span>
+                              {formatDateTime(conversation.lastMessageAt)}
                             </span>
                           </div>
                         </button>
                       );
-                    },
-                  )
-                )}
-              </div>
-            </aside>
+                    })
+                  )}
+                </div>
+              </aside>
 
-            {/* ==============================================
-                DETAIL
-            ============================================== */}
+              {/* ==============================================
+                  CONVERSATION DETAIL
+              ============================================== */}
 
-            <section
-              className={`min-w-0 ${
-                mobileShowDetail
-                  ? "block"
-                  : "hidden lg:block"
-              }`}
-            >
-              {!selectedTicket ? (
-                <div className="flex min-h-[650px] items-center justify-center px-6">
-                  <div className="max-w-md text-center">
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
-                      <MessageCircle className="h-8 w-8 text-slate-400" />
+              <section
+                className={`min-w-0 ${
+                  selectedConversation ? "block" : "hidden lg:block"
+                }`}
+              >
+                {!selectedConversation ? (
+                  <div className="flex min-h-[650px] items-center justify-center px-6">
+                    <div className="max-w-md text-center">
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-50">
+                        <MessageCircle className="h-8 w-8 text-violet-400" />
+                      </div>
+
+                      <h3 className="mt-4 text-lg font-semibold text-slate-900">
+                        Select a conversation
+                      </h3>
+
+                      <p className="mt-2 text-sm leading-6 text-slate-500">
+                        Select a player conversation from the list to view AI or
+                        human support messages.
+                      </p>
                     </div>
-
-                    <h3 className="mt-4 text-lg font-semibold text-slate-900">
-                      Select a support
-                      ticket
-                    </h3>
-
-                    <p className="mt-2 text-sm leading-6 text-slate-500">
-                      Select a ticket from
-                      the list to view the
-                      conversation and
-                      respond to the player.
-                    </p>
-
-                    <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4 text-left">
+                  </div>
+                ) : (
+                  <div className="flex h-full min-h-[650px] flex-col">
+                    <div className="border-b border-slate-200 px-4 py-4 sm:px-6">
                       <div className="flex items-start gap-3">
-                        <Bot className="mt-0.5 h-5 w-5 shrink-0 text-violet-600" />
+                        <button
+                          type="button"
+                          onClick={() => setSelectedConversation(null)}
+                          className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 lg:hidden"
+                          aria-label="Back to support conversations"
+                        >
+                          <ChevronLeft className="h-5 w-5" />
+                        </button>
 
-                        <div>
-                          <p className="text-sm font-semibold text-slate-800">
-                            Automated
-                            support
-                          </p>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h2 className="truncate text-base font-semibold text-slate-900 sm:text-lg">
+                              Player #{selectedConversation.userId}
+                            </h2>
 
-                          <p className="mt-1 text-xs leading-5 text-slate-500">
-                            AI Assistant
-                            messages can come
-                            from automated AI
-                            support or the
-                            built-in support
-                            knowledge fallback.
-                            Unresolved
-                            conversations can be
-                            handled by an
-                            administrator here.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex h-full min-h-[650px] flex-col">
-                  {/* DETAIL HEADER */}
-
-                  <div className="border-b border-slate-200 px-4 py-4 sm:px-6">
-                    <div className="flex items-start gap-3">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setMobileShowDetail(
-                            false,
-                          )
-                        }
-                        className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 lg:hidden"
-                        aria-label="Back to support tickets"
-                      >
-                        <ChevronLeft className="h-5 w-5" />
-                      </button>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="truncate text-base font-semibold text-slate-900 sm:text-lg">
-                            {getTicketTitle(
-                              selectedTicket,
-                            )}
-                          </h2>
-
-                          <span
-                            className={`rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ring-inset ${getStatusClassName(
-                              selectedTicket.status,
-                            )}`}
-                          >
-                            {getStatusLabel(
-                              selectedTicket.status,
-                            )}
-                          </span>
-
-                          <span
-                            className={`rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ring-inset ${getPriorityClassName(
-                              selectedTicket.priority,
-                            )}`}
-                          >
-                            {getPriorityLabel(
-                              selectedTicket.priority,
-                            )}
-                          </span>
-                        </div>
-
-                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
-                          <span>
-                            Ticket #
-                            {
-                              selectedTicket.id
-                            }
-                          </span>
-
-                          {selectedTicket.user && (
-                            <span>
-                              Player:{" "}
-                              {selectedTicket
-                                .user
-                                .fullName ||
-                                selectedTicket
-                                  .user
-                                  .username ||
-                                selectedTicket
-                                  .user
-                                  .phone ||
-                                selectedTicket
-                                  .user
-                                  .id}
+                            <span
+                              className={`rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ring-inset ${getConversationStatusClassName(
+                                selectedConversation.status,
+                              )}`}
+                            >
+                              {getConversationStatusLabel(
+                                selectedConversation.status,
+                              )}
                             </span>
-                          )}
+                          </div>
 
-                          <span>
-                            Created{" "}
-                            {formatDateTime(
-                              selectedTicket.createdAt,
+                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                            <span>Conversation #{selectedConversation.id}</span>
+
+                            <span>
+                              Language:{" "}
+                              {selectedConversation.language || "Unknown"}
+                            </span>
+
+                            <span>
+                              Created{" "}
+                              {formatDateTime(selectedConversation.createdAt)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {selectedConversation.status !== "CLOSED" && (
+                          <button
+                            type="button"
+                            onClick={() => void handleCloseConversation()}
+                            disabled={closingConversation}
+                            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {closingConversation ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <XCircle className="h-4 w-4" />
                             )}
-                          </span>
-                        </div>
+                            Close
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    {/* CONTROLS */}
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <select
-                        value={
-                          selectedTicket.status
-                        }
-                        disabled={
-                          updatingStatus
-                        }
-                        onChange={(event) =>
-                          void handleStatusChange(
-                            event.target
-                              .value as SupportTicketStatus,
-                          )
-                        }
-                        className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-blue-500 disabled:opacity-60"
-                      >
-                        <option value="OPEN">
-                          Open
-                        </option>
-
-                        <option value="IN_PROGRESS">
-                          In Progress
-                        </option>
-
-                        <option value="RESOLVED">
-                          Resolved
-                        </option>
-
-                        <option value="CLOSED">
-                          Closed
-                        </option>
-                      </select>
-
-                      <select
-                        value={
-                          selectedTicket.priority
-                        }
-                        disabled={
-                          updatingPriority
-                        }
-                        onChange={(event) =>
-                          void handlePriorityChange(
-                            event.target
-                              .value as SupportTicketPriority,
-                          )
-                        }
-                        className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-blue-500 disabled:opacity-60"
-                      >
-                        <option value="LOW">
-                          Low
-                        </option>
-
-                        <option value="NORMAL">
-                          Normal
-                        </option>
-
-                        <option value="HIGH">
-                          High
-                        </option>
-
-                        <option value="URGENT">
-                          Urgent
-                        </option>
-                      </select>
-
-                      {updatingStatus ||
-                      updatingPriority ? (
-                        <div className="inline-flex h-9 items-center gap-2 px-2 text-xs text-slate-400">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-
-                          Updating...
+                    <div className="flex-1 overflow-y-auto bg-slate-50/70 px-4 py-5 sm:px-6">
+                      {loadingConversationMessages ? (
+                        <div className="flex min-h-[300px] items-center justify-center">
+                          <div className="flex items-center gap-2 text-sm text-slate-500">
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            Loading conversation...
+                          </div>
                         </div>
-                      ) : null}
+                      ) : conversationMessages.length === 0 ? (
+                        <div className="flex min-h-[300px] items-center justify-center">
+                          <div className="text-center">
+                            <Clock3 className="mx-auto h-8 w-8 text-slate-300" />
+                            <p className="mt-3 text-sm font-medium text-slate-600">
+                              No messages yet
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-5">
+                          {conversationMessages.map((message) => {
+                            const isAdmin = message.senderType === "ADMIN";
+                            const isAI = message.senderType === "AI";
+
+                            const SenderIcon = isAdmin
+                              ? CheckCircle2
+                              : isAI
+                                ? Bot
+                                : message.senderType === "SYSTEM"
+                                  ? Clock3
+                                  : User;
+
+                            const senderName = isAdmin
+                              ? "Admin"
+                              : isAI
+                                ? "AI Assistant"
+                                : message.senderType === "SYSTEM"
+                                  ? "System"
+                                  : "Player";
+
+                            return (
+                              <div
+                                key={message.id}
+                                className={`flex w-full ${
+                                  isAdmin ? "justify-end" : "justify-start"
+                                }`}
+                              >
+                                <div
+                                  className={`flex max-w-[92%] flex-col sm:max-w-[78%] ${
+                                    isAdmin ? "items-end" : "items-start"
+                                  }`}
+                                >
+                                  <div className="mb-1 flex items-center gap-1.5 px-1 text-xs font-medium text-slate-500">
+                                    <SenderIcon className="h-3.5 w-3.5" />
+                                    <span>{senderName}</span>
+                                  </div>
+
+                                  <div
+                                    className={`rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
+                                      isAdmin
+                                        ? "rounded-br-md bg-blue-600 text-white"
+                                        : isAI
+                                          ? "rounded-bl-md border border-violet-200 bg-violet-50 text-slate-800"
+                                          : message.senderType === "SYSTEM"
+                                            ? "rounded-bl-md border border-amber-200 bg-amber-50 text-slate-800"
+                                            : "rounded-bl-md border border-slate-200 bg-white text-slate-800"
+                                    }`}
+                                  >
+                                    <p className="whitespace-pre-wrap break-words">
+                                      {message.message}
+                                    </p>
+                                  </div>
+
+                                  <span className="mt-1 px-1 text-[11px] text-slate-400">
+                                    {formatDateTime(message.createdAt)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  </div>
 
-                  {/* MESSAGES */}
-
-                  <div className="flex-1 overflow-y-auto bg-slate-50/70 px-4 py-5 sm:px-6">
-                    {loadingTicket ? (
-                      <div className="flex min-h-[300px] items-center justify-center">
-                        <div className="flex items-center gap-2 text-sm text-slate-500">
-                          <Loader2 className="h-5 w-5 animate-spin" />
-
-                          Loading conversation...
+                    <div className="border-t border-slate-200 bg-white p-4 sm:p-5">
+                      {selectedConversation.status === "CLOSED" ? (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                          This conversation is closed. No further replies can be
+                          sent.
                         </div>
-                      </div>
-                    ) : messages.length ===
-                      0 ? (
-                      <div className="flex min-h-[300px] items-center justify-center">
-                        <div className="text-center">
-                          <Clock3 className="mx-auto h-8 w-8 text-slate-300" />
+                      ) : (
+                        <>
+                          <div className="mb-2 flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                            <span className="text-xs font-semibold text-slate-700">
+                              Admin Reply
+                            </span>
+                          </div>
 
-                          <p className="mt-3 text-sm font-medium text-slate-600">
-                            No messages yet
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-5">
-                        {messages.map(
-                          (message) => (
-                            <MessageBubble
-                              key={
-                                message.id
+                          <div className="flex items-end gap-2">
+                            <textarea
+                              value={conversationReply}
+                              onChange={(event) =>
+                                setConversationReply(event.target.value)
                               }
-                              message={
-                                message
-                              }
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" && !event.shiftKey) {
+                                  event.preventDefault();
+
+                                  if (
+                                    conversationReply.trim() &&
+                                    !sendingConversationReply
+                                  ) {
+                                    void handleConversationReply();
+                                  }
+                                }
+                              }}
+                              rows={3}
+                              maxLength={2000}
+                              placeholder="Type your response..."
+                              className="min-h-[80px] flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm leading-6 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-500/10"
                             />
-                          ),
-                        )}
-                      </div>
-                    )}
-                  </div>
 
-                  {/* REPLY */}
+                            <button
+                              type="button"
+                              onClick={() => void handleConversationReply()}
+                              disabled={
+                                sendingConversationReply ||
+                                !conversationReply.trim()
+                              }
+                              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-sm transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              aria-label="Send conversation reply"
+                            >
+                              {sendingConversationReply ? (
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                              ) : (
+                                <Send className="h-5 w-5" />
+                              )}
+                            </button>
+                          </div>
 
-                  <div className="border-t border-slate-200 bg-white p-4 sm:p-5">
-                    <div className="mb-2 flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
+                            <span>
+                              Press Enter to send · Shift + Enter for a new line
+                            </span>
 
-                      <span className="text-xs font-semibold text-slate-700">
-                        Admin Reply
-                      </span>
-                    </div>
-
-                    <div className="flex items-end gap-2">
-                      <textarea
-                        value={
-                          replyMessage
-                        }
-                        onChange={(event) =>
-                          setReplyMessage(
-                            event.target
-                              .value,
-                          )
-                        }
-                        onKeyDown={(event) => {
-                          if (
-                            event.key ===
-                              "Enter" &&
-                            !event.shiftKey
-                          ) {
-                            event.preventDefault();
-
-                            if (
-                              replyMessage.trim() &&
-                              !sendingReply
-                            ) {
-                              void handleReply();
-                            }
-                          }
-                        }}
-                        rows={3}
-                        maxLength={2000}
-                        placeholder="Type your response..."
-                        className="min-h-[80px] flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm leading-6 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void handleReply()
-                        }
-                        disabled={
-                          sendingReply ||
-                          !replyMessage.trim()
-                        }
-                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        aria-label="Send reply"
-                      >
-                        {sendingReply ? (
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <Send className="h-5 w-5" />
-                        )}
-                      </button>
-                    </div>
-
-                    <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
-                      <span>
-                        Press Enter to send ·
-                        Shift + Enter for a
-                        new line
-                      </span>
-
-                      <span>
-                        {
-                          replyMessage.length
-                        }
-                        /2000
-                      </span>
+                            <span>{conversationReply.length}/2000</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
-                </div>
-              )}
-            </section>
+                )}
+              </section>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

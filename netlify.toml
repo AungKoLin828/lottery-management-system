@@ -221,6 +221,35 @@
   status = 200
   force = true
 
+[[redirects]]
+  from = "/api/support/chat"
+  to = "/.netlify/functions/support-chat"
+  status = 200
+
+[[redirects]]
+  from = "/api/support/conversations"
+  to = "/.netlify/functions/support-conversations"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/support"
+  to = "/.netlify/functions/admin-support"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/support/messages"
+  to = "/.netlify/functions/admin-support-messages"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/support/reply"
+  to = "/.netlify/functions/admin-support-reply"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/support/close"
+  to = "/.netlify/functions/admin-support-close"
+  status = 200
 
 # ============================================================
 # ADMIN DRAW SETTINGS API
