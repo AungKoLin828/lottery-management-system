@@ -1,16 +1,37 @@
-import type { SupportConversation, SupportMessage } from "@/types/support";
-
-/* ============================================================
-   TYPES
-============================================================ */
-
-export type SupportSource = "OPENROUTER" | "TRAINING" | "HUMAN";
-
-/**
- * Response returned by the player support chat endpoint.
+/*
+ * ============================================================
+ * SUPPORT SERVICE
+ * ============================================================
  */
+
+import type {
+  SupportConversation,
+  SupportMessage,
+} from "@/types/support";
+
+/*
+ * ============================================================
+ * SUPPORT SOURCE
+ * ============================================================
+ */
+
+export type SupportSource =
+  | "OPENROUTER"
+  | "TRAINING"
+  | "HUMAN";
+
+/*
+ * ============================================================
+ * CHAT RESPONSE
+ * ============================================================
+ */
+
 export interface SupportChatResponse {
-  conversation: SupportConversation;
+  success: boolean;
+
+  conversation:
+    | SupportConversation
+    | null;
 
   message: SupportMessage;
 
@@ -23,268 +44,410 @@ export interface SupportChatResponse {
   confidence: number;
 }
 
-/**
- * Response returned by the player's current
- * conversation endpoint.
+/*
+ * ============================================================
+ * CONVERSATION RESPONSE
+ * ============================================================
  */
+
 export interface SupportConversationResponse {
-  conversation: SupportConversation | null;
+  success: boolean;
+
+  conversation:
+    | SupportConversation
+    | null;
 
   messages: SupportMessage[];
 }
 
-/**
- * Response returned by admin conversation list.
+/*
+ * ============================================================
+ * ADMIN LIST RESPONSE
+ * ============================================================
  */
+
 export interface AdminSupportListResponse {
-  conversations: SupportConversation[];
+  success: boolean;
+
+  conversations:
+    SupportConversation[];
 }
 
-/**
- * Response returned by admin conversation messages.
+/*
+ * ============================================================
+ * ADMIN MESSAGES RESPONSE
+ * ============================================================
  */
+
 export interface AdminSupportMessagesResponse {
-  conversation: SupportConversation;
+  success: boolean;
 
-  messages: SupportMessage[];
+  conversation:
+    SupportConversation;
+
+  messages:
+    SupportMessage[];
 }
 
-/**
- * Response returned by admin reply.
+/*
+ * ============================================================
+ * ADMIN REPLY RESPONSE
+ * ============================================================
  */
+
 export interface AdminSupportReplyResponse {
-  message: SupportMessage;
+  success: boolean;
+
+  conversation?:
+    | SupportConversation
+    | null;
+
+  message:
+    SupportMessage;
 }
 
-/**
- * Response returned by admin close.
+/*
+ * ============================================================
+ * ADMIN CLOSE RESPONSE
+ * ============================================================
  */
+
 export interface AdminSupportCloseResponse {
-  success?: boolean;
+  success: boolean;
 
-  conversation?: SupportConversation;
+  conversation?:
+    | SupportConversation
+    | null;
 }
 
-/* ============================================================
-   API ERROR
-============================================================ */
-
-interface ApiErrorResponse {
-  error?: unknown;
-
-  message?: unknown;
-}
-
-/* ============================================================
-   HELPERS
-============================================================ */
-
-/**
- * Extract a useful error message from an API response.
+/*
+ * ============================================================
+ * API ERROR
+ * ============================================================
  */
-function getApiErrorMessage(data: unknown): string {
-  if (typeof data !== "object" || data === null) {
-    return "Support request failed";
+
+function getApiErrorMessage(
+  data: unknown,
+  fallback: string,
+): string {
+  if (
+    typeof data ===
+      "object" &&
+    data !== null
+  ) {
+    const value =
+      data as {
+        error?: unknown;
+        message?: unknown;
+      };
+
+    if (
+      typeof value.error ===
+      "string"
+    ) {
+      return value.error;
+    }
+
+    if (
+      typeof value.message ===
+      "string"
+    ) {
+      return value.message;
+    }
   }
 
-  const errorData = data as ApiErrorResponse;
-
-  if (typeof errorData.error === "string" && errorData.error.trim()) {
-    return errorData.error;
-  }
-
-  if (typeof errorData.message === "string" && errorData.message.trim()) {
-    return errorData.message;
-  }
-
-  return "Support request failed";
+  return fallback;
 }
 
-/**
- * Runtime validation for the support source.
- *
- * This prevents unexpected backend values from
- * breaking the frontend.
+/*
+ * ============================================================
+ * NORMALIZE SOURCE
+ * ============================================================
  */
-function normalizeSupportSource(value: unknown): SupportSource {
-  if (value === "OPENROUTER") {
-    return "OPENROUTER";
-  }
 
-  if (value === "TRAINING") {
-    return "TRAINING";
-  }
+function normalizeSupportSource(
+  value: unknown,
+): SupportSource {
+  switch (value) {
+    case "OPENROUTER":
+      return "OPENROUTER";
 
-  if (value === "HUMAN") {
-    return "HUMAN";
-  }
+    case "TRAINING":
+      return "TRAINING";
 
-  /*
-   * The backend should always return a valid
-   * source. If an old backend is temporarily
-   * deployed without `source`, treat the
-   * response as OPENROUTER for backward
-   * compatibility.
-   */
-  return "OPENROUTER";
+    case "HUMAN":
+      return "HUMAN";
+
+    default:
+      return "HUMAN";
+  }
 }
 
-/**
- * Generic API request helper.
+/*
+ * ============================================================
+ * API REQUEST
+ * ============================================================
  */
-async function api<T>(url: string, init?: RequestInit): Promise<T> {
+
+async function api<T>(
+  url: string,
+  init?: RequestInit,
+): Promise<T> {
   let response: Response;
 
   try {
-    response = await fetch(url, {
-      credentials: "include",
+    response =
+      await fetch(
+        url,
+        {
+          credentials:
+            "include",
 
-      ...init,
+          ...init,
 
-      headers: {
-        "Content-Type": "application/json",
+          headers: {
+            "Content-Type":
+              "application/json",
 
-        ...(init?.headers || {}),
-      },
-    });
+            ...(init?.headers ||
+              {}),
+          },
+        },
+      );
   } catch (error) {
-    /*
-     * Network-level error.
-     */
-    if (error instanceof Error) {
-      throw error;
-    }
-
-    throw new Error("Unable to connect to support service.");
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : "Unable to connect to the support service.",
+    );
   }
 
-  /*
-   * Some backend errors may return an
-   * empty response body.
-   */
-  const data: unknown = await response.json().catch(() => ({}));
+  let data: unknown = {};
+
+  try {
+    data =
+      await response.json();
+  } catch {
+    data = {};
+  }
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(data));
+    throw new Error(
+      getApiErrorMessage(
+        data,
+        `Support request failed (${response.status}).`,
+      ),
+    );
   }
 
   return data as T;
 }
 
-/* ============================================================
-   SUPPORT SERVICE
-============================================================ */
+/*
+ * ============================================================
+ * CHAT
+ * ============================================================
+ */
+
+async function chat(
+  message: string,
+): Promise<SupportChatResponse> {
+  const trimmed =
+    message.trim();
+
+  if (!trimmed) {
+    throw new Error(
+      "Please enter a support message.",
+    );
+  }
+
+  const response =
+    await api<SupportChatResponse>(
+      "/api/support/chat",
+      {
+        method: "POST",
+
+        body: JSON.stringify({
+          message: trimmed,
+        }),
+      },
+    );
+
+  return {
+    ...response,
+
+    source:
+      normalizeSupportSource(
+        response.source,
+      ),
+
+    escalated:
+      response.escalated ===
+      true,
+
+    intent:
+      typeof response.intent ===
+      "string"
+        ? response.intent
+        : null,
+
+    confidence:
+      Number.isFinite(
+        Number(
+          response.confidence,
+        ),
+      )
+        ? Number(
+            response.confidence,
+          )
+        : 0,
+  };
+}
+
+/*
+ * ============================================================
+ * PLAYER CONVERSATION
+ * ============================================================
+ */
+
+async function conversation(): Promise<
+  SupportConversationResponse
+> {
+  return api<SupportConversationResponse>(
+    "/api/support/conversations",
+  );
+}
+
+/*
+ * ============================================================
+ * ADMIN LIST
+ * ============================================================
+ */
+
+async function adminList(): Promise<
+  AdminSupportListResponse
+> {
+  return api<AdminSupportListResponse>(
+    "/api/admin/support",
+  );
+}
+
+/*
+ * ============================================================
+ * ADMIN MESSAGES
+ * ============================================================
+ */
+
+async function adminMessages(
+  id: number,
+): Promise<AdminSupportMessagesResponse> {
+  if (
+    !Number.isInteger(id) ||
+    id <= 0
+  ) {
+    throw new Error(
+      "Invalid support conversation ID.",
+    );
+  }
+
+  return api<AdminSupportMessagesResponse>(
+    `/api/admin/support/messages?conversationId=${encodeURIComponent(
+      String(id),
+    )}`,
+  );
+}
+
+/*
+ * ============================================================
+ * ADMIN REPLY
+ * ============================================================
+ */
+
+async function adminReply(
+  conversationId: number,
+  message: string,
+): Promise<AdminSupportReplyResponse> {
+  if (
+    !Number.isInteger(
+      conversationId,
+    ) ||
+    conversationId <= 0
+  ) {
+    throw new Error(
+      "Invalid support conversation ID.",
+    );
+  }
+
+  const trimmed =
+    message.trim();
+
+  if (!trimmed) {
+    throw new Error(
+      "Reply message cannot be empty.",
+    );
+  }
+
+  return api<AdminSupportReplyResponse>(
+    "/api/admin/support/reply",
+    {
+      method: "POST",
+
+      body: JSON.stringify({
+        conversationId,
+        message: trimmed,
+      }),
+    },
+  );
+}
+
+/*
+ * ============================================================
+ * ADMIN CLOSE
+ * ============================================================
+ */
+
+async function adminClose(
+  conversationId: number,
+): Promise<AdminSupportCloseResponse> {
+  if (
+    !Number.isInteger(
+      conversationId,
+    ) ||
+    conversationId <= 0
+  ) {
+    throw new Error(
+      "Invalid support conversation ID.",
+    );
+  }
+
+  return api<AdminSupportCloseResponse>(
+    "/api/admin/support/close",
+    {
+      method: "POST",
+
+      body: JSON.stringify({
+        conversationId,
+      }),
+    },
+  );
+}
+
+/*
+ * ============================================================
+ * SERVICE
+ * ============================================================
+ */
 
 export const supportService = {
-  /* ==========================================================
-     PLAYER CHAT
-  ========================================================== */
+  chat,
 
-  chat: (message: string): Promise<SupportChatResponse> =>
-    api<SupportChatResponse>("/api/support/chat", {
-      method: "POST",
+  conversation,
 
-      body: JSON.stringify({
-        message,
-      }),
-    }).then(
-      (response): SupportChatResponse => ({
-        ...response,
+  adminList,
 
-        /*
-         * Normalize source at the service
-         * boundary so all frontend consumers
-         * receive a valid value.
-         */
-        source: normalizeSupportSource(response?.source),
+  adminMessages,
 
-        /*
-         * Keep confidence predictable.
-         */
-        confidence:
-          typeof response?.confidence === "number" ? response.confidence : 0,
+  adminReply,
 
-        /*
-         * Keep intent predictable.
-         */
-        intent: typeof response?.intent === "string" ? response.intent : null,
-      }),
-    ),
-
-  /* ==========================================================
-     PLAYER CURRENT CONVERSATION
-  ========================================================== */
-
-  conversation: (): Promise<SupportConversationResponse> =>
-    api<SupportConversationResponse>("/api/support/conversations"),
-
-  /* ==========================================================
-     ADMIN LIST
-  ========================================================== */
-
-  adminList: (): Promise<AdminSupportListResponse> =>
-    api<AdminSupportListResponse>("/api/admin/support"),
-
-  /* ==========================================================
-     ADMIN MESSAGES
-  ========================================================== */
-
-  adminMessages: (id: number): Promise<AdminSupportMessagesResponse> => {
-    if (!Number.isInteger(id) || id <= 0) {
-      return Promise.reject(new Error("Invalid conversation ID."));
-    }
-
-    return api<AdminSupportMessagesResponse>(
-      `/api/admin/support/messages?conversationId=${encodeURIComponent(
-        String(id),
-      )}`,
-    );
-  },
-
-  /* ==========================================================
-     ADMIN REPLY
-  ========================================================== */
-
-  adminReply: (
-    conversationId: number,
-    message: string,
-  ): Promise<AdminSupportReplyResponse> => {
-    if (!Number.isInteger(conversationId) || conversationId <= 0) {
-      return Promise.reject(new Error("Invalid conversation ID."));
-    }
-
-    const trimmedMessage = message.trim();
-
-    if (!trimmedMessage) {
-      return Promise.reject(new Error("Message cannot be empty."));
-    }
-
-    return api<AdminSupportReplyResponse>("/api/admin/support/reply", {
-      method: "POST",
-
-      body: JSON.stringify({
-        conversationId,
-
-        message: trimmedMessage,
-      }),
-    });
-  },
-
-  /* ==========================================================
-     ADMIN CLOSE
-  ========================================================== */
-
-  adminClose: (conversationId: number): Promise<AdminSupportCloseResponse> => {
-    if (!Number.isInteger(conversationId) || conversationId <= 0) {
-      return Promise.reject(new Error("Invalid conversation ID."));
-    }
-
-    return api<AdminSupportCloseResponse>("/api/admin/support/close", {
-      method: "POST",
-
-      body: JSON.stringify({
-        conversationId,
-      }),
-    });
-  },
+  adminClose,
 };

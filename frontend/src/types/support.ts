@@ -1,6 +1,50 @@
-export type SenderType = "PLAYER" | "AI" | "ADMIN" | "SYSTEM";
+/*
+ * ============================================================
+ * SUPPORT TYPES
+ * ============================================================
+ */
 
-export type ConversationStatus = "AI" | "HUMAN" | "CLOSED";
+/*
+ * ============================================================
+ * SENDER TYPE
+ * ============================================================
+ */
+
+export type SenderType =
+  | "PLAYER"
+  | "AI"
+  | "ADMIN"
+  | "SYSTEM";
+
+/*
+ * ============================================================
+ * CONVERSATION STATUS
+ * ============================================================
+ */
+
+export type ConversationStatus =
+  | "AI"
+  | "HUMAN"
+  | "CLOSED";
+
+/*
+ * ============================================================
+ * SUPPORT MESSAGE
+ * ============================================================
+ *
+ * IMPORTANT:
+ *
+ * Support message ID:
+ *   number
+ *
+ * Conversation ID:
+ *   number
+ *
+ * Sender/user ID:
+ *   string
+ *
+ * because application users use UUID IDs.
+ */
 
 export interface SupportMessage {
   id: number;
@@ -9,21 +53,38 @@ export interface SupportMessage {
 
   senderType: SenderType;
 
-  senderId: number | null;
+  senderId: string | null;
 
   message: string;
 
   intent: string | null;
 
-  confidence: string | number | null;
+  confidence:
+    | string
+    | number
+    | null;
 
   createdAt: string;
 }
 
+/*
+ * ============================================================
+ * SUPPORT CONVERSATION
+ * ============================================================
+ *
+ * IMPORTANT:
+ *
+ * Conversation ID:
+ *   number
+ *
+ * User ID:
+ *   string / UUID
+ */
+
 export interface SupportConversation {
   id: number;
 
-  userId: number;
+  userId: string;
 
   status: ConversationStatus;
 

@@ -1,22 +1,23 @@
 /*
  * ============================================================
- * PLAYER CURRENT SUPPORT CONVERSATION
+ * PLAYER SUPPORT CONVERSATION
  * ============================================================
  *
  * GET /api/support/conversations
+ *
  * ============================================================
  */
 
 import type {
   Handler,
   HandlerEvent,
+  HandlerContext,
 } from "@netlify/functions";
 
 import {
   authenticate,
-  getNumericUserId,
+  getUserId,
   json,
-  requireMethod,
 } from "./helpers";
 
 import {
@@ -24,70 +25,114 @@ import {
   listMessages,
 } from "./db";
 
-export const handler: Handler =
-  async (
-    event: HandlerEvent,
-  ) => {
-    const methodError =
-      requireMethod(
-        event,
-        "GET",
-      );
+/*
+ * ============================================================
+ * HANDLER
+ * ============================================================
+ */
 
-    if (methodError) {
-      return methodError;
+export const handler: Handler = async (
+  event: HandlerEvent,
+  _context: HandlerContext,
+) => {
+  try {
+    if (
+      event.httpMethod.toUpperCase() !==
+      "GET"
+    ) {
+      return json(
+        405,
+        {
+          success: false,
+          error: "Method not allowed.",
+        },
+      );
     }
 
+    let user;
+
     try {
-      const user =
+      user =
         await authenticate(
           event,
         );
-
-      const userId =
-        getNumericUserId(user);
-
-      const conversation =
-        await findActiveConversation(
-          userId,
-        );
-
-      if (!conversation) {
-        return json(
-          200,
-          {
-            conversation: null,
-            messages: [],
-          },
-        );
-      }
-
-      const messages =
-        await listMessages(
-          conversation.id,
-        );
-
-      return json(
-        200,
-        {
-          conversation,
-          messages,
-        },
-      );
     } catch (error) {
-      console.error(
-        "GET SUPPORT CONVERSATION ERROR:",
-        error,
-      );
+      const statusCode =
+        error &&
+        typeof error === "object" &&
+        "statusCode" in error
+          ? Number(
+              (
+                error as {
+                  statusCode?: unknown;
+                }
+              ).statusCode,
+            )
+          : 401;
 
       return json(
-        500,
+        Number.isInteger(
+          statusCode,
+        ) &&
+          statusCode >= 400 &&
+          statusCode <= 599
+          ? statusCode
+          : 401,
         {
+          success: false,
           error:
             error instanceof Error
               ? error.message
-              : "Failed to load support conversation.",
+              : "Authentication required.",
         },
       );
     }
-  };
+
+    const userId =
+      getUserId(user);
+
+    const conversation =
+      await findActiveConversation(
+        userId,
+      );
+
+    if (!conversation) {
+      return json(
+        200,
+        {
+          success: true,
+          conversation: null,
+          messages: [],
+        },
+      );
+    }
+
+    const messages =
+      await listMessages(
+        conversation.id,
+      );
+
+    return json(
+      200,
+      {
+        success: true,
+        conversation,
+        messages,
+      },
+    );
+  } catch (error) {
+    console.error(
+      "SUPPORT CONVERSATION ERROR:",
+      error,
+    );
+
+    return json(
+      500,
+      {
+        success: false,
+        error:
+          "Failed to load support conversation.",
+      },
+    );
+  }
+};

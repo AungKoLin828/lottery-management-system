@@ -9,179 +9,82 @@
  *
  * {
  *   "conversationId": 123,
- *   "message": "How can I help you?"
+ *   "message": "..."
  * }
+ *
  * ============================================================
  */
 
 import type {
   Handler,
   HandlerEvent,
+  HandlerContext,
 } from "@netlify/functions";
 
 import {
   authenticateAdmin,
-  getNumericUserId,
   json,
   parseJsonBody,
-  requireMethod,
 } from "./support/helpers";
 
 import {
-  getConversation,
   addMessage,
+  getConversation,
   updateConversationStatus,
 } from "./support/db";
 
-interface ReplyBody {
+interface AdminReplyBody {
   conversationId?: unknown;
   message?: unknown;
 }
 
-export const handler: Handler =
-  async (
-    event: HandlerEvent,
-  ) => {
-    const methodError =
-      requireMethod(
-        event,
-        "POST",
-      );
+/*
+ * ============================================================
+ * HANDLER
+ * ============================================================
+ */
 
-    if (methodError) {
-      return methodError;
+export const handler: Handler = async (
+  event: HandlerEvent,
+  _context: HandlerContext,
+) => {
+  try {
+    /*
+     * --------------------------------------------------------
+     * METHOD
+     * --------------------------------------------------------
+     */
+
+    if (
+      event.httpMethod.toUpperCase() !==
+      "POST"
+    ) {
+      return json(
+        405,
+        {
+          success: false,
+          error: "Method not allowed.",
+        },
+      );
     }
 
+    /*
+     * --------------------------------------------------------
+     * ADMIN AUTH
+     * --------------------------------------------------------
+     */
+
+    let admin;
+
     try {
-      const admin =
+      admin =
         await authenticateAdmin(
           event,
         );
-
-      const adminId =
-        getNumericUserId(
-          admin,
-        );
-
-      const body =
-        parseJsonBody<ReplyBody>(
-          event,
-        );
-
-      const conversationId =
-        Number(
-          body.conversationId,
-        );
-
-      const message =
-        typeof body.message ===
-        "string"
-          ? body.message.trim()
-          : "";
-
-      if (
-        !Number.isSafeInteger(
-          conversationId,
-        ) ||
-        conversationId <= 0
-      ) {
-        return json(
-          400,
-          {
-            error:
-              "Valid conversationId is required.",
-          },
-        );
-      }
-
-      if (!message) {
-        return json(
-          400,
-          {
-            error:
-              "Reply message is required.",
-          },
-        );
-      }
-
-      if (
-        message.length > 2000
-      ) {
-        return json(
-          400,
-          {
-            error:
-              "Reply message must not exceed 2000 characters.",
-          },
-        );
-      }
-
-      const conversation =
-        await getConversation(
-          conversationId,
-        );
-
-      if (!conversation) {
-        return json(
-          404,
-          {
-            error:
-              "Support conversation not found.",
-          },
-        );
-      }
-
-      if (
-        conversation.status ===
-        "CLOSED"
-      ) {
-        return json(
-          409,
-          {
-            error:
-              "This support conversation is already closed.",
-          },
-        );
-      }
-
-      /* ======================================================
-         ADMIN MESSAGE
-      ====================================================== */
-
-      const supportMessage =
-        await addMessage(
-          conversationId,
-          "ADMIN",
-          adminId,
-          message,
-        );
-
-      /* ======================================================
-         HUMAN STATUS
-      ====================================================== */
-
-      await updateConversationStatus(
-        conversationId,
-        "HUMAN",
-      );
-
-      return json(
-        200,
-        {
-          message:
-            supportMessage,
-        },
-      );
     } catch (error) {
-      console.error(
-        "ADMIN SUPPORT REPLY ERROR:",
-        error,
-      );
-
       const statusCode =
         error &&
-        typeof error ===
-          "object" &&
+        typeof error === "object" &&
         "statusCode" in error
           ? Number(
               (
@@ -190,7 +93,7 @@ export const handler: Handler =
                 }
               ).statusCode,
             )
-          : 500;
+          : 401;
 
       return json(
         Number.isInteger(
@@ -199,13 +102,225 @@ export const handler: Handler =
           statusCode >= 400 &&
           statusCode <= 599
           ? statusCode
-          : 500,
+          : 401,
         {
+          success: false,
           error:
             error instanceof Error
               ? error.message
-              : "Failed to send support reply.",
+              : "Administrator authentication required.",
         },
       );
     }
-  };
+
+    /*
+     * --------------------------------------------------------
+     * BODY
+     * --------------------------------------------------------
+     */
+
+    let body: AdminReplyBody;
+
+    try {
+      body =
+        parseJsonBody<AdminReplyBody>(
+          event,
+        );
+    } catch {
+      return json(
+        400,
+        {
+          success: false,
+          error:
+            "Invalid JSON request body.",
+        },
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * CONVERSATION ID
+     * --------------------------------------------------------
+     */
+
+    const conversationId =
+      Number(
+        body.conversationId,
+      );
+
+    if (
+      !Number.isInteger(
+        conversationId,
+      ) ||
+      conversationId <= 0
+    ) {
+      return json(
+        400,
+        {
+          success: false,
+          error:
+            "A valid conversationId is required.",
+        },
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * MESSAGE
+     * --------------------------------------------------------
+     */
+
+    if (
+      typeof body.message !==
+      "string"
+    ) {
+      return json(
+        400,
+        {
+          success: false,
+          error:
+            "Message is required.",
+        },
+      );
+    }
+
+    const message =
+      body.message.trim();
+
+    if (!message) {
+      return json(
+        400,
+        {
+          success: false,
+          error:
+            "Message cannot be empty.",
+        },
+      );
+    }
+
+    if (
+      message.length > 5000
+    ) {
+      return json(
+        400,
+        {
+          success: false,
+          error:
+            "Message must not exceed 5000 characters.",
+        },
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * FIND CONVERSATION
+     * --------------------------------------------------------
+     */
+
+    const conversation =
+      await getConversation(
+        conversationId,
+      );
+
+    if (!conversation) {
+      return json(
+        404,
+        {
+          success: false,
+          error:
+            "Support conversation not found.",
+        },
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * CLOSED CHECK
+     * --------------------------------------------------------
+     */
+
+    if (
+      conversation.status ===
+      "CLOSED"
+    ) {
+      return json(
+        409,
+        {
+          success: false,
+          error:
+            "This support conversation is closed.",
+        },
+      );
+    }
+
+    /*
+     * --------------------------------------------------------
+     * ADMIN USER ID
+     * --------------------------------------------------------
+     *
+     * IMPORTANT:
+     *
+     * Admin ID is also a UUID string.
+     *
+     * Never use Number(admin.id).
+     */
+
+    const adminId =
+      admin.userId ??
+      admin.id;
+
+    /*
+     * --------------------------------------------------------
+     * SAVE ADMIN MESSAGE
+     * --------------------------------------------------------
+     */
+
+    const savedMessage =
+      await addMessage(
+        conversationId,
+        "ADMIN",
+        adminId,
+        message,
+        null,
+        null,
+      );
+
+    /*
+     * --------------------------------------------------------
+     * HUMAN STATUS
+     * --------------------------------------------------------
+     */
+
+    const updatedConversation =
+      await updateConversationStatus(
+        conversationId,
+        "HUMAN",
+      );
+
+    return json(
+      200,
+      {
+        success: true,
+        conversation:
+          updatedConversation ??
+          conversation,
+        message:
+          savedMessage,
+      },
+    );
+  } catch (error) {
+    console.error(
+      "ADMIN SUPPORT REPLY ERROR:",
+      error,
+    );
+
+    return json(
+      500,
+      {
+        success: false,
+        error:
+          "Failed to send support reply.",
+      },
+    );
+  }
+};

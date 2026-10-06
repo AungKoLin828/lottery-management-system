@@ -6,40 +6,45 @@
 
 import type {
   HandlerEvent,
+  HandlerResponse,
 } from "@netlify/functions";
 
 import {
   requireAuth,
+  verifyAdminAuth,
   type AuthenticatedUser,
 } from "../ai/auth";
 
-/* ============================================================
-   JSON RESPONSE
-============================================================ */
+/*
+ * ============================================================
+ * JSON RESPONSE
+ * ============================================================
+ */
 
 export function json(
   statusCode: number,
   body: unknown,
-) {
+): HandlerResponse {
   return {
     statusCode,
 
     headers: {
       "Content-Type":
-        "application/json",
+        "application/json; charset=utf-8",
+
       "Cache-Control":
         "no-store",
     },
 
-    body: JSON.stringify(
-      body,
-    ),
+    body: JSON.stringify(body),
   };
 }
 
-/* ============================================================
-   BODY
-============================================================ */
+/*
+ * ============================================================
+ * PARSE JSON BODY
+ * ============================================================
+ */
 
 export function parseJsonBody<T>(
   event: HandlerEvent,
@@ -59,32 +64,11 @@ export function parseJsonBody<T>(
   }
 }
 
-/* ============================================================
-   USER ID
-============================================================ */
-
-export function getNumericUserId(
-  user: AuthenticatedUser,
-): number {
-  const id = Number(
-    user.id,
-  );
-
-  if (
-    !Number.isSafeInteger(id) ||
-    id <= 0
-  ) {
-    throw new Error(
-      "Authenticated user ID is invalid.",
-    );
-  }
-
-  return id;
-}
-
-/* ============================================================
-   AUTH
-============================================================ */
+/*
+ * ============================================================
+ * AUTHENTICATE PLAYER
+ * ============================================================
+ */
 
 export async function authenticate(
   event: HandlerEvent,
@@ -92,54 +76,101 @@ export async function authenticate(
   return requireAuth(event);
 }
 
-/* ============================================================
-   ADMIN AUTH
-============================================================ */
+/*
+ * ============================================================
+ * AUTHENTICATE ADMIN
+ * ============================================================
+ */
 
 export async function authenticateAdmin(
   event: HandlerEvent,
 ): Promise<AuthenticatedUser> {
-  const user =
-    await authenticate(event);
+  return verifyAdminAuth(event);
+}
+
+/*
+ * ============================================================
+ * USER ID
+ * ============================================================
+ *
+ * The application uses UUID user IDs.
+ *
+ * Never convert this value to Number.
+ * ============================================================
+ */
+
+export function getUserId(
+  user: AuthenticatedUser,
+): string {
+  const userId =
+    user.userId ??
+    user.id;
 
   if (
-    String(user.role)
-      .toUpperCase() !==
-    "ADMIN"
+    typeof userId !== "string" ||
+    !userId.trim()
   ) {
-    throw Object.assign(
-      new Error(
-        "Admin access required.",
-      ),
-      {
-        statusCode: 403,
-      },
+    throw new Error(
+      "Authenticated user ID is missing.",
     );
   }
 
-  return user;
+  return userId.trim();
 }
 
-/* ============================================================
-   METHOD
-============================================================ */
+/*
+ * ============================================================
+ * REQUIRE METHOD
+ * ============================================================
+ */
 
 export function requireMethod(
   event: HandlerEvent,
   method: string,
-) {
+): HandlerResponse | null {
   if (
-    event.httpMethod !== method
+    event.httpMethod.toUpperCase() !==
+    method.toUpperCase()
   ) {
     return json(
       405,
       {
         success: false,
-        message:
-          "Method not allowed.",
+        error: "Method not allowed.",
       },
     );
   }
 
   return null;
+}
+
+/*
+ * ============================================================
+ * INTEGER PARAMETER
+ * ============================================================
+ */
+
+export function parsePositiveInteger(
+  value: string | null | undefined,
+): number | null {
+  if (
+    typeof value !== "string" ||
+    !value.trim()
+  ) {
+    return null;
+  }
+
+  const numberValue =
+    Number(value);
+
+  if (
+    !Number.isInteger(
+      numberValue,
+    ) ||
+    numberValue <= 0
+  ) {
+    return null;
+  }
+
+  return numberValue;
 }
