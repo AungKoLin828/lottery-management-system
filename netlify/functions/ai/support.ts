@@ -86,6 +86,32 @@ type AIResponse = {
   error?: string;
 };
 
+type AccountIntent =
+  | "WALLET_BALANCE"
+  | "DEPOSIT"
+  | "BALANCE_AFTER_DEPOSIT"
+  | "WITHDRAWAL"
+  | "TRANSACTIONS"
+  | null;
+
+type AccountData = {
+  wallet?: Awaited<
+    ReturnType<typeof getMyWallet>
+  >;
+
+  latestDeposit?: Awaited<
+    ReturnType<typeof getMyLatestDeposit>
+  >;
+
+  latestWithdrawal?: Awaited<
+    ReturnType<typeof getMyLatestWithdrawal>
+  >;
+
+  transactions?: Awaited<
+    ReturnType<typeof getMyRecentTransactions>
+  >;
+};
+
 /* ============================================================
    CONSTANTS
 ============================================================ */
@@ -94,49 +120,14 @@ const MAX_MESSAGE_LENGTH = 2000;
 
 const MAX_HISTORY_MESSAGES = 10;
 
-/*
- * One OpenRouter request may return tool calls.
- *
- * Round 1:
- *
- *   AI -> tool call
- *
- * Round 2:
- *
- *   tool result -> AI -> final answer
- *
- * Do not reduce this to 1.
- */
 const MAX_TOOL_ROUNDS = 2;
 
-/*
- * Only this many account tools can be executed during one
- * support request.
- *
- * This prevents accidental excessive database access.
- */
 const MAX_TOOL_CALLS_PER_REQUEST = 4;
 
 /* ============================================================
    RESPONSE HELPER
 ============================================================ */
 
-/*
- * IMPORTANT
- *
- * The current auth.ts uses:
- *
- *   jsonResponse(data, status)
- *
- * NOT:
- *
- *   jsonResponse(status, data)
- *
- * Keeping this order prevents:
- *
- *   RangeError:
- *   init["status"] must be in the range of 200 to 599
- */
 function response(
   statusCode: number,
   body:
@@ -162,6 +153,16 @@ function normalizeText(
     .trim();
 }
 
+function normalizeForIntent(
+  value: string,
+): string {
+  return normalizeText(value)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /* ============================================================
    GET USER MESSAGE
 ============================================================ */
@@ -169,13 +170,6 @@ function normalizeText(
 function getUserMessage(
   body: SupportRequestBody,
 ): string {
-  /*
-   * Preferred request format:
-   *
-   * {
-   *   message: "..."
-   * }
-   */
   if (
     typeof body.message ===
     "string"
@@ -185,13 +179,6 @@ function getUserMessage(
     );
   }
 
-  /*
-   * Backward compatibility with:
-   *
-   * {
-   *   messages: [...]
-   * }
-   */
   if (
     Array.isArray(
       body.messages,
@@ -299,34 +286,147 @@ function getHistory(
 }
 
 /* ============================================================
-   READ-ONLY TOOL EXECUTION
+   ACCOUNT INTENT DETECTION
 ============================================================ */
 
-/*
- * IMPORTANT SECURITY RULE
- *
- * The model NEVER supplies the player ID.
- *
- * The authenticated user ID is always supplied by the backend.
- *
- * Example:
- *
- * User JWT
- *    ↓
- * requireAuth()
- *    ↓
- * user.id
- *    ↓
- * executeTool()
- *    ↓
- * getMyWallet(user.id)
- *
- * Therefore a prompt such as:
- *
- *   "show me user abc's balance"
- *
- * cannot make the AI access another player.
- */
+function detectAccountIntent(
+  message: string,
+): AccountIntent {
+  const text =
+    normalizeForIntent(
+      message,
+    );
+
+  if (!text) {
+    return null;
+  }
+
+  /*
+   * ----------------------------------------------------------
+   * BALANCE AFTER DEPOSIT
+   * ----------------------------------------------------------
+   *
+   * Examples:
+   *
+   * balance not update after deposit
+   * deposited but balance not updated
+   * deposit completed but wallet balance unchanged
+   * I have deposit but balance does not update
+   * my balance is not showing deposit
+   */
+  const hasBalance =
+    /\b(balance|wallet|money|funds)\b/u.test(
+      text,
+    );
+
+  const hasDeposit =
+    /\b(deposit|deposited|depositing|topup|top up|topuped|payment)\b/u.test(
+      text,
+    );
+
+  const hasNotUpdated =
+    /\b(
+      not update|
+      not updated|
+      doesn't update|
+      does not update|
+      didnt update|
+      didn't update|
+      not showing|
+      doesn't show|
+      does not show|
+      not reflected|
+      missing|
+      disappeared|
+      unchanged|
+      same balance|
+      balance unchanged|
+      balance not changed
+    )\b/ux.test(
+      text,
+    );
+
+  if (
+    hasBalance &&
+    hasDeposit &&
+    (
+      hasNotUpdated ||
+      /\b(after|but|yet)\b/u.test(
+        text,
+      )
+    )
+  ) {
+    return "BALANCE_AFTER_DEPOSIT";
+  }
+
+  /*
+   * ----------------------------------------------------------
+   * WALLET BALANCE
+   * ----------------------------------------------------------
+   */
+  if (
+    hasBalance &&
+    !hasDeposit
+  ) {
+    return "WALLET_BALANCE";
+  }
+
+  /*
+   * ----------------------------------------------------------
+   * DEPOSIT
+   * ----------------------------------------------------------
+   */
+  if (
+    hasDeposit
+  ) {
+    return "DEPOSIT";
+  }
+
+  /*
+   * ----------------------------------------------------------
+   * WITHDRAWAL
+   * ----------------------------------------------------------
+   */
+  if (
+    /\b(
+      withdrawal|
+      withdraw|
+      withdrawn|
+      cashout|
+      cash out|
+      payout
+    )\b/ux.test(
+      text,
+    )
+  ) {
+    return "WITHDRAWAL";
+  }
+
+  /*
+   * ----------------------------------------------------------
+   * TRANSACTIONS
+   * ----------------------------------------------------------
+   */
+  if (
+    /\b(
+      transaction|
+      transactions|
+      history|
+      payment history|
+      account history
+    )\b/ux.test(
+      text,
+    )
+  ) {
+    return "TRANSACTIONS";
+  }
+
+  return null;
+}
+
+/* ============================================================
+   READ-ONLY TOOL EXECUTION
+============================================================ */
 
 async function executeTool(
   name: string,
@@ -385,6 +485,499 @@ async function executeTool(
 }
 
 /* ============================================================
+   ACCOUNT DATA
+============================================================ */
+
+async function loadAccountData(
+  intent: AccountIntent,
+  authenticatedUserId: string,
+): Promise<{
+  data: AccountData;
+  failed: boolean;
+}> {
+  const data: AccountData = {};
+
+  try {
+    switch (intent) {
+      case "WALLET_BALANCE": {
+        data.wallet =
+          await getMyWallet(
+            authenticatedUserId,
+          );
+
+        return {
+          data,
+          failed: false,
+        };
+      }
+
+      case "DEPOSIT": {
+        data.latestDeposit =
+          await getMyLatestDeposit(
+            authenticatedUserId,
+          );
+
+        return {
+          data,
+          failed: false,
+        };
+      }
+
+      case "BALANCE_AFTER_DEPOSIT": {
+        /*
+         * Both are authoritative read-only
+         * account queries.
+         */
+        const [
+          wallet,
+          latestDeposit,
+        ] =
+          await Promise.all([
+            getMyWallet(
+              authenticatedUserId,
+            ),
+            getMyLatestDeposit(
+              authenticatedUserId,
+            ),
+          ]);
+
+        data.wallet =
+          wallet;
+
+        data.latestDeposit =
+          latestDeposit;
+
+        return {
+          data,
+          failed: false,
+        };
+      }
+
+      case "WITHDRAWAL": {
+        data.latestWithdrawal =
+          await getMyLatestWithdrawal(
+            authenticatedUserId,
+          );
+
+        return {
+          data,
+          failed: false,
+        };
+      }
+
+      case "TRANSACTIONS": {
+        data.transactions =
+          await getMyRecentTransactions(
+            authenticatedUserId,
+            10,
+          );
+
+        return {
+          data,
+          failed: false,
+        };
+      }
+
+      default:
+        return {
+          data,
+          failed: false,
+        };
+    }
+  } catch (error) {
+    console.error(
+      "Account support data lookup failed:",
+      error,
+    );
+
+    return {
+      data,
+      failed: true,
+    };
+  }
+}
+
+/* ============================================================
+   ACCOUNT DATA -> OPENROUTER CONTEXT
+============================================================ */
+
+function accountDataToText(
+  intent: AccountIntent,
+  data: AccountData,
+): string {
+  if (!intent) {
+    return "";
+  }
+
+  const sections: string[] =
+    [];
+
+  sections.push(
+    "AUTHORITATIVE ACCOUNT DATA:",
+  );
+
+  sections.push(
+    JSON.stringify(
+      data,
+      null,
+      2,
+    ),
+  );
+
+  sections.push(
+    "",
+  );
+
+  sections.push(
+    "IMPORTANT: The account data above comes from the authenticated player's backend database.",
+  );
+
+  sections.push(
+    "Use these values exactly. Do not invent or change financial values or statuses.",
+  );
+
+  return sections.join(
+    "\n",
+  );
+}
+
+/* ============================================================
+   DETERMINISTIC ACCOUNT RESPONSE
+============================================================ */
+
+function deterministicAccountResponse(
+  message: string,
+  intent: AccountIntent,
+  data: AccountData,
+): AIResponse | null {
+  if (!intent) {
+    return null;
+  }
+
+  /*
+   * ----------------------------------------------------------
+   * WALLET BALANCE
+   * ----------------------------------------------------------
+   */
+  if (
+    intent ===
+    "WALLET_BALANCE"
+  ) {
+    const wallet =
+      data.wallet;
+
+    if (
+      !wallet ||
+      !wallet.found
+    ) {
+      return {
+        success: true,
+        source: "HUMAN",
+        message:
+          "I could not find your wallet information right now. Please contact our support team so they can check your account.",
+      };
+    }
+
+    return {
+      success: true,
+      source: "TRAINING",
+      confidence: 1,
+      message:
+        `Your current wallet balance is ${wallet.balance}.`,
+    };
+  }
+
+  /*
+   * ----------------------------------------------------------
+   * DEPOSIT
+   * ----------------------------------------------------------
+   */
+  if (
+    intent ===
+    "DEPOSIT"
+  ) {
+    const deposit =
+      data.latestDeposit;
+
+    if (
+      !deposit ||
+      !deposit.found
+    ) {
+      return {
+        success: true,
+        source: "HUMAN",
+        message:
+          "I could not find a recent deposit for your account. Please contact our support team so they can check your deposit.",
+      };
+    }
+
+    const item =
+      deposit.deposit;
+
+    return {
+      success: true,
+      source: "TRAINING",
+      confidence: 1,
+      message:
+        [
+          `Your latest deposit is ${item.amount}.`,
+          `Status: ${item.status}.`,
+          item.createdAt
+            ? `Created: ${item.createdAt}.`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
+    };
+  }
+
+  /*
+   * ----------------------------------------------------------
+   * BALANCE AFTER DEPOSIT
+   * ----------------------------------------------------------
+   */
+  if (
+    intent ===
+    "BALANCE_AFTER_DEPOSIT"
+  ) {
+    const wallet =
+      data.wallet;
+
+    const deposit =
+      data.latestDeposit;
+
+    if (
+      !wallet ||
+      !wallet.found
+    ) {
+      return {
+        success: true,
+        source: "HUMAN",
+        message:
+          "I could not retrieve your current wallet balance. Please contact our support team so they can check your account.",
+      };
+    }
+
+    if (
+      !deposit ||
+      !deposit.found
+    ) {
+      return {
+        success: true,
+        source: "HUMAN",
+        message:
+          `Your current wallet balance is ${wallet.balance}, but I could not find a recent deposit record. Please contact our support team so they can check the deposit.`,
+      };
+    }
+
+    const item =
+      deposit.deposit;
+
+    const status =
+      String(
+        item.status || "",
+      )
+        .trim()
+        .toUpperCase();
+
+    /*
+     * --------------------------------------------------------
+     * PENDING / PROCESSING
+     * --------------------------------------------------------
+     */
+    if (
+      status ===
+        "PENDING" ||
+      status ===
+        "PROCESSING"
+    ) {
+      return {
+        success: true,
+        source: "TRAINING",
+        confidence: 1,
+        message:
+          [
+            `Your current wallet balance is ${wallet.balance}.`,
+            `Your latest deposit is ${item.amount} and its status is ${item.status}.`,
+            "The deposit is not in a completed state yet, so the current balance does not show that deposit as completed.",
+            "If you need the deposit checked, please contact our support team.",
+          ].join(" "),
+      };
+    }
+
+    /*
+     * --------------------------------------------------------
+     * APPROVED / COMPLETED / SUCCESS
+     * --------------------------------------------------------
+     */
+    if (
+      status ===
+        "APPROVED" ||
+      status ===
+        "COMPLETED" ||
+      status ===
+        "SUCCESS" ||
+      status ===
+        "SUCCESSFUL"
+    ) {
+      return {
+        success: true,
+        source: "TRAINING",
+        confidence: 1,
+        message:
+          [
+            `Your current wallet balance is ${wallet.balance}.`,
+            `Your latest deposit is ${item.amount} and its status is ${item.status}.`,
+            "The deposit record is completed, but I cannot confirm from the current account data whether the balance changed at the expected time.",
+            "Please contact our support team so they can check the deposit and wallet transaction together.",
+          ].join(" "),
+      };
+    }
+
+    /*
+     * --------------------------------------------------------
+     * REJECTED / FAILED / CANCELLED
+     * --------------------------------------------------------
+     */
+    if (
+      status ===
+        "REJECTED" ||
+      status ===
+        "FAILED" ||
+      status ===
+        "CANCELLED" ||
+      status ===
+        "CANCELED"
+    ) {
+      return {
+        success: true,
+        source: "TRAINING",
+        confidence: 1,
+        message:
+          [
+            `Your current wallet balance is ${wallet.balance}.`,
+            `Your latest deposit is ${item.amount} and its status is ${item.status}.`,
+            "The deposit is not a successful completed deposit, so it is not reflected as a completed deposit in the wallet.",
+          ].join(" "),
+      };
+    }
+
+    /*
+     * --------------------------------------------------------
+     * UNKNOWN STATUS
+     * --------------------------------------------------------
+     */
+    return {
+      success: true,
+      source: "TRAINING",
+      confidence: 1,
+      message:
+        [
+          `Your current wallet balance is ${wallet.balance}.`,
+          `Your latest deposit is ${item.amount}.`,
+          `The deposit status is ${item.status}.`,
+          "I cannot determine from this information why the balance has not updated, so please contact our support team for further checking.",
+        ].join(" "),
+    };
+  }
+
+  /*
+   * ----------------------------------------------------------
+   * WITHDRAWAL
+   * ----------------------------------------------------------
+   */
+  if (
+    intent ===
+    "WITHDRAWAL"
+  ) {
+    const withdrawal =
+      data.latestWithdrawal;
+
+    if (
+      !withdrawal ||
+      !withdrawal.found
+    ) {
+      return {
+        success: true,
+        source: "HUMAN",
+        message:
+          "I could not find a recent withdrawal for your account. Please contact our support team if you need your withdrawal checked.",
+      };
+    }
+
+    const item =
+      withdrawal.withdrawal;
+
+    return {
+      success: true,
+      source: "TRAINING",
+      confidence: 1,
+      message:
+        [
+          `Your latest withdrawal is ${item.amount}.`,
+          `Status: ${item.status}.`,
+          item.createdAt
+            ? `Created: ${item.createdAt}.`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
+    };
+  }
+
+  /*
+   * ----------------------------------------------------------
+   * TRANSACTIONS
+   * ----------------------------------------------------------
+   */
+  if (
+    intent ===
+    "TRANSACTIONS"
+  ) {
+    const transactions =
+      data.transactions
+        ?.transactions;
+
+    if (
+      !transactions ||
+      transactions.length === 0
+    ) {
+      return {
+        success: true,
+        source: "TRAINING",
+        confidence: 1,
+        message:
+          "I could not find any recent transactions for your account.",
+      };
+    }
+
+    const lines =
+      transactions
+        .slice(0, 5)
+        .map(
+          (
+            transaction,
+            index,
+          ) =>
+            `${index + 1}. ${transaction.type}: ${transaction.amount} — ${transaction.status}`,
+        );
+
+    return {
+      success: true,
+      source: "TRAINING",
+      confidence: 1,
+      message:
+        [
+          "Here are your latest transactions:",
+          ...lines,
+        ].join("\n"),
+    };
+  }
+
+  return null;
+}
+
+/* ============================================================
    OPENROUTER TOOL LOOP
 ============================================================ */
 
@@ -394,9 +987,6 @@ async function runOpenRouter(
   history: OpenRouterMessage[],
   knowledgeText: string,
 ): Promise<string | null> {
-  /*
-   * Start with system instructions.
-   */
   const messages: OpenRouterMessage[] =
     [
       {
@@ -406,9 +996,6 @@ async function runOpenRouter(
       },
     ];
 
-  /*
-   * Add relevant knowledge.
-   */
   if (
     knowledgeText &&
     knowledgeText.trim()
@@ -424,16 +1011,10 @@ async function runOpenRouter(
     });
   }
 
-  /*
-   * Add previous conversation.
-   */
   messages.push(
     ...history,
   );
 
-  /*
-   * Add current user message.
-   */
   messages.push({
     role: "user",
     content: message,
@@ -441,25 +1022,6 @@ async function runOpenRouter(
 
   let toolCallCount = 0;
 
-  /*
-   * ----------------------------------------------------------
-   * MODEL / TOOL LOOP
-   * ----------------------------------------------------------
-   *
-   * Round 1:
-   *
-   * AI may answer directly:
-   *
-   *   AI -> answer
-   *
-   * OR:
-   *
-   *   AI -> getMyWallet()
-   *
-   * Round 2:
-   *
-   *   tool result -> AI -> final answer
-   */
   for (
     let round = 0;
     round < MAX_TOOL_ROUNDS;
@@ -488,11 +1050,6 @@ async function runOpenRouter(
         ? result.toolCalls
         : [];
 
-    /*
-     * --------------------------------------------------------
-     * NORMAL FINAL ANSWER
-     * --------------------------------------------------------
-     */
     if (
       toolCalls.length === 0
     ) {
@@ -503,11 +1060,6 @@ async function runOpenRouter(
       return null;
     }
 
-    /*
-     * --------------------------------------------------------
-     * TOOL LIMIT
-     * --------------------------------------------------------
-     */
     if (
       toolCallCount >=
       MAX_TOOL_CALLS_PER_REQUEST
@@ -519,31 +1071,6 @@ async function runOpenRouter(
       return null;
     }
 
-    /*
-     * --------------------------------------------------------
-     * IMPORTANT
-     *
-     * Preserve the ORIGINAL assistant tool_calls.
-     *
-     * OpenRouter expects:
-     *
-     * assistant:
-     *   tool_calls: [...]
-     *
-     * followed by:
-     *
-     * tool:
-     *   tool_call_id: ...
-     *
-     * The previous support.ts only pushed:
-     *
-     *   role: assistant
-     *   content: ""
-     *
-     * which loses the tool-call information.
-     * --------------------------------------------------------
-     */
-
     messages.push({
       role: "assistant",
       content:
@@ -552,11 +1079,6 @@ async function runOpenRouter(
         toolCalls,
     });
 
-    /*
-     * --------------------------------------------------------
-     * EXECUTE EACH TOOL
-     * --------------------------------------------------------
-     */
     for (
       const toolCall of toolCalls
     ) {
@@ -579,17 +1101,6 @@ async function runOpenRouter(
         continue;
       }
 
-      /*
-       * IMPORTANT:
-       *
-       * We intentionally DO NOT trust:
-       *
-       * toolCall.function.arguments
-       *
-       * for user identity.
-       *
-       * The authenticated user ID is supplied directly.
-       */
       try {
         toolCallCount += 1;
 
@@ -613,10 +1124,6 @@ async function runOpenRouter(
           error,
         );
 
-        /*
-         * Do not expose database/internal
-         * errors to the player.
-         */
         messages.push({
           role: "tool",
           content:
@@ -632,24 +1139,8 @@ async function runOpenRouter(
         });
       }
     }
-
-    /*
-     * Continue the loop.
-     *
-     * The next OpenRouter request receives:
-     *
-     * assistant tool_calls
-     * +
-     * tool results
-     *
-     * and can produce the final answer.
-     */
   }
 
-  /*
-   * If we reach here, the model did not produce
-   * a final natural-language answer.
-   */
   return null;
 }
 
@@ -713,17 +1204,6 @@ async function runCustomTrainingFallback(
   message: string,
 ): Promise<AIResponse | null> {
   try {
-    /*
-     * This is the actual local deterministic
-     * training AI.
-     *
-     * It searches:
-     *
-     *   training/*.json
-     *   knowledge/*.json
-     *
-     * through the existing RAG layer.
-     */
     const result =
       await generateCustomTrainingResponse(
         message,
@@ -744,12 +1224,8 @@ async function runCustomTrainingFallback(
     }
 
     /*
-     * generateCustomTrainingResponse()
-     * returns confidence 0 for no result,
-     * and approximately 0.35 for weak matches.
-     *
-     * Do NOT present weak/no-match content
-     * as a reliable answer.
+     * Do not use weak/no-match training
+     * content as a reliable answer.
      */
     if (
       result.confidence <
@@ -825,11 +1301,6 @@ export const handler: Handler =
       let user;
 
       try {
-        /*
-         * requireAuth() returns the authenticated user
-         * directly and throws AuthError when authentication
-         * fails.
-         */
         user =
           await requireAuth(
             event,
@@ -851,8 +1322,7 @@ export const handler: Handler =
                   error as {
                     statusCode?: unknown;
                   }
-                )
-                  .statusCode,
+                ).statusCode,
               )
             : 401;
 
@@ -867,7 +1337,7 @@ export const handler: Handler =
 
         const message =
           error instanceof
-            Error
+          Error
             ? error.message
             : "Authentication required. Please log in again.";
 
@@ -881,12 +1351,7 @@ export const handler: Handler =
       }
 
       /*
-       * The existing auth.ts normalizes:
-       *
-       * user.id
-       * user.userId
-       *
-       * to the authenticated player's UUID.
+       * Never trust a user-provided ID.
        */
       const authenticatedUserId =
         typeof user?.id ===
@@ -981,9 +1446,8 @@ export const handler: Handler =
         );
 
         /*
-         * Fail closed for external AI.
-         *
-         * Local training remains available.
+         * External AI fails closed.
+         * Account/training fallback still works.
          */
         aiEnabled = false;
       }
@@ -1014,10 +1478,8 @@ export const handler: Handler =
         }
       } catch (error) {
         /*
-         * Preserve the existing behavior:
-         *
-         * rate-limit infrastructure failure should
-         * not unnecessarily destroy support.
+         * Rate-limit infrastructure failure
+         * must not destroy support.
          */
         console.error(
           "Rate limit check failed:",
@@ -1026,7 +1488,155 @@ export const handler: Handler =
       }
 
       /* ======================================================
-         KNOWLEDGE SEARCH
+         ACCOUNT INTENT
+      ====================================================== */
+
+      const accountIntent =
+        detectAccountIntent(
+          message,
+        );
+
+      /*
+       * ------------------------------------------------------
+       * IMPORTANT
+       *
+       * Account-specific questions are handled BEFORE
+       * relying on OpenRouter to decide whether a tool
+       * should be called.
+       *
+       * This fixes cases such as:
+       *
+       * "balance not update yet after deposit"
+       * ------------------------------------------------------
+       */
+
+      if (accountIntent) {
+        const accountResult =
+          await loadAccountData(
+            accountIntent,
+            authenticatedUserId,
+          );
+
+        /*
+         * ----------------------------------------------------
+         * ACCOUNT DATA AVAILABLE
+         * ----------------------------------------------------
+         */
+        if (
+          !accountResult.failed
+        ) {
+          /*
+           * First give OpenRouter the authoritative
+           * database data if AI is enabled.
+           *
+           * OpenRouter failure is intentionally caught
+           * and does NOT become HTTP 502.
+           */
+          if (aiEnabled) {
+            try {
+              const accountContext =
+                accountDataToText(
+                  accountIntent,
+                  accountResult.data,
+                );
+
+              const knowledge =
+                await loadKnowledge(
+                  message,
+                );
+
+              const combinedKnowledge =
+                [
+                  knowledge.text,
+                  accountContext,
+                ]
+                  .filter(
+                    (value) =>
+                      Boolean(
+                        value &&
+                        value.trim(),
+                      ),
+                  )
+                  .join(
+                    "\n\n",
+                  );
+
+              const answer =
+                await runOpenRouter(
+                  authenticatedUserId,
+                  message,
+                  getHistory(body),
+                  combinedKnowledge,
+                );
+
+              if (
+                answer &&
+                answer.trim()
+              ) {
+                return response(
+                  200,
+                  {
+                    success: true,
+                    message:
+                      answer.trim(),
+                    source:
+                      "OPENROUTER",
+                  },
+                );
+              }
+            } catch (error) {
+              /*
+               * ------------------------------------------------
+               * CRITICAL FALLBACK
+               *
+               * OpenRouter 429 / 502 / timeout / provider
+               * failure must NEVER break account support.
+               * ------------------------------------------------
+               */
+              console.error(
+                "OpenRouter account-support error; using deterministic fallback:",
+                error,
+              );
+            }
+          }
+
+          /*
+           * ----------------------------------------------------
+           * DETERMINISTIC ACCOUNT RESPONSE
+           * ----------------------------------------------------
+           *
+           * This does not depend on OpenRouter.
+           */
+          const accountResponse =
+            deterministicAccountResponse(
+              message,
+              accountIntent,
+              accountResult.data,
+            );
+
+          if (
+            accountResponse
+          ) {
+            return response(
+              200,
+              accountResponse,
+            );
+          }
+        } else {
+          /*
+           * Database/tool failure.
+           *
+           * Do NOT expose database errors.
+           * Continue to normal training fallback.
+           */
+          console.warn(
+            "Account data unavailable; continuing to training fallback.",
+          );
+        }
+      }
+
+      /* ======================================================
+         GENERAL KNOWLEDGE SEARCH
       ====================================================== */
 
       const knowledge =
@@ -1035,10 +1645,12 @@ export const handler: Handler =
         );
 
       /* ======================================================
-         OPENROUTER
+         GENERAL OPENROUTER
       ====================================================== */
 
-      if (aiEnabled) {
+      if (
+        aiEnabled
+      ) {
         try {
           const answer =
             await runOpenRouter(
@@ -1065,20 +1677,19 @@ export const handler: Handler =
           }
         } catch (error) {
           /*
-           * IMPORTANT:
-           *
            * OpenRouter is optional.
            *
            * 429
            * timeout
+           * 5xx
            * provider failure
            * unavailable model
            * tool failure
            *
-           * must continue to local training.
+           * all continue to local fallback.
            */
           console.error(
-            "OpenRouter support error:",
+            "OpenRouter support error; continuing to fallback:",
             error,
           );
         }
@@ -1088,16 +1699,6 @@ export const handler: Handler =
          LOCAL CUSTOM TRAINING AI
       ====================================================== */
 
-      /*
-       * IMPORTANT:
-       *
-       * This is intentionally unconditional.
-       *
-       * We do NOT require knowledge.results.length > 0
-       * before calling generateCustomTrainingResponse().
-       *
-       * The custom training AI performs its own RAG search.
-       */
       const trainingResponse =
         await runCustomTrainingFallback(
           message,
@@ -1116,23 +1717,18 @@ export const handler: Handler =
          HUMAN SUPPORT
       ====================================================== */
 
-      /*
-       * At this point:
-       *
-       * - OpenRouter did not provide a reliable answer
-       * - local deterministic training did not provide
-       *   a sufficiently strong answer
-       *
-       * Do not invent an answer.
-       *
-       * Return HUMAN so the existing support/ticket layer
-       * can handle the conversation.
-       */
       return response(
         200,
         humanFallback(),
       );
     } catch (error) {
+      /*
+       * ------------------------------------------------------
+       * LAST-RESORT ERROR HANDLING
+       *
+       * Never expose internal database/OpenRouter details.
+       * ------------------------------------------------------
+       */
       console.error(
         "AI SUPPORT UNHANDLED ERROR:",
         error,
