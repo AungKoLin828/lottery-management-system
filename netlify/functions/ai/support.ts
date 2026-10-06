@@ -1,3 +1,47 @@
+/*
+ * ============================================================
+ * AI SUPPORT
+ * ============================================================
+ *
+ * Flow:
+ *
+ * USER MESSAGE
+ *      |
+ *      v
+ * AUTHENTICATED USER
+ *      |
+ *      v
+ * ACCOUNT INTENT DETECTION
+ *      |
+ *      +-----------------------------+
+ *      |                             |
+ *      v                             v
+ * LIVE ACCOUNT DATA             GENERAL QUESTION
+ * wallet/deposit/etc                  |
+ *      |                              v
+ *      |                       OPENROUTER AI
+ *      |                              |
+ *      |                         failure/empty
+ *      |                              |
+ *      +--------------+---------------+
+ *                     |
+ *                     v
+ *             CUSTOM TRAINING AI
+ *                     |
+ *                  no match
+ *                     |
+ *                     v
+ *                   HUMAN
+ *
+ * IMPORTANT
+ * - Never trust user-provided userId.
+ * - Account tools always use authenticated user ID.
+ * - Account tools are READ-ONLY.
+ * - OpenRouter failure must not become HTTP 502.
+ * - Training fallback must not invent account data.
+ * ============================================================
+ */
+
 import type {
   Handler,
   HandlerEvent,
@@ -7,6 +51,7 @@ import type {
 import {
   requireAuth,
   jsonResponse,
+  type AuthenticatedUser,
 } from "./auth";
 
 import {
@@ -18,8 +63,9 @@ import {
 } from "./rateLimit";
 
 import {
-  knowledgeToText,
   searchKnowledge,
+  knowledgeToText,
+  type KnowledgeResult,
 } from "./rag";
 
 import {
@@ -47,74 +93,11 @@ import {
   SYSTEM_PROMPT,
 } from "./systemPrompt";
 
-/* ============================================================
-   TYPES
-============================================================ */
-
-type SupportRequestBody = {
-  message?: unknown;
-  messages?: unknown;
-};
-
-type ClientChatMessage = {
-  role?: unknown;
-  content?: unknown;
-};
-
-type AIResponse = {
-  success: boolean;
-
-  message?: string;
-
-  source?:
-    | "OPENROUTER"
-    | "TRAINING"
-    | "HUMAN";
-
-  ticketId?: string;
-
-  messageId?: string;
-
-  confidence?: number;
-
-  matchedDocuments?: Array<{
-    fileName: string;
-    category: string;
-    score: number;
-  }>;
-
-  error?: string;
-};
-
-type AccountIntent =
-  | "WALLET_BALANCE"
-  | "DEPOSIT"
-  | "BALANCE_AFTER_DEPOSIT"
-  | "WITHDRAWAL"
-  | "TRANSACTIONS"
-  | null;
-
-type AccountData = {
-  wallet?: Awaited<
-    ReturnType<typeof getMyWallet>
-  >;
-
-  latestDeposit?: Awaited<
-    ReturnType<typeof getMyLatestDeposit>
-  >;
-
-  latestWithdrawal?: Awaited<
-    ReturnType<typeof getMyLatestWithdrawal>
-  >;
-
-  transactions?: Awaited<
-    ReturnType<typeof getMyRecentTransactions>
-  >;
-};
-
-/* ============================================================
-   CONSTANTS
-============================================================ */
+/*
+ * ============================================================
+ * CONSTANTS
+ * ============================================================
+ */
 
 const MAX_MESSAGE_LENGTH = 2000;
 
@@ -124,59 +107,309 @@ const MAX_TOOL_ROUNDS = 2;
 
 const MAX_TOOL_CALLS_PER_REQUEST = 4;
 
-/* ============================================================
-   RESPONSE HELPER
-============================================================ */
+/*
+ * ============================================================
+ * TYPES
+ * ============================================================
+ */
+
+type SupportSource =
+  | "OPENROUTER"
+  | "TRAINING"
+  | "HUMAN";
+
+type AccountIntent =
+  | "WALLET_BALANCE"
+  | "BALANCE_AFTER_DEPOSIT"
+  | "DEPOSIT"
+  | "WITHDRAWAL"
+  | "TRANSACTIONS"
+  | null;
+
+interface SupportRequestBody {
+  message?: unknown;
+  messages?: unknown;
+}
+
+interface SupportResponse {
+  success: boolean;
+  answer: string;
+  source: SupportSource;
+  intent: AccountIntent;
+  confidence: number;
+  fallback: boolean;
+}
+
+interface AccountData {
+  wallet?: Awaited<
+    ReturnType<typeof getMyWallet>
+  >;
+
+  deposit?: Awaited<
+    ReturnType<typeof getMyLatestDeposit>
+  >;
+
+  withdrawal?: Awaited<
+    ReturnType<typeof getMyLatestWithdrawal>
+  >;
+
+  transactions?: Awaited<
+    ReturnType<typeof getMyRecentTransactions>
+  >;
+}
+
+/*
+ * ============================================================
+ * BASIC HELPERS
+ * ============================================================
+ */
 
 function response(
   statusCode: number,
-  body:
-    | AIResponse
-    | Record<string, unknown>,
-) {
+  body: unknown,
+): Response {
   return jsonResponse(
     body,
     statusCode,
   );
 }
 
-/* ============================================================
-   TEXT NORMALIZATION
-============================================================ */
+function errorResponse(
+  statusCode: number,
+  message: string,
+): Response {
+  return response(
+    statusCode,
+    {
+      success: false,
+      error: message,
+    },
+  );
+}
 
-function normalizeText(
+function isRecord(
+  value: unknown,
+): value is Record<string, unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null
+  );
+}
+
+function stringValue(
+  value: unknown,
+): string {
+  if (value == null) {
+    return "";
+  }
+
+  return String(value);
+}
+
+/*
+ * ============================================================
+ * TEXT NORMALIZATION
+ * ============================================================
+ *
+ * IMPORTANT:
+ *
+ * Do NOT replace this with a multiline regex.
+ *
+ * The previous multiline regex caused:
+ *
+ *   ERROR: Unterminated regular expression
+ *
+ * during Netlify/esbuild bundling.
+ * ============================================================
+ */
+
+function normalizeSupportText(
   value: string,
 ): string {
   return value
     .normalize("NFKC")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function normalizeForIntent(
-  value: string,
-): string {
-  return normalizeText(value)
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .replace(/\s+/g, " ")
+    .replace(
+      /[^\p{L}\p{N}\s]/gu,
+      " ",
+    )
+    .replace(
+      /\s+/g,
+      " ",
+    )
     .trim();
 }
 
-/* ============================================================
-   GET USER MESSAGE
-============================================================ */
+function containsAny(
+  text: string,
+  words: string[],
+): boolean {
+  return words.some(
+    (word) =>
+      text.includes(word),
+  );
+}
 
-function getUserMessage(
+/*
+ * ============================================================
+ * ACCOUNT INTENT DETECTION
+ * ============================================================
+ */
+
+function detectAccountIntent(
+  message: string,
+): AccountIntent {
+  const text =
+    normalizeSupportText(
+      message,
+    );
+
+  const balanceWords = [
+    "balance",
+    "wallet balance",
+    "my balance",
+    "account balance",
+    "current balance",
+    "available balance",
+    "လက်ကျန်",
+    "ငွေလက်ကျန်",
+  ];
+
+  const depositWords = [
+    "deposit",
+    "deposited",
+    "depositing",
+    "deposit amount",
+    "deposit status",
+    "ငွေသွင်း",
+    "ငွေသွင်းထား",
+    "ငွေသွင်းပြီး",
+  ];
+
+  const notUpdatedWords = [
+    "not update",
+    "not updated",
+    "does not update",
+    "doesnt update",
+    "did not update",
+    "didnt update",
+    "not showing",
+    "not reflected",
+    "not added",
+    "missing",
+    "still not",
+    "balance unchanged",
+    "balance is unchanged",
+    "balance has not changed",
+    "balance hasnt changed",
+    "ငွေမတက်",
+    "လက်ကျန်မတက်",
+    "လက်ကျန်မပြ",
+    "လက်ကျန်မပြောင်း",
+    "လက်ကျန်မတိုး",
+  ];
+
+  const withdrawalWords = [
+    "withdrawal",
+    "withdraw",
+    "withdrawn",
+    "cash out",
+    "withdrawal status",
+    "ငွေထုတ်",
+    "ငွေထုတ်ထား",
+    "ငွေထုတ်ပြီး",
+  ];
+
+  const transactionWords = [
+    "transaction",
+    "transactions",
+    "transaction history",
+    "history",
+    "recent transactions",
+    "ငွေလွှဲမှတ်တမ်း",
+    "မှတ်တမ်း",
+  ];
+
+  const hasBalance =
+    containsAny(
+      text,
+      balanceWords,
+    );
+
+  const hasDeposit =
+    containsAny(
+      text,
+      depositWords,
+    );
+
+  const hasNotUpdated =
+    containsAny(
+      text,
+      notUpdatedWords,
+    );
+
+  /*
+   * Example:
+   *
+   * "I have deposit. but balance does not update"
+   *
+   * => BALANCE_AFTER_DEPOSIT
+   */
+
+  if (
+    hasDeposit &&
+    (
+      hasBalance ||
+      hasNotUpdated
+    )
+  ) {
+    return "BALANCE_AFTER_DEPOSIT";
+  }
+
+  if (hasBalance) {
+    return "WALLET_BALANCE";
+  }
+
+  if (hasDeposit) {
+    return "DEPOSIT";
+  }
+
+  if (
+    containsAny(
+      text,
+      withdrawalWords,
+    )
+  ) {
+    return "WITHDRAWAL";
+  }
+
+  if (
+    containsAny(
+      text,
+      transactionWords,
+    )
+  ) {
+    return "TRANSACTIONS";
+  }
+
+  return null;
+}
+
+/*
+ * ============================================================
+ * REQUEST MESSAGE
+ * ============================================================
+ */
+
+function extractUserMessage(
   body: SupportRequestBody,
 ): string {
   if (
     typeof body.message ===
-    "string"
+      "string" &&
+    body.message.trim()
   ) {
-    return normalizeText(
-      body.message,
-    );
+    return body.message.trim();
   }
 
   if (
@@ -185,7 +418,7 @@ function getUserMessage(
     )
   ) {
     const messages =
-      body.messages as ClientChatMessage[];
+      body.messages;
 
     for (
       let index =
@@ -197,19 +430,26 @@ function getUserMessage(
         messages[index];
 
       if (
-        item &&
-        item.role === "user" &&
-        typeof item.content ===
-          "string"
+        !isRecord(item)
       ) {
-        const content =
-          normalizeText(
-            item.content,
-          );
+        continue;
+      }
 
-        if (content) {
-          return content;
-        }
+      const role =
+        stringValue(
+          item.role,
+        ).toLowerCase();
+
+      const content =
+        stringValue(
+          item.content,
+        ).trim();
+
+      if (
+        role === "user" &&
+        content
+      ) {
+        return content;
       }
     }
   }
@@ -217,11 +457,13 @@ function getUserMessage(
   return "";
 }
 
-/* ============================================================
-   GET HISTORY
-============================================================ */
+/*
+ * ============================================================
+ * CONVERSATION HISTORY
+ * ============================================================
+ */
 
-function getHistory(
+function extractHistory(
   body: SupportRequestBody,
 ): OpenRouterMessage[] {
   if (
@@ -232,926 +474,62 @@ function getHistory(
     return [];
   }
 
-  const messages =
-    body.messages as ClientChatMessage[];
-
-  return messages
-    .filter(
-      (
-        message,
-      ): message is ClientChatMessage & {
-        role:
-          | "user"
-          | "assistant";
-        content: string;
-      } => {
-        if (!message) {
-          return false;
-        }
-
-        if (
-          typeof message.content !==
-          "string"
-        ) {
-          return false;
-        }
-
-        if (
-          message.role !== "user" &&
-          message.role !==
-            "assistant"
-        ) {
-          return false;
-        }
-
-        return (
-          message.content.trim()
-            .length > 0
-        );
-      },
-    )
-    .slice(
-      -MAX_HISTORY_MESSAGES,
-    )
-    .map(
-      (message) => ({
-        role:
-          message.role,
-        content:
-          normalizeText(
-            message.content,
-          ),
-      }),
-    );
-}
-
-/* ============================================================
-   ACCOUNT INTENT DETECTION
-============================================================ */
-
-function detectAccountIntent(
-  message: string,
-): AccountIntent {
-  const text =
-    normalizeForIntent(
-      message,
-    );
-
-  if (!text) {
-    return null;
-  }
-
-  /*
-   * ----------------------------------------------------------
-   * BALANCE AFTER DEPOSIT
-   * ----------------------------------------------------------
-   *
-   * Examples:
-   *
-   * balance not update after deposit
-   * deposited but balance not updated
-   * deposit completed but wallet balance unchanged
-   * I have deposit but balance does not update
-   * my balance is not showing deposit
-   */
-  const hasBalance =
-    /\b(balance|wallet|money|funds)\b/u.test(
-      text,
-    );
-
-  const hasDeposit =
-    /\b(deposit|deposited|depositing|topup|top up|topuped|payment)\b/u.test(
-      text,
-    );
-
-  const hasNotUpdated =
-    /\b(
-      not update|
-      not updated|
-      doesn't update|
-      does not update|
-      didnt update|
-      didn't update|
-      not showing|
-      doesn't show|
-      does not show|
-      not reflected|
-      missing|
-      disappeared|
-      unchanged|
-      same balance|
-      balance unchanged|
-      balance not changed
-    )\b/ux.test(
-      text,
-    );
-
-  if (
-    hasBalance &&
-    hasDeposit &&
-    (
-      hasNotUpdated ||
-      /\b(after|but|yet)\b/u.test(
-        text,
-      )
-    )
-  ) {
-    return "BALANCE_AFTER_DEPOSIT";
-  }
-
-  /*
-   * ----------------------------------------------------------
-   * WALLET BALANCE
-   * ----------------------------------------------------------
-   */
-  if (
-    hasBalance &&
-    !hasDeposit
-  ) {
-    return "WALLET_BALANCE";
-  }
-
-  /*
-   * ----------------------------------------------------------
-   * DEPOSIT
-   * ----------------------------------------------------------
-   */
-  if (
-    hasDeposit
-  ) {
-    return "DEPOSIT";
-  }
-
-  /*
-   * ----------------------------------------------------------
-   * WITHDRAWAL
-   * ----------------------------------------------------------
-   */
-  if (
-    /\b(
-      withdrawal|
-      withdraw|
-      withdrawn|
-      cashout|
-      cash out|
-      payout
-    )\b/ux.test(
-      text,
-    )
-  ) {
-    return "WITHDRAWAL";
-  }
-
-  /*
-   * ----------------------------------------------------------
-   * TRANSACTIONS
-   * ----------------------------------------------------------
-   */
-  if (
-    /\b(
-      transaction|
-      transactions|
-      history|
-      payment history|
-      account history
-    )\b/ux.test(
-      text,
-    )
-  ) {
-    return "TRANSACTIONS";
-  }
-
-  return null;
-}
-
-/* ============================================================
-   READ-ONLY TOOL EXECUTION
-============================================================ */
-
-async function executeTool(
-  name: string,
-  authenticatedUserId: string,
-): Promise<string> {
-  switch (name) {
-    case "getMyWallet": {
-      const result =
-        await getMyWallet(
-          authenticatedUserId,
-        );
-
-      return JSON.stringify(
-        result,
-      );
-    }
-
-    case "getMyLatestDeposit": {
-      const result =
-        await getMyLatestDeposit(
-          authenticatedUserId,
-        );
-
-      return JSON.stringify(
-        result,
-      );
-    }
-
-    case "getMyLatestWithdrawal": {
-      const result =
-        await getMyLatestWithdrawal(
-          authenticatedUserId,
-        );
-
-      return JSON.stringify(
-        result,
-      );
-    }
-
-    case "getMyRecentTransactions": {
-      const result =
-        await getMyRecentTransactions(
-          authenticatedUserId,
-        );
-
-      return JSON.stringify(
-        result,
-      );
-    }
-
-    default:
-      throw new Error(
-        `Unsupported read-only support tool: ${name}`,
-      );
-  }
-}
-
-/* ============================================================
-   ACCOUNT DATA
-============================================================ */
-
-async function loadAccountData(
-  intent: AccountIntent,
-  authenticatedUserId: string,
-): Promise<{
-  data: AccountData;
-  failed: boolean;
-}> {
-  const data: AccountData = {};
-
-  try {
-    switch (intent) {
-      case "WALLET_BALANCE": {
-        data.wallet =
-          await getMyWallet(
-            authenticatedUserId,
-          );
-
-        return {
-          data,
-          failed: false,
-        };
-      }
-
-      case "DEPOSIT": {
-        data.latestDeposit =
-          await getMyLatestDeposit(
-            authenticatedUserId,
-          );
-
-        return {
-          data,
-          failed: false,
-        };
-      }
-
-      case "BALANCE_AFTER_DEPOSIT": {
-        /*
-         * Both are authoritative read-only
-         * account queries.
-         */
-        const [
-          wallet,
-          latestDeposit,
-        ] =
-          await Promise.all([
-            getMyWallet(
-              authenticatedUserId,
-            ),
-            getMyLatestDeposit(
-              authenticatedUserId,
-            ),
-          ]);
-
-        data.wallet =
-          wallet;
-
-        data.latestDeposit =
-          latestDeposit;
-
-        return {
-          data,
-          failed: false,
-        };
-      }
-
-      case "WITHDRAWAL": {
-        data.latestWithdrawal =
-          await getMyLatestWithdrawal(
-            authenticatedUserId,
-          );
-
-        return {
-          data,
-          failed: false,
-        };
-      }
-
-      case "TRANSACTIONS": {
-        data.transactions =
-          await getMyRecentTransactions(
-            authenticatedUserId,
-            10,
-          );
-
-        return {
-          data,
-          failed: false,
-        };
-      }
-
-      default:
-        return {
-          data,
-          failed: false,
-        };
-    }
-  } catch (error) {
-    console.error(
-      "Account support data lookup failed:",
-      error,
-    );
-
-    return {
-      data,
-      failed: true,
-    };
-  }
-}
-
-/* ============================================================
-   ACCOUNT DATA -> OPENROUTER CONTEXT
-============================================================ */
-
-function accountDataToText(
-  intent: AccountIntent,
-  data: AccountData,
-): string {
-  if (!intent) {
-    return "";
-  }
-
-  const sections: string[] =
+  const result: OpenRouterMessage[] =
     [];
 
-  sections.push(
-    "AUTHORITATIVE ACCOUNT DATA:",
-  );
-
-  sections.push(
-    JSON.stringify(
-      data,
-      null,
-      2,
-    ),
-  );
-
-  sections.push(
-    "",
-  );
-
-  sections.push(
-    "IMPORTANT: The account data above comes from the authenticated player's backend database.",
-  );
-
-  sections.push(
-    "Use these values exactly. Do not invent or change financial values or statuses.",
-  );
-
-  return sections.join(
-    "\n",
-  );
-}
-
-/* ============================================================
-   DETERMINISTIC ACCOUNT RESPONSE
-============================================================ */
-
-function deterministicAccountResponse(
-  message: string,
-  intent: AccountIntent,
-  data: AccountData,
-): AIResponse | null {
-  if (!intent) {
-    return null;
-  }
-
-  /*
-   * ----------------------------------------------------------
-   * WALLET BALANCE
-   * ----------------------------------------------------------
-   */
-  if (
-    intent ===
-    "WALLET_BALANCE"
-  ) {
-    const wallet =
-      data.wallet;
-
-    if (
-      !wallet ||
-      !wallet.found
-    ) {
-      return {
-        success: true,
-        source: "HUMAN",
-        message:
-          "I could not find your wallet information right now. Please contact our support team so they can check your account.",
-      };
-    }
-
-    return {
-      success: true,
-      source: "TRAINING",
-      confidence: 1,
-      message:
-        `Your current wallet balance is ${wallet.balance}.`,
-    };
-  }
-
-  /*
-   * ----------------------------------------------------------
-   * DEPOSIT
-   * ----------------------------------------------------------
-   */
-  if (
-    intent ===
-    "DEPOSIT"
-  ) {
-    const deposit =
-      data.latestDeposit;
-
-    if (
-      !deposit ||
-      !deposit.found
-    ) {
-      return {
-        success: true,
-        source: "HUMAN",
-        message:
-          "I could not find a recent deposit for your account. Please contact our support team so they can check your deposit.",
-      };
-    }
-
-    const item =
-      deposit.deposit;
-
-    return {
-      success: true,
-      source: "TRAINING",
-      confidence: 1,
-      message:
-        [
-          `Your latest deposit is ${item.amount}.`,
-          `Status: ${item.status}.`,
-          item.createdAt
-            ? `Created: ${item.createdAt}.`
-            : "",
-        ]
-          .filter(Boolean)
-          .join(" "),
-    };
-  }
-
-  /*
-   * ----------------------------------------------------------
-   * BALANCE AFTER DEPOSIT
-   * ----------------------------------------------------------
-   */
-  if (
-    intent ===
-    "BALANCE_AFTER_DEPOSIT"
-  ) {
-    const wallet =
-      data.wallet;
-
-    const deposit =
-      data.latestDeposit;
-
-    if (
-      !wallet ||
-      !wallet.found
-    ) {
-      return {
-        success: true,
-        source: "HUMAN",
-        message:
-          "I could not retrieve your current wallet balance. Please contact our support team so they can check your account.",
-      };
-    }
-
-    if (
-      !deposit ||
-      !deposit.found
-    ) {
-      return {
-        success: true,
-        source: "HUMAN",
-        message:
-          `Your current wallet balance is ${wallet.balance}, but I could not find a recent deposit record. Please contact our support team so they can check the deposit.`,
-      };
-    }
-
-    const item =
-      deposit.deposit;
-
-    const status =
-      String(
-        item.status || "",
-      )
-        .trim()
-        .toUpperCase();
-
-    /*
-     * --------------------------------------------------------
-     * PENDING / PROCESSING
-     * --------------------------------------------------------
-     */
-    if (
-      status ===
-        "PENDING" ||
-      status ===
-        "PROCESSING"
-    ) {
-      return {
-        success: true,
-        source: "TRAINING",
-        confidence: 1,
-        message:
-          [
-            `Your current wallet balance is ${wallet.balance}.`,
-            `Your latest deposit is ${item.amount} and its status is ${item.status}.`,
-            "The deposit is not in a completed state yet, so the current balance does not show that deposit as completed.",
-            "If you need the deposit checked, please contact our support team.",
-          ].join(" "),
-      };
-    }
-
-    /*
-     * --------------------------------------------------------
-     * APPROVED / COMPLETED / SUCCESS
-     * --------------------------------------------------------
-     */
-    if (
-      status ===
-        "APPROVED" ||
-      status ===
-        "COMPLETED" ||
-      status ===
-        "SUCCESS" ||
-      status ===
-        "SUCCESSFUL"
-    ) {
-      return {
-        success: true,
-        source: "TRAINING",
-        confidence: 1,
-        message:
-          [
-            `Your current wallet balance is ${wallet.balance}.`,
-            `Your latest deposit is ${item.amount} and its status is ${item.status}.`,
-            "The deposit record is completed, but I cannot confirm from the current account data whether the balance changed at the expected time.",
-            "Please contact our support team so they can check the deposit and wallet transaction together.",
-          ].join(" "),
-      };
-    }
-
-    /*
-     * --------------------------------------------------------
-     * REJECTED / FAILED / CANCELLED
-     * --------------------------------------------------------
-     */
-    if (
-      status ===
-        "REJECTED" ||
-      status ===
-        "FAILED" ||
-      status ===
-        "CANCELLED" ||
-      status ===
-        "CANCELED"
-    ) {
-      return {
-        success: true,
-        source: "TRAINING",
-        confidence: 1,
-        message:
-          [
-            `Your current wallet balance is ${wallet.balance}.`,
-            `Your latest deposit is ${item.amount} and its status is ${item.status}.`,
-            "The deposit is not a successful completed deposit, so it is not reflected as a completed deposit in the wallet.",
-          ].join(" "),
-      };
-    }
-
-    /*
-     * --------------------------------------------------------
-     * UNKNOWN STATUS
-     * --------------------------------------------------------
-     */
-    return {
-      success: true,
-      source: "TRAINING",
-      confidence: 1,
-      message:
-        [
-          `Your current wallet balance is ${wallet.balance}.`,
-          `Your latest deposit is ${item.amount}.`,
-          `The deposit status is ${item.status}.`,
-          "I cannot determine from this information why the balance has not updated, so please contact our support team for further checking.",
-        ].join(" "),
-    };
-  }
-
-  /*
-   * ----------------------------------------------------------
-   * WITHDRAWAL
-   * ----------------------------------------------------------
-   */
-  if (
-    intent ===
-    "WITHDRAWAL"
-  ) {
-    const withdrawal =
-      data.latestWithdrawal;
-
-    if (
-      !withdrawal ||
-      !withdrawal.found
-    ) {
-      return {
-        success: true,
-        source: "HUMAN",
-        message:
-          "I could not find a recent withdrawal for your account. Please contact our support team if you need your withdrawal checked.",
-      };
-    }
-
-    const item =
-      withdrawal.withdrawal;
-
-    return {
-      success: true,
-      source: "TRAINING",
-      confidence: 1,
-      message:
-        [
-          `Your latest withdrawal is ${item.amount}.`,
-          `Status: ${item.status}.`,
-          item.createdAt
-            ? `Created: ${item.createdAt}.`
-            : "",
-        ]
-          .filter(Boolean)
-          .join(" "),
-    };
-  }
-
-  /*
-   * ----------------------------------------------------------
-   * TRANSACTIONS
-   * ----------------------------------------------------------
-   */
-  if (
-    intent ===
-    "TRANSACTIONS"
-  ) {
-    const transactions =
-      data.transactions
-        ?.transactions;
-
-    if (
-      !transactions ||
-      transactions.length === 0
-    ) {
-      return {
-        success: true,
-        source: "TRAINING",
-        confidence: 1,
-        message:
-          "I could not find any recent transactions for your account.",
-      };
-    }
-
-    const lines =
-      transactions
-        .slice(0, 5)
-        .map(
-          (
-            transaction,
-            index,
-          ) =>
-            `${index + 1}. ${transaction.type}: ${transaction.amount} — ${transaction.status}`,
-        );
-
-    return {
-      success: true,
-      source: "TRAINING",
-      confidence: 1,
-      message:
-        [
-          "Here are your latest transactions:",
-          ...lines,
-        ].join("\n"),
-    };
-  }
-
-  return null;
-}
-
-/* ============================================================
-   OPENROUTER TOOL LOOP
-============================================================ */
-
-async function runOpenRouter(
-  authenticatedUserId: string,
-  message: string,
-  history: OpenRouterMessage[],
-  knowledgeText: string,
-): Promise<string | null> {
-  const messages: OpenRouterMessage[] =
-    [
-      {
-        role: "system",
-        content:
-          SYSTEM_PROMPT,
-      },
-    ];
-
-  if (
-    knowledgeText &&
-    knowledgeText.trim()
-  ) {
-    messages.push({
-      role: "system",
-      content:
-        [
-          "Relevant support knowledge:",
-          "",
-          knowledgeText,
-        ].join("\n"),
-    });
-  }
-
-  messages.push(
-    ...history,
-  );
-
-  messages.push({
-    role: "user",
-    content: message,
-  });
-
-  let toolCallCount = 0;
-
   for (
-    let round = 0;
-    round < MAX_TOOL_ROUNDS;
-    round += 1
+    const item of body.messages
   ) {
-    const result =
-      await generateOpenRouterResponse(
-        messages,
-        TOOL_DEFINITIONS,
-      );
-
-    if (!result) {
-      return null;
+    if (
+      !isRecord(item)
+    ) {
+      continue;
     }
+
+    const role =
+      stringValue(
+        item.role,
+      ).toLowerCase();
 
     const content =
-      typeof result.content ===
-      "string"
-        ? result.content.trim()
-        : "";
-
-    const toolCalls =
-      Array.isArray(
-        result.toolCalls,
-      )
-        ? result.toolCalls
-        : [];
+      stringValue(
+        item.content,
+      ).trim();
 
     if (
-      toolCalls.length === 0
+      (
+        role === "user" ||
+        role === "assistant" ||
+        role === "system"
+      ) &&
+      content
     ) {
-      if (content) {
-        return content;
-      }
-
-      return null;
-    }
-
-    if (
-      toolCallCount >=
-      MAX_TOOL_CALLS_PER_REQUEST
-    ) {
-      console.warn(
-        "AI support tool-call limit reached.",
-      );
-
-      return null;
-    }
-
-    messages.push({
-      role: "assistant",
-      content:
-        content || null,
-      tool_calls:
-        toolCalls,
-    });
-
-    for (
-      const toolCall of toolCalls
-    ) {
-      if (
-        toolCallCount >=
-        MAX_TOOL_CALLS_PER_REQUEST
-      ) {
-        break;
-      }
-
-      const toolName =
-        toolCall.function
-          ?.name;
-
-      if (
-        !toolName ||
-        typeof toolName !==
-          "string"
-      ) {
-        continue;
-      }
-
-      try {
-        toolCallCount += 1;
-
-        const toolResult =
-          await executeTool(
-            toolName,
-            authenticatedUserId,
-          );
-
-        messages.push({
-          role: "tool",
-          content:
-            toolResult,
-          tool_call_id:
-            toolCall.id,
-          name: toolName,
-        });
-      } catch (error) {
-        console.error(
-          `AI support tool failed: ${toolName}`,
-          error,
-        );
-
-        messages.push({
-          role: "tool",
-          content:
-            JSON.stringify({
-              success: false,
-              found: false,
-              error:
-                "Unable to retrieve the requested account information.",
-            }),
-          tool_call_id:
-            toolCall.id,
-          name: toolName,
-        });
-      }
+      result.push({
+        role:
+          role as
+            | "user"
+            | "assistant"
+            | "system",
+        content,
+      });
     }
   }
 
-  return null;
+  return result.slice(
+    -MAX_HISTORY_MESSAGES,
+  );
 }
 
-/* ============================================================
-   KNOWLEDGE SEARCH
-============================================================ */
+/*
+ * ============================================================
+ * KNOWLEDGE SEARCH
+ * ============================================================
+ */
 
 async function loadKnowledge(
   message: string,
 ): Promise<{
-  results: unknown[];
+  results: KnowledgeResult[];
   text: string;
 }> {
   try {
@@ -1162,7 +540,8 @@ async function loadKnowledge(
       );
 
     if (
-      !Array.isArray(results)
+      !results ||
+      results.length === 0
     ) {
       return {
         results: [],
@@ -1177,15 +556,14 @@ async function loadKnowledge(
 
     return {
       results,
-      text:
-        typeof text ===
-        "string"
-          ? text.trim()
-          : "",
+      text: text.slice(
+        0,
+        8000,
+      ),
     };
   } catch (error) {
     console.error(
-      "Knowledge search failed:",
+      "AI knowledge search error:",
       error,
     );
 
@@ -1196,13 +574,806 @@ async function loadKnowledge(
   }
 }
 
-/* ============================================================
-   CUSTOM TRAINING FALLBACK
-============================================================ */
+/*
+ * ============================================================
+ * AUTHENTICATED USER ID
+ * ============================================================
+ */
 
-async function runCustomTrainingFallback(
+function getAuthenticatedUserId(
+  user: AuthenticatedUser,
+): string {
+  const userRecord =
+    user as unknown as Record<
+      string,
+      unknown
+    >;
+
+  const candidate =
+    userRecord.userId ??
+    userRecord.id ??
+    userRecord.sub;
+
+  const userId =
+    stringValue(
+      candidate,
+    ).trim();
+
+  if (!userId) {
+    throw new Error(
+      "Authenticated user ID is missing",
+    );
+  }
+
+  return userId;
+}
+
+/*
+ * ============================================================
+ * LOAD LIVE ACCOUNT DATA
+ * ============================================================
+ *
+ * IMPORTANT:
+ *
+ * The userId comes only from the authenticated JWT.
+ *
+ * Never use a userId supplied by the player or AI model.
+ * ============================================================
+ */
+
+async function loadAccountData(
+  userId: string,
+  intent: AccountIntent,
+): Promise<AccountData> {
+  const data: AccountData =
+    {};
+
+  switch (intent) {
+    case "WALLET_BALANCE":
+      data.wallet =
+        await getMyWallet(
+          userId,
+        );
+      break;
+
+    case "BALANCE_AFTER_DEPOSIT":
+      data.wallet =
+        await getMyWallet(
+          userId,
+        );
+
+      data.deposit =
+        await getMyLatestDeposit(
+          userId,
+        );
+      break;
+
+    case "DEPOSIT":
+      data.deposit =
+        await getMyLatestDeposit(
+          userId,
+        );
+
+      data.wallet =
+        await getMyWallet(
+          userId,
+        );
+      break;
+
+    case "WITHDRAWAL":
+      data.withdrawal =
+        await getMyLatestWithdrawal(
+          userId,
+        );
+
+      data.wallet =
+        await getMyWallet(
+          userId,
+        );
+      break;
+
+    case "TRANSACTIONS":
+      data.transactions =
+        await getMyRecentTransactions(
+          userId,
+          10,
+        );
+      break;
+
+    default:
+      break;
+  }
+
+  return data;
+}
+
+/*
+ * ============================================================
+ * ACCOUNT VALUE HELPERS
+ * ============================================================
+ */
+
+function formatAccountValue(
+  value: unknown,
+): string {
+  const result =
+    stringValue(
+      value,
+    );
+
+  return result || "0";
+}
+
+function getDepositStatus(
+  accountData: AccountData,
+): string {
+  if (
+    !accountData.deposit ||
+    !accountData.deposit.found
+  ) {
+    return "";
+  }
+
+  return stringValue(
+    accountData.deposit.deposit
+      ?.status,
+  ).toUpperCase();
+}
+
+/*
+ * ============================================================
+ * DETERMINISTIC ACCOUNT RESPONSE
+ * ============================================================
+ *
+ * These answers are based on live database values.
+ *
+ * No guessing.
+ * ============================================================
+ */
+
+function deterministicAccountResponse(
+  intent: AccountIntent,
+  data: AccountData,
+): {
+  answer: string;
+  confidence: number;
+} | null {
+  switch (intent) {
+    /*
+     * --------------------------------------------------------
+     * WALLET BALANCE
+     * --------------------------------------------------------
+     */
+
+    case "WALLET_BALANCE": {
+      if (
+        !data.wallet ||
+        !data.wallet.found
+      ) {
+        return {
+          answer:
+            "I could not find your wallet information. Please contact our support team for assistance.",
+          confidence: 0.95,
+        };
+      }
+
+      const balance =
+        formatAccountValue(
+          data.wallet.balance,
+        );
+
+      return {
+        answer:
+          `Your current wallet balance is ${balance}.`,
+        confidence: 0.98,
+      };
+    }
+
+    /*
+     * --------------------------------------------------------
+     * BALANCE AFTER DEPOSIT
+     * --------------------------------------------------------
+     */
+
+    case "BALANCE_AFTER_DEPOSIT": {
+      const wallet =
+        data.wallet;
+
+      const deposit =
+        data.deposit;
+
+      if (
+        !wallet ||
+        !wallet.found
+      ) {
+        return {
+          answer:
+            "I could not find your wallet information. Please contact our support team so we can check your deposit and balance.",
+          confidence: 0.95,
+        };
+      }
+
+      const balance =
+        formatAccountValue(
+          wallet.balance,
+        );
+
+      if (
+        !deposit ||
+        !deposit.found ||
+        !deposit.deposit
+      ) {
+        return {
+          answer:
+            `Your current wallet balance is ${balance}. I could not find a recent deposit record for your account. Please contact our support team if you have already made a deposit.`,
+          confidence: 0.95,
+        };
+      }
+
+      const amount =
+        formatAccountValue(
+          deposit.deposit.amount,
+        );
+
+      const status =
+        getDepositStatus(
+          data,
+        );
+
+      /*
+       * APPROVED / COMPLETED
+       */
+
+      if (
+        status === "APPROVED" ||
+        status === "COMPLETED" ||
+        status === "SUCCESS" ||
+        status === "SUCCESSFUL"
+      ) {
+        return {
+          answer:
+            `Your latest deposit is ${amount} and its status is ${status}. Your current wallet balance is ${balance}. If the approved deposit amount is not reflected in this balance, please contact our support team so they can investigate the transaction.`,
+          confidence: 0.99,
+        };
+      }
+
+      /*
+       * PENDING / PROCESSING
+       */
+
+      if (
+        status === "PENDING" ||
+        status === "PROCESSING"
+      ) {
+        return {
+          answer:
+            `Your latest deposit is ${amount} and its status is ${status}. Your current wallet balance is ${balance}. The deposit has not been confirmed yet, so the amount may not be reflected in your balance.`,
+          confidence: 0.99,
+        };
+      }
+
+      /*
+       * REJECTED / FAILED / CANCELLED
+       */
+
+      if (
+        status === "REJECTED" ||
+        status === "FAILED" ||
+        status === "CANCELLED" ||
+        status === "CANCELED"
+      ) {
+        return {
+          answer:
+            `Your latest deposit is ${amount} and its status is ${status}. Your current wallet balance is ${balance}. The deposit is not currently confirmed as successful. Please contact our support team if you believe this is incorrect.`,
+          confidence: 0.99,
+        };
+      }
+
+      /*
+       * UNKNOWN STATUS
+       */
+
+      return {
+        answer:
+          `Your latest deposit is ${amount} and its current status is ${status || "UNKNOWN"}. Your current wallet balance is ${balance}. Please contact our support team if the deposit should already be reflected in your balance.`,
+        confidence: 0.97,
+      };
+    }
+
+    /*
+     * --------------------------------------------------------
+     * DEPOSIT
+     * --------------------------------------------------------
+     */
+
+    case "DEPOSIT": {
+      if (
+        !data.deposit ||
+        !data.deposit.found ||
+        !data.deposit.deposit
+      ) {
+        return {
+          answer:
+            "I could not find a recent deposit record for your account. Please contact our support team if you have already made a deposit.",
+          confidence: 0.95,
+        };
+      }
+
+      const amount =
+        formatAccountValue(
+          data.deposit.deposit.amount,
+        );
+
+      const status =
+        getDepositStatus(
+          data,
+        );
+
+      return {
+        answer:
+          `Your latest deposit is ${amount} and its current status is ${status || "UNKNOWN"}.`,
+        confidence: 0.99,
+      };
+    }
+
+    /*
+     * --------------------------------------------------------
+     * WITHDRAWAL
+     * --------------------------------------------------------
+     */
+
+    case "WITHDRAWAL": {
+      if (
+        !data.withdrawal ||
+        !data.withdrawal.found ||
+        !data.withdrawal.withdrawal
+      ) {
+        return {
+          answer:
+            "I could not find a recent withdrawal record for your account. Please contact our support team if you have already requested a withdrawal.",
+          confidence: 0.95,
+        };
+      }
+
+      const amount =
+        formatAccountValue(
+          data.withdrawal.withdrawal.amount,
+        );
+
+      const status =
+        stringValue(
+          data.withdrawal.withdrawal.status,
+        ).toUpperCase();
+
+      const balance =
+        data.wallet &&
+        data.wallet.found
+          ? formatAccountValue(
+              data.wallet.balance,
+            )
+          : "";
+
+      if (balance) {
+        return {
+          answer:
+            `Your latest withdrawal is ${amount} and its current status is ${status || "UNKNOWN"}. Your current wallet balance is ${balance}.`,
+          confidence: 0.99,
+        };
+      }
+
+      return {
+        answer:
+          `Your latest withdrawal is ${amount} and its current status is ${status || "UNKNOWN"}.`,
+        confidence: 0.99,
+      };
+    }
+
+    /*
+     * --------------------------------------------------------
+     * TRANSACTIONS
+     * --------------------------------------------------------
+     */
+
+    case "TRANSACTIONS": {
+      if (
+        !data.transactions
+      ) {
+        return null;
+      }
+
+      const transactions =
+        data.transactions
+          .transactions;
+
+      if (
+        !transactions ||
+        transactions.length === 0
+      ) {
+        return {
+          answer:
+            "I could not find any recent transactions for your account.",
+          confidence: 0.95,
+        };
+      }
+
+      const lines =
+        transactions
+          .slice(0, 5)
+          .map(
+            (
+              transaction,
+              index,
+            ) => {
+              const type =
+                stringValue(
+                  transaction.type,
+                ) ||
+                "UNKNOWN";
+
+              const amount =
+                formatAccountValue(
+                  transaction.amount,
+                );
+
+              const status =
+                stringValue(
+                  transaction.status,
+                ) ||
+                "UNKNOWN";
+
+              return `${index + 1}. ${type}: ${amount} (${status})`;
+            },
+          );
+
+      return {
+        answer:
+          `Here are your latest transactions:\n${lines.join("\n")}`,
+        confidence: 0.98,
+      };
+    }
+
+    default:
+      return null;
+  }
+}
+
+/*
+ * ============================================================
+ * TOOL RESULT
+ * ============================================================
+ */
+
+function toolResultText(
+  value: unknown,
+): string {
+  try {
+    return JSON.stringify(
+      value,
+    );
+  } catch {
+    return String(value);
+  }
+}
+
+/*
+ * ============================================================
+ * OPENROUTER TOOL EXECUTION
+ * ============================================================
+ */
+
+async function executeTool(
+  toolName: string,
+  argumentsValue: unknown,
+  userId: string,
+): Promise<unknown> {
+  let args: Record<
+    string,
+    unknown
+  > = {};
+
+  if (
+    typeof argumentsValue ===
+    "string"
+  ) {
+    try {
+      const parsed =
+        JSON.parse(
+          argumentsValue,
+        );
+
+      if (
+        isRecord(parsed)
+      ) {
+        args = parsed;
+      }
+    } catch {
+      args = {};
+    }
+  } else if (
+    isRecord(
+      argumentsValue,
+    )
+  ) {
+    args =
+      argumentsValue;
+  }
+
+  /*
+   * IMPORTANT:
+   *
+   * Never use args.userId.
+   *
+   * Always use the authenticated user ID.
+   */
+
+  switch (toolName) {
+    case "getMyWallet":
+      return getMyWallet(
+        userId,
+      );
+
+    case "getMyLatestDeposit":
+      return getMyLatestDeposit(
+        userId,
+      );
+
+    case "getMyLatestWithdrawal":
+      return getMyLatestWithdrawal(
+        userId,
+      );
+
+    case "getMyRecentTransactions": {
+      const requestedLimit =
+        Number(
+          args.limit ?? 10,
+        );
+
+      const safeLimit =
+        Number.isFinite(
+          requestedLimit,
+        )
+          ? Math.min(
+              Math.max(
+                Math.floor(
+                  requestedLimit,
+                ),
+                1,
+              ),
+              10,
+            )
+          : 10;
+
+      return getMyRecentTransactions(
+        userId,
+        safeLimit,
+      );
+    }
+
+    default:
+      throw new Error(
+        `Unsupported support tool: ${toolName}`,
+      );
+  }
+}
+
+/*
+ * ============================================================
+ * OPENROUTER
+ * ============================================================
+ *
+ * Model selection remains inside openRouter.ts.
+ *
+ * This file does NOT specify a model.
+ * ============================================================
+ */
+
+async function runOpenRouter(
   message: string,
-): Promise<AIResponse | null> {
+  history: OpenRouterMessage[],
+  knowledgeText: string,
+  userId: string,
+): Promise<string | null> {
+  const messages: OpenRouterMessage[] =
+    [
+      {
+        role: "system",
+        content:
+          SYSTEM_PROMPT,
+      },
+    ];
+
+  /*
+   * Knowledge context
+   */
+
+  if (knowledgeText) {
+    messages.push({
+      role: "system",
+      content:
+        `KNOWLEDGE BASE CONTEXT:\n${knowledgeText}`,
+    });
+  }
+
+  /*
+   * Conversation history
+   */
+
+  for (
+    const item of history
+  ) {
+    if (
+      item.role === "system"
+    ) {
+      continue;
+    }
+
+    messages.push({
+      role: item.role,
+      content: item.content,
+    });
+  }
+
+  /*
+   * Current message
+   */
+
+  messages.push({
+    role: "user",
+    content: message,
+  });
+
+  let toolRounds = 0;
+
+  let toolCallCount = 0;
+
+  while (
+    toolRounds <
+    MAX_TOOL_ROUNDS
+  ) {
+    toolRounds += 1;
+
+    const result =
+      await generateOpenRouterResponse(
+        messages,
+        TOOL_DEFINITIONS,
+      );
+
+    const content =
+      typeof result?.content ===
+      "string"
+        ? result.content.trim()
+        : "";
+
+    const toolCalls =
+      Array.isArray(
+        result?.toolCalls,
+      )
+        ? result.toolCalls
+        : [];
+
+    /*
+     * Normal answer
+     */
+
+    if (
+      toolCalls.length === 0
+    ) {
+      return (
+        content || null
+      );
+    }
+
+    /*
+     * Maximum tool calls
+     */
+
+    if (
+      toolCallCount >=
+      MAX_TOOL_CALLS_PER_REQUEST
+    ) {
+      return (
+        content || null
+      );
+    }
+
+    /*
+     * Preserve assistant content
+     */
+
+    messages.push({
+      role: "assistant",
+      content:
+        content || "",
+    });
+
+    /*
+     * Execute tools
+     */
+
+    for (
+      const toolCall of toolCalls
+    ) {
+      if (
+        toolCallCount >=
+        MAX_TOOL_CALLS_PER_REQUEST
+      ) {
+        break;
+      }
+
+      toolCallCount += 1;
+
+      const call =
+        toolCall as OpenRouterToolCall;
+
+      const toolName =
+        stringValue(
+          call.function?.name ??
+          call.name,
+        );
+
+      const rawArguments =
+        call.function?.arguments ??
+        call.arguments ??
+        {};
+
+      if (!toolName) {
+        continue;
+      }
+
+      try {
+        const toolResult =
+          await executeTool(
+            toolName,
+            rawArguments,
+            userId,
+          );
+
+        /*
+         * Pass the read-only tool result back
+         * into the next OpenRouter round.
+         */
+        messages.push({
+          role: "system",
+          content:
+            `READ-ONLY TOOL RESULT (${toolName}):\n${toolResultText(toolResult)}`,
+        });
+      } catch (error) {
+        console.error(
+          `Support tool failed: ${toolName}`,
+          error,
+        );
+
+        messages.push({
+          role: "system",
+          content:
+            `READ-ONLY TOOL RESULT (${toolName}): The tool failed. Do not invent the missing information.`,
+        });
+      }
+    }
+
+    if (
+      toolRounds >=
+      MAX_TOOL_ROUNDS
+    ) {
+      break;
+    }
+  }
+
+  return null;
+}
+
+/*
+ * ============================================================
+ * CUSTOM TRAINING AI
+ * ============================================================
+ */
+
+async function runCustomTraining(
+  message: string,
+): Promise<{
+  answer: string;
+  confidence: number;
+} | null> {
   try {
     const result =
       await generateCustomTrainingResponse(
@@ -1214,38 +1385,39 @@ async function runCustomTrainingFallback(
     }
 
     const answer =
-      typeof result.message ===
-      "string"
-        ? result.message.trim()
-        : "";
+      stringValue(
+        result.message,
+      ).trim();
 
     if (!answer) {
       return null;
     }
 
+    const confidence =
+      Number(
+        result.confidence,
+      );
+
     /*
-     * Do not use weak/no-match training
-     * content as a reliable answer.
+     * Do not use weak matches.
      */
+
     if (
-      result.confidence <
-      0.55
+      !Number.isFinite(
+        confidence,
+      ) ||
+      confidence < 0.55
     ) {
       return null;
     }
 
     return {
-      success: true,
-      message: answer,
-      source: "TRAINING",
-      confidence:
-        result.confidence,
-      matchedDocuments:
-        result.matchedDocuments,
+      answer,
+      confidence,
     };
   } catch (error) {
     console.error(
-      "Custom training AI fallback failed:",
+      "Custom training AI error:",
       error,
     );
 
@@ -1253,166 +1425,126 @@ async function runCustomTrainingFallback(
   }
 }
 
-/* ============================================================
-   HUMAN FALLBACK
-============================================================ */
+/*
+ * ============================================================
+ * HUMAN FALLBACK
+ * ============================================================
+ */
 
-function humanFallback(): AIResponse {
+function humanFallback(): SupportResponse {
   return {
     success: true,
+    answer:
+      "I could not find a reliable answer for your question. Your request should be handled by our support team.",
     source: "HUMAN",
-    message:
-      "I could not find a reliable answer for your question. Please create a support ticket so our admin support team can help you.",
+    intent: null,
+    confidence: 0,
+    fallback: true,
   };
 }
 
-/* ============================================================
-   HANDLER
-============================================================ */
+/*
+ * ============================================================
+ * REQUEST BODY
+ * ============================================================
+ */
+
+function parseRequestBody(
+  event: HandlerEvent,
+): SupportRequestBody {
+  if (!event.body) {
+    return {};
+  }
+
+  try {
+    const parsed =
+      JSON.parse(
+        event.body,
+      );
+
+    if (
+      !isRecord(parsed)
+    ) {
+      return {};
+    }
+
+    return parsed as SupportRequestBody;
+  } catch {
+    throw new Error(
+      "Invalid JSON request body",
+    );
+  }
+}
+
+/*
+ * ============================================================
+ * MAIN HANDLER
+ * ============================================================
+ */
 
 export const handler: Handler =
   async (
     event: HandlerEvent,
     _context: HandlerContext,
   ) => {
+    /*
+     * --------------------------------------------------------
+     * METHOD
+     * --------------------------------------------------------
+     */
+
+    if (
+      event.httpMethod !== "POST"
+    ) {
+      return errorResponse(
+        405,
+        "Method not allowed",
+      );
+    }
+
     try {
-      /* ======================================================
-         METHOD
-      ====================================================== */
+      /*
+       * ------------------------------------------------------
+       * AUTH
+       * ------------------------------------------------------
+       *
+       * requireAuth() returns the authenticated user directly.
+       *
+       * It does NOT return:
+       *
+       * { success, user }
+       */
 
-      if (
-        event.httpMethod !==
-        "POST"
-      ) {
-        return response(
-          405,
-          {
-            success: false,
-            message:
-              "Method not allowed.",
-          },
-        );
-      }
-
-      /* ======================================================
-         AUTHENTICATION
-      ====================================================== */
-
-      let user;
-
-      try {
-        user =
-          await requireAuth(
-            event,
-          );
-      } catch (error) {
-        console.error(
-          "AI support authentication error:",
-          error,
+      const user =
+        await requireAuth(
+          event,
         );
 
-        const statusCode =
-          error &&
-          typeof error ===
-            "object" &&
-          "statusCode" in
-            error
-            ? Number(
-                (
-                  error as {
-                    statusCode?: unknown;
-                  }
-                ).statusCode,
-              )
-            : 401;
-
-        const safeStatusCode =
-          Number.isInteger(
-            statusCode,
-          ) &&
-          statusCode >= 200 &&
-          statusCode <= 599
-            ? statusCode
-            : 401;
-
-        const message =
-          error instanceof
-          Error
-            ? error.message
-            : "Authentication required. Please log in again.";
-
-        return response(
-          safeStatusCode,
-          {
-            success: false,
-            message,
-          },
+      const userId =
+        getAuthenticatedUserId(
+          user,
         );
-      }
 
       /*
-       * Never trust a user-provided ID.
+       * ------------------------------------------------------
+       * BODY
+       * ------------------------------------------------------
        */
-      const authenticatedUserId =
-        typeof user?.id ===
-        "string"
-          ? user.id.trim()
-          : typeof user?.userId ===
-              "string"
-            ? user.userId.trim()
-            : "";
 
-      if (
-        !authenticatedUserId
-      ) {
-        return response(
-          401,
-          {
-            success: false,
-            message:
-              "Authenticated user not found.",
-          },
+      const body =
+        parseRequestBody(
+          event,
         );
-      }
-
-      /* ======================================================
-         REQUEST BODY
-      ====================================================== */
-
-      let body:
-        | SupportRequestBody
-        | null = null;
-
-      try {
-        body = event.body
-          ? (JSON.parse(
-              event.body,
-            ) as SupportRequestBody)
-          : {};
-      } catch {
-        return response(
-          400,
-          {
-            success: false,
-            message:
-              "Invalid JSON request body.",
-          },
-        );
-      }
 
       const message =
-        getUserMessage(
+        extractUserMessage(
           body,
         );
 
       if (!message) {
-        return response(
+        return errorResponse(
           400,
-          {
-            success: false,
-            message:
-              "Please enter a support message.",
-          },
+          "Message is required",
         );
       }
 
@@ -1420,244 +1552,194 @@ export const handler: Handler =
         message.length >
         MAX_MESSAGE_LENGTH
       ) {
-        return response(
+        return errorResponse(
           400,
-          {
-            success: false,
-            message:
-              `Message must not exceed ${MAX_MESSAGE_LENGTH} characters.`,
-          },
+          `Message must be ${MAX_MESSAGE_LENGTH} characters or less`,
         );
       }
 
-      /* ======================================================
-         AI SUPPORT SETTING
-      ====================================================== */
+      /*
+       * ------------------------------------------------------
+       * AI ENABLED / DISABLED
+       * ------------------------------------------------------
+       */
 
-      let aiEnabled = true;
+      let aiEnabled = false;
 
       try {
         aiEnabled =
           await getAISupportEnabled();
       } catch (error) {
         console.error(
-          "Unable to read AI support setting:",
+          "Failed to read AI support setting:",
           error,
         );
 
         /*
-         * External AI fails closed.
-         * Account/training fallback still works.
+         * If the setting cannot be safely read,
+         * disable OpenRouter but continue with
+         * deterministic/training support.
          */
         aiEnabled = false;
       }
 
-      /* ======================================================
-         RATE LIMIT
-      ====================================================== */
+      /*
+       * ------------------------------------------------------
+       * RATE LIMIT
+       * ------------------------------------------------------
+       */
 
       try {
         const rateLimit =
           await checkRateLimitDetailed(
-            authenticatedUserId,
+            userId,
           );
 
         if (
           rateLimit &&
-          rateLimit.allowed ===
-            false
+          !rateLimit.allowed
         ) {
-          return response(
+          return errorResponse(
             429,
-            {
-              success: false,
-              message:
-                "You have sent too many support messages. Please try again later.",
-            },
+            "Too many support requests. Please try again shortly.",
           );
         }
       } catch (error) {
         /*
-         * Rate-limit infrastructure failure
-         * must not destroy support.
+         * Rate-limit service failure should not make
+         * the support system unavailable.
          */
         console.error(
-          "Rate limit check failed:",
+          "Support rate-limit check failed:",
           error,
         );
       }
 
-      /* ======================================================
-         ACCOUNT INTENT
-      ====================================================== */
+      /*
+       * ------------------------------------------------------
+       * INTENT
+       * ------------------------------------------------------
+       */
 
-      const accountIntent =
+      const intent =
         detectAccountIntent(
           message,
         );
 
+      console.log(
+        "AI SUPPORT REQUEST",
+        {
+          userId,
+          intent,
+          aiEnabled,
+          messageLength:
+            message.length,
+        },
+      );
+
       /*
        * ------------------------------------------------------
-       * IMPORTANT
-       *
-       * Account-specific questions are handled BEFORE
-       * relying on OpenRouter to decide whether a tool
-       * should be called.
-       *
-       * This fixes cases such as:
-       *
-       * "balance not update yet after deposit"
+       * LIVE ACCOUNT SUPPORT
        * ------------------------------------------------------
+       *
+       * This is BEFORE OpenRouter.
+       *
+       * Example:
+       *
+       * "I have deposit. but balance does not update"
+       *
+       * will directly query:
+       *
+       * getMyWallet()
+       * getMyLatestDeposit()
        */
 
-      if (accountIntent) {
-        const accountResult =
-          await loadAccountData(
-            accountIntent,
-            authenticatedUserId,
-          );
+      if (intent) {
+        try {
+          const accountData =
+            await loadAccountData(
+              userId,
+              intent,
+            );
 
-        /*
-         * ----------------------------------------------------
-         * ACCOUNT DATA AVAILABLE
-         * ----------------------------------------------------
-         */
-        if (
-          !accountResult.failed
-        ) {
-          /*
-           * First give OpenRouter the authoritative
-           * database data if AI is enabled.
-           *
-           * OpenRouter failure is intentionally caught
-           * and does NOT become HTTP 502.
-           */
-          if (aiEnabled) {
-            try {
-              const accountContext =
-                accountDataToText(
-                  accountIntent,
-                  accountResult.data,
-                );
-
-              const knowledge =
-                await loadKnowledge(
-                  message,
-                );
-
-              const combinedKnowledge =
-                [
-                  knowledge.text,
-                  accountContext,
-                ]
-                  .filter(
-                    (value) =>
-                      Boolean(
-                        value &&
-                        value.trim(),
-                      ),
-                  )
-                  .join(
-                    "\n\n",
-                  );
-
-              const answer =
-                await runOpenRouter(
-                  authenticatedUserId,
-                  message,
-                  getHistory(body),
-                  combinedKnowledge,
-                );
-
-              if (
-                answer &&
-                answer.trim()
-              ) {
-                return response(
-                  200,
-                  {
-                    success: true,
-                    message:
-                      answer.trim(),
-                    source:
-                      "OPENROUTER",
-                  },
-                );
-              }
-            } catch (error) {
-              /*
-               * ------------------------------------------------
-               * CRITICAL FALLBACK
-               *
-               * OpenRouter 429 / 502 / timeout / provider
-               * failure must NEVER break account support.
-               * ------------------------------------------------
-               */
-              console.error(
-                "OpenRouter account-support error; using deterministic fallback:",
-                error,
-              );
-            }
-          }
-
-          /*
-           * ----------------------------------------------------
-           * DETERMINISTIC ACCOUNT RESPONSE
-           * ----------------------------------------------------
-           *
-           * This does not depend on OpenRouter.
-           */
-          const accountResponse =
+          const deterministic =
             deterministicAccountResponse(
-              message,
-              accountIntent,
-              accountResult.data,
+              intent,
+              accountData,
             );
 
           if (
-            accountResponse
+            deterministic
           ) {
             return response(
               200,
-              accountResponse,
+              {
+                success: true,
+                answer:
+                  deterministic.answer,
+                source:
+                  "TRAINING",
+                intent,
+                confidence:
+                  deterministic.confidence,
+                fallback: true,
+              } satisfies SupportResponse,
             );
           }
-        } else {
+        } catch (error) {
           /*
-           * Database/tool failure.
+           * Do not return 502.
            *
-           * Do NOT expose database errors.
-           * Continue to normal training fallback.
+           * Continue to OpenRouter/training fallback.
            */
-          console.warn(
-            "Account data unavailable; continuing to training fallback.",
+          console.error(
+            "Account support tools failed:",
+            error,
           );
         }
       }
 
-      /* ======================================================
-         GENERAL KNOWLEDGE SEARCH
-      ====================================================== */
+      /*
+       * ------------------------------------------------------
+       * KNOWLEDGE
+       * ------------------------------------------------------
+       */
 
       const knowledge =
         await loadKnowledge(
           message,
         );
 
-      /* ======================================================
-         GENERAL OPENROUTER
-      ====================================================== */
+      /*
+       * ------------------------------------------------------
+       * OPENROUTER
+       * ------------------------------------------------------
+       *
+       * Dynamic model selection is handled by openRouter.ts.
+       *
+       * This code does NOT specify:
+       *
+       * AI_FREE_MODEL_1
+       * AI_FREE_MODEL_2
+       * AI_FREE_MODEL_3
+       *
+       * OpenRouter failure is caught and the request
+       * continues to custom training.
+       */
 
-      if (
-        aiEnabled
-      ) {
+      if (aiEnabled) {
         try {
+          const history =
+            extractHistory(
+              body,
+            );
+
           const answer =
             await runOpenRouter(
-              authenticatedUserId,
               message,
-              getHistory(body),
+              history,
               knowledge.text,
+              userId,
             );
 
           if (
@@ -1668,79 +1750,191 @@ export const handler: Handler =
               200,
               {
                 success: true,
-                message:
+                answer:
                   answer.trim(),
                 source:
                   "OPENROUTER",
-              },
+                intent,
+                confidence: 0.95,
+                fallback: false,
+              } satisfies SupportResponse,
             );
           }
         } catch (error) {
           /*
-           * OpenRouter is optional.
+           * Expected OpenRouter failures:
            *
-           * 429
-           * timeout
-           * 5xx
-           * provider failure
-           * unavailable model
-           * tool failure
+           * - 429
+           * - timeout
+           * - provider unavailable
+           * - model unavailable
+           * - network error
+           * - malformed provider response
            *
-           * all continue to local fallback.
+           * Never turn these into HTTP 502 here.
            */
           console.error(
-            "OpenRouter support error; continuing to fallback:",
+            "OpenRouter support error:",
             error,
           );
         }
       }
 
-      /* ======================================================
-         LOCAL CUSTOM TRAINING AI
-      ====================================================== */
+      /*
+       * ------------------------------------------------------
+       * CUSTOM TRAINING AI
+       * ------------------------------------------------------
+       *
+       * Works without OpenRouter.
+       *
+       * Uses training/ and knowledge/.
+       */
 
-      const trainingResponse =
-        await runCustomTrainingFallback(
+      const customTraining =
+        await runCustomTraining(
           message,
         );
 
       if (
-        trainingResponse
+        customTraining &&
+        customTraining.answer
       ) {
         return response(
           200,
-          trainingResponse,
+          {
+            success: true,
+            answer:
+              customTraining.answer,
+            source:
+              "TRAINING",
+            intent,
+            confidence:
+              customTraining.confidence,
+            fallback: true,
+          } satisfies SupportResponse,
         );
       }
 
-      /* ======================================================
-         HUMAN SUPPORT
-      ====================================================== */
+      /*
+       * ------------------------------------------------------
+       * FINAL KNOWLEDGE FALLBACK
+       * ------------------------------------------------------
+       */
+
+      if (
+        knowledge.results.length >
+          0 &&
+        knowledge.text
+      ) {
+        const first =
+          knowledge.results[0] as unknown as Record<
+            string,
+            unknown
+          >;
+
+        const possibleAnswer =
+          stringValue(
+            first.answer ??
+              first.response ??
+              first.reply ??
+              first.content ??
+              first.text,
+          ).trim();
+
+        if (
+          possibleAnswer
+        ) {
+          return response(
+            200,
+            {
+              success: true,
+              answer:
+                possibleAnswer.slice(
+                  0,
+                  4000,
+                ),
+              source:
+                "TRAINING",
+              intent,
+              confidence: 0.6,
+              fallback: true,
+            } satisfies SupportResponse,
+          );
+        }
+      }
+
+      /*
+       * ------------------------------------------------------
+       * HUMAN SUPPORT
+       * ------------------------------------------------------
+       *
+       * HTTP 200 is intentional.
+       *
+       * The outer conversation layer can detect:
+       *
+       * source === "HUMAN"
+       *
+       * and escalate/create a human support conversation.
+       */
+
+      const human =
+        humanFallback();
 
       return response(
         200,
-        humanFallback(),
+        human,
       );
     } catch (error) {
       /*
        * ------------------------------------------------------
-       * LAST-RESORT ERROR HANDLING
-       *
-       * Never expose internal database/OpenRouter details.
+       * AUTH ERROR
        * ------------------------------------------------------
        */
+
+      if (
+        error instanceof Error &&
+        error.name === "AuthError"
+      ) {
+        return errorResponse(
+          401,
+          error.message ||
+            "Authentication required",
+        );
+      }
+
+      /*
+       * ------------------------------------------------------
+       * INVALID JSON
+       * ------------------------------------------------------
+       */
+
+      if (
+        error instanceof Error &&
+        error.message ===
+          "Invalid JSON request body"
+      ) {
+        return errorResponse(
+          400,
+          error.message,
+        );
+      }
+
+      /*
+       * ------------------------------------------------------
+       * UNEXPECTED ERROR
+       * ------------------------------------------------------
+       */
+
       console.error(
         "AI SUPPORT UNHANDLED ERROR:",
         error,
       );
 
-      return response(
+      return errorResponse(
         500,
-        {
-          success: false,
-          message:
-            "AI support is temporarily unavailable. Please try again or contact support.",
-        },
+        "I'm sorry, I couldn't process your request right now. Please try again or contact our support team directly.",
       );
     }
   };
+
+export default handler;
